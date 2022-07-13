@@ -8,3 +8,6 @@ perf.data*
 *.hrd
 *.stdout
 results/
+contract/build
+contract/tests/build
+contract/venv
