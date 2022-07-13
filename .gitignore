@@ -1,0 +1,4 @@
+contract/build
+contract/tests/build
+contract/venv
+.vscode

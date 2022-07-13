@@ -1,0 +1,27 @@
+[submodule "external/intx"]
+	path = contract/external/intx
+	url = https://github.com/chfast/intx
+[submodule "external/evmone"]
+	path = contract/external/evmone
+	url = https://github.com/elmato/evmone
+[submodule "external/ethash"]
+	path = contract/external/ethash
+	url = https://github.com/elmato/ethash
+[submodule "tests/ethereum-tests"]
+	path = contract/tests/ethereum-tests
+	url = https://github.com/ethereum/tests
+[submodule "tests/external/abseil"]
+	path = contract/tests/external/abseil
+	url = https://github.com/abseil/abseil-cpp
+[submodule "tests/external/ethash"]
+	path = contract/tests/external/ethash
+	url = https://github.com/chfast/ethash
+[submodule "tests/external/intx"]
+	path = contract/tests/external/intx
+	url = https://github.com/chfast/intx
+[submodule "tests/external/magic_enum"]
+	path = contract/tests/external/magic_enum
+	url = https://github.com/Neargye/magic_enum
+[submodule "tests/external/evmone"]
+	path = contract/tests/external/evmone
+	url = https://github.com/ethereum/evmone
