@@ -56,7 +56,16 @@ endif()
 
 add_executable(silkrpcdaemon silkrpc_daemon.cpp)
 target_include_directories(silkrpcdaemon PUBLIC ${CMAKE_SOURCE_DIR})
-target_link_libraries(silkrpcdaemon ${SILKRPC_DAEMON_LIBRARIES})
+target_link_libraries(silkrpcdaemon PUBLIC ${SILKRPC_DAEMON_LIBRARIES})
+
+add_library(silkrpcplugin silkrpc_plugin.cpp)
+target_include_directories(silkrpcplugin PUBLIC ${CMAKE_SOURCE_DIR})
+
+target_link_libraries(silkrpcplugin PUBLIC ${SILKRPC_DAEMON_LIBRARIES} appbase fc ${Boost_PROGRAM_OPTIONS_LIBRARY})
+
+add_executable(trustevm-node node.cpp)
+target_include_directories(trustevm-node PRIVATE ${CMAKE_SOURCE_DIR})
+target_link_libraries(trustevm-node PRIVATE silkrpcplugin fc appbase abieos)
 
 # Unit tests
 enable_testing()

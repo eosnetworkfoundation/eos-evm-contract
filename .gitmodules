@@ -7,3 +7,12 @@
 [submodule "silkrpc/croaring"]
 	path = silkrpc/croaring
 	url = https://github.com/lemire/CRoaringUnityBuild
+[submodule "external/mandel-fc"]
+	path = external/mandel-fc
+	url = https://github.com/eosnetworkfoundation/mandel-fc
+[submodule "external/mandel-appbase"]
+	path = external/mandel-appbase
+	url = https://github.com/eosnetworkfoundation/mandel-appbase
+[submodule "external/mandel-abieos"]
+	path = external/mandel-abieos
+	url = https://github.com/eosnetworkfoundation/mandel-abieos
