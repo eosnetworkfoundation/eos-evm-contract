@@ -35,8 +35,8 @@ HunterGate(
   FILEPATH "${CMAKE_SOURCE_DIR}/cmake/Hunter/config.cmake"
 )
 
-project(silkrpc)
-set(PROJECT_VERSION 0.0.7)
+project(trustevm_node)
+set(PROJECT_VERSION 1.0.0)
 
 string(REGEX MATCH "([0-9]+)\\.([0-9]+)\\.([0-9]+)" _ ${PROJECT_VERSION})
 set(PROJECT_VERSION_MAJOR ${CMAKE_MATCH_1})

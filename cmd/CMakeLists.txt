@@ -34,38 +34,32 @@ elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     add_compile_options(-stdlib=libc++)
 endif()
 
-# Silkrpc toolbox
-add_executable(silkrpc_toolbox
-    silkrpc_toolbox.cpp
-    ethbackend_async.cpp ethbackend_coroutines.cpp ethbackend.cpp
-    kv_seek_async_callback.cpp kv_seek_async_coroutines.cpp kv_seek_async.cpp kv_seek.cpp
-    kv_seek_both.cpp
-)
-target_include_directories(silkrpc_toolbox PRIVATE ${CMAKE_SOURCE_DIR})
-target_link_libraries(silkrpc_toolbox absl::flags_parse gRPC::grpc++_unsecure protobuf::libprotobuf silkrpc)
-
 # Silkrpc daemon
-set(SILKRPC_DAEMON_LIBRARIES
-    silkrpc-buildinfo
+set(NODE_LIBRARIES
+    trustevm_node-buildinfo
     silkrpc
     absl::flags_parse
     silkinterfaces)
-if(SILKRPC_USE_MIMALLOC)
-    list(APPEND SILKRPC_DAEMON_LIBRARIES mimalloc)
-endif()
 
-add_executable(silkrpcdaemon silkrpc_daemon.cpp)
-target_include_directories(silkrpcdaemon PUBLIC ${CMAKE_SOURCE_DIR})
-target_link_libraries(silkrpcdaemon PUBLIC ${SILKRPC_DAEMON_LIBRARIES})
+add_library(silkrpc_plugin silkrpc_plugin.cpp)
+target_include_directories(silkrpc_plugin PUBLIC ${CMAKE_SOURCE_DIR})
+target_link_libraries(silkrpc_plugin PUBLIC ${NODE_LIBRARIES} appbase fc ${Boost_PROGRAM_OPTIONS_LIBRARY})
 
-add_library(silkrpcplugin silkrpc_plugin.cpp)
-target_include_directories(silkrpcplugin PUBLIC ${CMAKE_SOURCE_DIR})
+add_library(silkengine_plugin silk_engine_plugin.cpp)
+target_include_directories(silkengine_plugin PUBLIC ${CMAKE_SOURCE_DIR})
+target_link_libraries(silkengine_plugin PUBLIC silkworm_core silkworm_node appbase fc ${Boost_PROGRAM_OPTIONS_LIBRARY})
 
-target_link_libraries(silkrpcplugin PUBLIC ${SILKRPC_DAEMON_LIBRARIES} appbase fc ${Boost_PROGRAM_OPTIONS_LIBRARY})
+add_library(shipreceiver_plugin ship_receiver_plugin.cpp)
+target_include_directories(shipreceiver_plugin PUBLIC ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/external/mandel-abieos/src)
+target_link_libraries(shipreceiver_plugin PUBLIC ${NODE_LIBRARIES} appbase fc abieos ${Boost_PROGRAM_OPTIONS_LIBRARY})
+
+add_library(logger_plugin logger_plugin.cpp)
+target_include_directories(logger_plugin PUBLIC ${CMAKE_SOURCE_DIR})
+target_link_libraries(logger_plugin PUBLIC silkworm_core silkworm_node appbase fc ${Boost_PROGRAM_OPTIONS_LIBRARY})
 
 add_executable(trustevm-node node.cpp)
-target_include_directories(trustevm-node PRIVATE ${CMAKE_SOURCE_DIR})
-target_link_libraries(trustevm-node PRIVATE silkrpcplugin fc appbase abieos)
+target_include_directories(trustevm-node PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR})
+target_link_libraries(trustevm-node PRIVATE silkrpc_plugin silkengine_plugin shipreceiver_plugin logger_plugin)
 
 # Unit tests
 enable_testing()

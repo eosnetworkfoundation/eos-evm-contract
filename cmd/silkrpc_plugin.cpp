@@ -7,7 +7,6 @@
 
 #include <grpcpp/grpcpp.h>
 
-#include <silkrpc/buildinfo.h>
 #include <silkrpc/common/log.hpp>
 #include <silkrpc/daemon.hpp>
 
@@ -44,6 +43,7 @@ void silkrpc_plugin::plugin_initialize( const appbase::variables_map& options ) 
    const auto& http_port  = options.at("http-port").as<std::string>();
    const auto& contexts   = options.at("contexts").as<uint32_t>();
    const auto& threads    = options.at("threads").as<uint32_t>();
+   SILK_INFO << "Initializing SilkRPC Plugin";
 
    silkrpc::DaemonSettings settings {
       chain_data,
