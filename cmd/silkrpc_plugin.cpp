@@ -9,95 +9,93 @@
 
 #include <silkrpc/common/log.hpp>
 #include <silkrpc/daemon.hpp>
+#include <silkworm/common/settings.hpp>
 
 class silkrpc_plugin_impl : std::enable_shared_from_this<silkrpc_plugin_impl> {
    public:
-      silkrpc_plugin_impl() {}
+      silkrpc_plugin_impl(silkrpc::DaemonSettings settings)
+         : settings(settings) {}
 
       void init(const silkrpc::DaemonSettings& s) {
          settings = s;
       }
 
-   private:
       silkrpc::DaemonSettings settings;
 };
 
-silkrpc_plugin::silkrpc_plugin() : my(new silkrpc_plugin_impl) {}
+silkrpc_plugin::silkrpc_plugin() {}
 silkrpc_plugin::~silkrpc_plugin() {}
 
 void silkrpc_plugin::set_program_options( appbase::options_description& cli, appbase::options_description& cfg ) {
    cfg.add_options()
-      ("chain-data", boost::program_options::value<std::string>()->default_value("."),
-        "chain data path as a string")
-      ("http-port", boost::program_options::value<std::string>()->default_value("127.0.0.1:8080"),
-        "http port for JSON RPC of the form <address>:<port>")
-      ("contexts", boost::program_options::value<std::uint32_t>()->default_value(std::thread::hardware_concurrency() / 3),
-        "number of I/O contexts")
-      ("threads", boost::program_options::value<std::uint32_t>()->default_value(16),
-        "number of worker threads")
+      ("http-port", boost::program_options::value<std::string>()->default_value("127.0.0.1:8881"),
+        "http port for JSON RPC of the form <address>:<port>"),
+      ("trust-evm-node", boost::program_options::value<std::string>()->default_value("127.0.0.1:8001"),
+        "address to trust-evm-node of the form <address>:<port>"),
+      ("rpc-threads", boost::program_options::value<uint32_t>()->default_value(16),
+        "number of threads for use with rpc"),
+      ("chaindata", boost::program_options::value<std::string>()->default_value("./"),
+        "directory of chaindata"),
+      ("rpc-max-readers", boost::program_options::value<uint32_t>()->default_value(16),
+        "maximum number of rpc readers")
    ;
 }
 
 void silkrpc_plugin::plugin_initialize( const appbase::variables_map& options ) {
-   const auto& chain_data = options.at("chain-data").as<std::string>();
-   const auto& http_port  = options.at("http-port").as<std::string>();
-   const auto& contexts   = options.at("contexts").as<uint32_t>();
-   const auto& threads    = options.at("threads").as<uint32_t>();
-   SILK_INFO << "Initializing SilkRPC Plugin";
+   const auto& http_port   = options.at("rpc-endpoint").as<std::string>();
+   const auto  threads     = options.at("rpc-threads").as<uint32_t>();
+   const auto  max_readers = options.at("rpc-max-readers").as<uint32_t>();
+
+   // TODO when we resolve issues with silkrpc compiling in trust-evm-node then remove 
+   // the `trust-evm-node` options and use silk_engine for the address and configuration
+   const auto& node_port  = options.at("trust-evm-node").as<std::string>();
+   //const auto node_settings   = engine.get_node_settings();
+   const auto& data_dir   = options.at("chaindata").as<std::string>();
+
+   auto verbosity         = appbase::app().get_plugin<logger_plugin>().get_verbosity();
+
+   silkworm::ChainConfig config{
+      0,  // chain_id
+      silkworm::SealEngineType::kNoProof,
+      {
+         0,          // Homestead
+         0,          // Tangerine Whistle
+         0,          // Spurious Dragon
+         0,          // Byzantium
+         0,          // Constantinople
+         0,          // Petersburg
+         0,          // Istanbul
+      },
+   };
+
+   silkworm::NodeSettings node_settings;
+   node_settings.data_directory = std::make_unique<silkworm::DataDirectory>(data_dir, false);
+   node_settings.network_id = config.chain_id;
+   node_settings.etherbase  = silkworm::to_evmc_address(silkworm::from_hex("evm").value()); // TODO determine etherbase name
+   node_settings.chaindata_env_config = {node_settings.data_directory->chaindata().path().string(), false, false};
+   node_settings.chaindata_env_config.max_readers = max_readers;
+   node_settings.chain_config = config;
 
    silkrpc::DaemonSettings settings {
-      chain_data,
+      node_settings.data_directory->chaindata().path().string(),
       http_port,
-      
+      "", 
+      0 /* determine proper abi spec */,
+      node_port,
+      std::thread::hardware_concurrency() / 3,
+      threads,
+      static_cast<silkrpc::LogLevel>(verbosity), 
+      silkrpc::WaitMode::blocking
    };
+
+   my.reset(new silkrpc_plugin_impl(settings));
+
+   SILK_INFO << "Initialized SilkRPC Plugin";
 }
 
 void silkrpc_plugin::plugin_startup() {
+   silkrpc::Daemon::run(my->settings, {"trust-evm-rpc", "version: "+appbase::app().full_version_string()});
 }
 
 void silkrpc_plugin::plugin_shutdown() {
-
 }
-
-//ABSL_FLAG(std::string, chaindata, silkrpc::kEmptyChainData, "chain data path as string");
-//ABSL_FLAG(std::string, http_port, silkrpc::kDefaultHttpPort, "Ethereum JSON RPC API local end-point as string <address>:<port>");
-//ABSL_FLAG(std::string, engine_port, silkrpc::kDefaultEnginePort, "Engine JSON RPC API local end-point as string <address>:<port>");
-//ABSL_FLAG(std::string, target, silkrpc::kDefaultTarget, "Erigon Core gRPC service location as string <address>:<port>");
-//ABSL_FLAG(std::string, api_spec, silkrpc::kDefaultEth1ApiSpec, "JSON RPC API namespaces as comma-separated list of strings");
-//ABSL_FLAG(uint32_t, num_contexts, std::thread::hardware_concurrency() / 3, "number of running I/O contexts as 32-bit integer");
-//ABSL_FLAG(uint32_t, num_workers, 16, "number of worker threads as 32-bit integer");
-//ABSL_FLAG(uint32_t, timeout, silkrpc::kDefaultTimeout.count(), "gRPC call timeout as 32-bit integer");
-//ABSL_FLAG(silkrpc::LogLevel, log_verbosity, silkrpc::LogLevel::Critical, "logging verbosity level");
-//ABSL_FLAG(silkrpc::WaitMode, wait_mode, silkrpc::WaitMode::blocking, "scheduler wait mode");
-
-/*
-silkrpc::DaemonSettings parse_args(int argc, char* argv[]) {
-    absl::FlagsUsageConfig config;
-    config.contains_helpshort_flags = [](absl::string_view) { return false; };
-    config.contains_help_flags = [](absl::string_view filename) { return absl::EndsWith(filename, "main.cpp"); };
-    config.contains_helppackage_flags = [](absl::string_view) { return false; };
-    config.normalize_filename = [](absl::string_view f) { return std::string{f.substr(f.rfind("/") + 1)}; };
-    config.version_string = []() { return get_version_from_build_info() + "\n"; };
-    absl::SetFlagsUsageConfig(config);
-    absl::SetProgramUsageMessage("C++ implementation of Ethereum JSON RPC API service within Thorax architecture");
-    absl::ParseCommandLine(argc, argv);
-
-    const silkrpc::DaemonSettings rpc_daemon_settings{
-        absl::GetFlag(FLAGS_chaindata),
-        absl::GetFlag(FLAGS_http_port),
-        absl::GetFlag(FLAGS_engine_port),
-        absl::GetFlag(FLAGS_api_spec),
-        absl::GetFlag(FLAGS_target),
-        absl::GetFlag(FLAGS_num_contexts),
-        absl::GetFlag(FLAGS_num_workers),
-        absl::GetFlag(FLAGS_log_verbosity),
-        absl::GetFlag(FLAGS_wait_mode)
-    };
-
-    return rpc_daemon_settings;
-}
-
-int main(int argc, char* argv[]) {
-    return silkrpc::Daemon::run(parse_args(argc, argv), {get_name_from_build_info(), get_library_versions()});
-}
-*/

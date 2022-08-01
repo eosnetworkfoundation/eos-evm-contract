@@ -33,5 +33,8 @@ void logger_plugin::plugin_startup() {
 }
 
 void logger_plugin::plugin_shutdown() {
+}
 
+uint32_t logger_plugin::get_verbosity() {
+   return static_cast<uint32_t>(settings.log_verbosity);
 }

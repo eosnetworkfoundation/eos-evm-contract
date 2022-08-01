@@ -21,13 +21,8 @@
 #include <string>
 
 #include <appbase/application.hpp>
-//#include "silkrpc_plugin.hpp"
-#include "core_system_plugin.hpp"
-#include "silk_engine_plugin.hpp"
-#include "ship_receiver_plugin.hpp"
+#include "silkrpc_plugin.hpp"
 #include "logger_plugin.hpp"
-#include "blockchain_plugin.hpp"
-#include "block_conversion_plugin.hpp"
 
 #include <trustevm_node/buildinfo.h>
 #include <silkrpc/common/log.hpp>
@@ -44,22 +39,17 @@ std::string get_version_from_build_info() {
 int main(int argc, char* argv[]) {
     try {
         appbase::app().set_version_string(get_version_from_build_info());
-        appbase::app().register_plugin<blockchain_plugin>();
- //       appbase::app().register_plugin<silkrpc_plugin>();
-        appbase::app().register_plugin<silk_engine_plugin>();
-        appbase::app().register_plugin<ship_receiver_plugin>();
         appbase::app().register_plugin<logger_plugin>();
-        appbase::app().register_plugin<core_system_plugin>();
-        appbase::app().register_plugin<block_conversion_plugin>();
+        appbase::app().register_plugin<silkrpc_plugin>();
 
-        if (!appbase::app().initialize<logger_plugin, core_system_plugin, block_conversion_plugin>(argc, argv))
+        if (!appbase::app().initialize<logger_plugin, silkrpc_plugin>(argc, argv))
            return -1;
         appbase::app().startup();
         appbase::app().set_thread_priority_max();
         appbase::app().exec();
     } catch( const std::runtime_error& err) {
-        SILK_CRIT << "Error " << err.what();
+        SILK_CRIT << err.what();
     } catch( std::exception err ) {
-        SILK_CRIT << "Error " << err.what();
+        SILK_CRIT << err.what();
     }
 }

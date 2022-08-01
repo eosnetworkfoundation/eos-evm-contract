@@ -1,4 +1,5 @@
 #include "silk_engine_plugin.hpp"
+#include "channels.hpp"
 
 #include <iostream>
 #include <string>
@@ -6,13 +7,13 @@
 #include <boost/process/environment.hpp>
 
 #include <silkworm/common/log.hpp>
-#include <silkworm/common/settings.hpp>
 #include <silkworm/common/stopwatch.hpp>
 #include <silkworm/concurrency/signal_handler.hpp>
 #include <silkworm/db/stages.hpp>
 #include <silkworm/stagedsync/sync_loop.hpp>
 #include <silkworm/rpc/server/backend_kv_server.hpp>
 #include <silkworm/rpc/util.hpp>
+
 
 class silk_engine_plugin_impl : std::enable_shared_from_this<silk_engine_plugin_impl> {
    public:
@@ -35,9 +36,10 @@ class silk_engine_plugin_impl : std::enable_shared_from_this<silk_engine_plugin_
 
          node_settings.data_directory = std::make_unique<silkworm::DataDirectory>(data_dir, false);
          node_settings.network_id = id;
-         node_settings.etherbase  = silkworm::to_evmc_address(silkworm::from_hex("").value()); // TODO determine etherbase name
+         node_settings.etherbase  = silkworm::to_evmc_address(silkworm::from_hex("evdirectory of chaindatam").value()); // TODO determine etherbase name
          node_settings.chaindata_env_config = {node_settings.data_directory->chaindata().path().string(), false, false};
          node_settings.chaindata_env_config.max_readers = max_readers;
+         node_settings.chain_config = config;
 
          server_settings.set_address_uri(address);
          server_settings.set_num_contexts(num_of_threads);
@@ -63,10 +65,12 @@ class silk_engine_plugin_impl : std::enable_shared_from_this<silk_engine_plugin_
 
          SILK_DEBUG << "Signals registered on scheduler " << &sched;
 
-         sigs.async_wait([&](const boost::system::error_code& ec, int sig) {
+         const auto& handler = [&](const boost::system::error_code& ec, int sig) {
+            SILK_DEBUG << "Signal caught " << sig;
             shutdown();
-         });
-         server->join();
+         };
+
+         sigs.async_wait(handler);
       }
 
       inline void shutdown() {
@@ -82,6 +86,7 @@ class silk_engine_plugin_impl : std::enable_shared_from_this<silk_engine_plugin_
       std::unique_ptr<silkworm::rpc::BackEndKvServer> server;
       int                                             pid;
       std::thread::id                                 tid;
+      channels::shutdown_signal::channel_type::handle shutdown_subscription;
 };
 
 silk_engine_plugin::silk_engine_plugin() {}
@@ -107,6 +112,11 @@ void silk_engine_plugin::plugin_initialize( const appbase::variables_map& option
    const auto& threads    = options.at("threads").as<uint32_t>();
    uint32_t id = 0; // get id from action/DB entry
    my.reset(new silk_engine_plugin_impl(id, chain_data, contexts, threads, address));
+   my->shutdown_subscription = appbase::app().get_channel<channels::shutdown_signal>().subscribe(
+      [this](auto s) {
+         this->shutdown();
+      }
+   );
    SILK_INFO << "Initializing Silk Engine Plugin";
 }
 
@@ -116,4 +126,21 @@ void silk_engine_plugin::plugin_startup() {
 
 void silk_engine_plugin::plugin_shutdown() {
    my->shutdown();
+   SILK_INFO << "Shutdown silk_engine plugin";
+}
+
+mdbx::env* silk_engine_plugin::get_db() {
+   return &my->db_env;
+}
+
+silkworm::NodeSettings* silk_engine_plugin::get_node_settings() {
+   return &my->node_settings;
+}
+
+std::string silk_engine_plugin::get_address() {
+   return my->server_settings.address_uri();
+}
+
+uint32_t silk_engine_plugin::get_threads() {
+   return my->server_settings.num_contexts();
 }
