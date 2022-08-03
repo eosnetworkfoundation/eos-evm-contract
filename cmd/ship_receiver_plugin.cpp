@@ -40,15 +40,7 @@ using boost::system::error_code;
 class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plugin_impl> {
    public:
       ship_receiver_plugin_impl()
-         : blocks_channel(appbase::app().get_channel<channels::blocks>()),
-           sigs(appbase::app().get_io_service()) {
-
-            SILK_DEBUG << "Signals registered on scheduler";
-            const auto& handler = [this](const boost::system::error_code& ec, int sig) {
-               SILK_DEBUG << "Signal caught " << sig;
-               this->shutdown();
-            };
-            sigs.async_wait(handler);
+         : blocks_channel(appbase::app().get_channel<channels::native_blocks>()) {
          }
 
       using block_range_t  = std::pair<std::uint32_t, std::uint32_t>;
@@ -146,6 +138,23 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
          }
          return buff;
       }
+
+      template <typename F>
+      inline void async_read(F&& func) const {
+         auto buff = std::make_shared<flat_buffer>();
+         boost::system::error_code ec;
+
+         stream->async_read(*buff, appbase::app().get_priority_queue().wrap(80,
+            [this, buff, func](const auto ec, auto) {
+               if (ec) {
+                  SILK_CRIT << "SHiP read failed : " << ec.message();
+                  throw std::runtime_error(ec.message());
+               }
+               func(buff);
+            })
+         );
+      }
+
 
       void get_blocks_request(std::size_t start, std::size_t end, bool deltas = false) {
          abieos::jarray positions = {};
@@ -257,18 +266,23 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
             native_trx.actions.emplace_back(std::move(action));
             SILK_INFO  << "Appending action " << native_trx.actions.back().name.to_string();
          }
+         block.transactions.emplace_back(std::move(native_trx));
          return block;
       }
 
      
-      eosio::ship_protocol::get_blocks_result_v0 get_block_result(std::size_t s, std::size_t e){
+      auto get_block_result(std::size_t s, std::size_t e){
          get_blocks_request(s, e, false);
          return get_result(read());
       }
 
-      std::optional<native_block_t> get_block(std::size_t s, std::size_t e){
+      template <typename F>
+      void get_block(std::size_t s, std::size_t e, F&& func){
          get_blocks_request(s, e, false);
-         return on_block_result(read());
+         async_read([this, func](auto buff) {
+            auto res = on_block_result(buff);
+            func(res);
+         });
       }
 
       void verify_variant(eosio::input_stream& bin, const eosio::abi_type& type, const char* expected) const {
@@ -297,19 +311,31 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
          should_shutdown.store(false);
       }
 
-      bool sync() {
+      
+      void sync_one(uint32_t next_block, uint32_t core_head) {
+
+         if (next_block <= core_head) {
+            get_block(next_block, core_head, [this, next_block, core_head](auto block) {
+               if (block) {
+                  blocks_channel.publish(80, std::make_shared<channels::native_block>(std::move(*block)));
+               }
+               uint32_t next = next_block + 1;
+               if (next <= core_head) {
+                  sync_one(next, core_head);
+               } else {
+                  SILK_INFO << "Finished Syncing";
+               }
+            });
+         }
+      }
+
+      void sync() {
          // get the block range we can grab
          const auto& res = get_block_result(0, 0);
          uint32_t core_head = res.head.block_num;
          SILK_INFO << "Syncing from block #" << genesis << " to block #" << core_head;
          last_received = genesis;
-         if (genesis <= core_head) {
-            for (std::size_t i=0; i < core_head - genesis; i++) {
-               auto block_ptr = get_block(genesis+i, core_head);
-            }
-         }
-         SILK_INFO << "Finished Syncing";
-         return true;
+         sync_one(genesis, res.head.block_num);
       }
 
    private:
@@ -323,13 +349,12 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
       uint32_t                                        last_received   = 0;
       uint32_t                                        lib = 0;
       uint32_t                                        head = 0; // TODO fix this to point to head for silkworm chain
-      channels::blocks::channel_type&                 blocks_channel;
+      channels::native_blocks::channel_type&          blocks_channel;
       block_range_t                                   sync_range;
       uint32_t                                        genesis;
       eosio::name                                     core_account;
       channels::shutdown_signal::channel_type::handle shutdown_subscription;
       std::atomic<bool>                               should_shutdown = false;
-      boost::asio::signal_set                         sigs;
       uint32_t                                        latest_height;
 };
 
