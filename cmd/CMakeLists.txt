@@ -41,21 +41,17 @@ set(NODE_LIBRARIES
     absl::flags_parse
     silkinterfaces)
 
-#add_library(silkrpc_plugin silkrpc_plugin.cpp)
-#target_include_directories(silkrpc_plugin PUBLIC ${CMAKE_SOURCE_DIR})
-#target_link_libraries(silkrpc_plugin PUBLIC ${NODE_LIBRARIES} appbase fc ${Boost_PROGRAM_OPTIONS_LIBRARY})
-
-#add_library(coresystem_plugin core_system_plugin.cpp)
-#target_include_directories(coresystem_plugin PUBLIC ${CMAKE_SOURCE_DIR})
-#target_link_libraries(coresystem_plugin PUBLIC )
+add_library(rpc_plugin rpc_plugin.cpp)
+target_include_directories(rpc_plugin PUBLIC ${CMAKE_SOURCE_DIR})
+target_link_libraries(rpc_plugin PUBLIC ${NODE_LIBRARIES} appbase fc ${Boost_PROGRAM_OPTIONS_LIBRARY})
 
 add_library(blockconversion_plugin block_conversion_plugin.cpp)
 target_include_directories(blockconversion_plugin PUBLIC ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/external/mandel-abieos/src)
 target_link_libraries(blockconversion_plugin PUBLIC ${NODE_LIBRARIES} silkworm_core silkworm_node appbase abieos ${Boost_PROGRAM_OPTIONS_LIBRARY})
 
-add_library(silkengine_plugin silk_engine_plugin.cpp)
-target_include_directories(silkengine_plugin PUBLIC ${CMAKE_SOURCE_DIR})
-target_link_libraries(silkengine_plugin PUBLIC ${NODE_LIBRARIES} silkworm_core silkworm_node appbase abieos ${Boost_PROGRAM_OPTIONS_LIBRARY})
+add_library(engine_plugin engine_plugin.cpp)
+target_include_directories(engine_plugin PUBLIC ${CMAKE_SOURCE_DIR})
+target_link_libraries(engine_plugin PUBLIC ${NODE_LIBRARIES} silkworm_core silkworm_node appbase abieos ${Boost_PROGRAM_OPTIONS_LIBRARY})
 
 add_library(shipreceiver_plugin ship_receiver_plugin.cpp)
 target_include_directories(shipreceiver_plugin PUBLIC ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/external/mandel-abieos/src)
@@ -63,19 +59,19 @@ target_link_libraries(shipreceiver_plugin PUBLIC ${NODE_LIBRARIES} silkworm_core
 
 add_library(blockchain_plugin blockchain_plugin.cpp)
 target_include_directories(blockchain_plugin PUBLIC ${CMAKE_SOURCE_DIR})
-target_link_libraries(blockchain_plugin PUBLIC silkengine_plugin shipreceiver_plugin blockconversion_plugin)
+target_link_libraries(blockchain_plugin PUBLIC engine_plugin shipreceiver_plugin blockconversion_plugin)
 
-add_library(logger_plugin logger_plugin.cpp)
-target_include_directories(logger_plugin PUBLIC ${CMAKE_SOURCE_DIR})
-target_link_libraries(logger_plugin PUBLIC silkworm_core silkworm_node appbase ${Boost_PROGRAM_OPTIONS_LIBRARY})
+add_library(sys_plugin sys_plugin.cpp)
+target_include_directories(sys_plugin PUBLIC ${CMAKE_SOURCE_DIR})
+target_link_libraries(sys_plugin PUBLIC silkworm_core silkworm_node appbase ${Boost_PROGRAM_OPTIONS_LIBRARY})
 
 add_executable(trustevm-node node.cpp)
 target_include_directories(trustevm-node PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR})
-target_link_libraries(trustevm-node PRIVATE logger_plugin blockchain_plugin)
+target_link_libraries(trustevm-node PRIVATE engine_plugin shipreceiver_plugin sys_plugin blockchain_plugin)
 
 #add_executable(trustevm-rpc rpc.cpp)
 #target_include_directories(trustevm-rpc PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR})
-#target_link_libraries(trustevm-rpc PRIVATE logger_plugin silkrpc_plugin)
+#target_link_libraries(trustevm-rpc PRIVATE sys_plugin rpc_plugin)
 
 # Unit tests
 enable_testing()

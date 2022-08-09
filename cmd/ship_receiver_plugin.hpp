@@ -7,12 +7,12 @@
 #include <eosio/crypto.hpp>
 #include <eosio/ship_protocol.hpp>
 
-#include "logger_plugin.hpp"
+#include "sys_plugin.hpp"
 #include "channels.hpp"
 
 class ship_receiver_plugin : public appbase::plugin<ship_receiver_plugin> {
    public:
-      APPBASE_PLUGIN_REQUIRES((logger_plugin));
+      APPBASE_PLUGIN_REQUIRES((sys_plugin));
       ship_receiver_plugin();
       virtual ~ship_receiver_plugin();
       virtual void set_program_options(appbase::options_description& cli, appbase::options_description& cfg) override;

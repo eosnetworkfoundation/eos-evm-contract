@@ -1,4 +1,5 @@
 #include "ship_receiver_plugin.hpp"
+#include "abi_utils.hpp"
 //#include "thread_pool.hpp"
 
 #include <atomic>
@@ -6,9 +7,6 @@
 #include <string>
 #include <unordered_set>
 #include <utility>
-
-#include <eosio/abi.hpp>
-#include <abieos.hpp>
 
 #include <boost/asio/connect.hpp>
 #include <boost/asio/ip/tcp.hpp>
@@ -37,6 +35,7 @@ using asio::ip::tcp;
 using boost::beast::flat_buffer;
 using boost::system::error_code;
 
+using sys = sys_plugin;
 class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plugin_impl> {
    public:
       ship_receiver_plugin_impl()
@@ -57,12 +56,6 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
          stream->binary(true);
          stream->read_message_max(0x1ull << 36);
          connect_stream();
-         shutdown_subscription = appbase::app().get_channel<channels::shutdown_signal>().subscribe(
-            [this](auto s) {
-               this->shutdown();
-            }
-         );
-
       }
 
       void initial_read() {
@@ -71,35 +64,24 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
          stream->read(buff, ec);
          if (ec) {
             SILK_CRIT << "SHiP initial read failed : " << ec.message();
-            throw std::runtime_error(ec.message());
+            sys::error();
          }
 
-         eosio::json_token_stream stream = {(char*)buff.data().data()};
-         eosio::abi_def def = eosio::from_json<eosio::abi_def>(stream);
-         SILK_DEBUG << "SHiP ABI Version " << def.version;
-         eosio::convert(def, abi);
-      }
-      
-      const auto& get_type(const std::string& n) {
-         auto it = abi.abi_types.find(n);
-         if (it == abi.abi_types.end())
-            throw std::runtime_error("unknown ABI type <"+n+">");
-         return it->second;
+         abi = load_abi(eosio::json_token_stream{(char*)buff.data().data()});
       }
 
       void send_request(const abieos::jvalue& v) {
          std::vector<char> bin;
          try {
-            abieos::json_to_bin(bin, &get_type("request"), v, [&](){});
+            abieos::json_to_bin(bin, &get_type("request", abi), v, [&](){});
          } catch (std::runtime_error err) {
-            SILK_CRIT << err.what();
-            throw err;
+            sys::error(err.what());
          }
          boost::system::error_code ec;
          stream->write(asio::buffer(bin), ec);
          if (ec) {
             SILK_CRIT << "Sending request failed : " << ec.message();
-            throw std::runtime_error(ec.message());
+            sys::error();
          }
       }
 
@@ -108,21 +90,21 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
          auto res = resolver->resolve( tcp::v4(), host, port, ec);
          if (ec) {
             SILK_CRIT << "Resolver failed : " << ec.message();
-            throw std::runtime_error(ec.message());
+            sys::error();
          }
 
          boost::asio::connect(stream->next_layer(), res, ec);
 
          if (ec) {
             SILK_CRIT << "SHiP connection failed : " << ec.message();
-            throw std::runtime_error(ec.message());
+            sys::error();
          }
 
          stream->handshake(host, "/", ec);
 
          if (ec) {
             SILK_CRIT << "SHiP failed handshake : " << ec.message();
-            throw std::runtime_error(ec.message());
+            sys::error();
          }
 
          SILK_INFO << "Connected to SHiP at " << host << ":" << port;
@@ -134,7 +116,7 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
          stream->read(*buff, ec);
          if (ec) {
             SILK_CRIT << "SHiP read failed : " << ec.message();
-            throw std::runtime_error(ec.message());
+            sys::error();
          }
          return buff;
       }
@@ -148,7 +130,7 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
             [this, buff, func](const auto ec, auto) {
                if (ec) {
                   SILK_CRIT << "SHiP read failed : " << ec.message();
-                  throw std::runtime_error(ec.message());
+                  sys::error();
                }
                func(buff);
             })
@@ -188,7 +170,7 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
       eosio::ship_protocol::get_blocks_result_v0 get_result(Buffer&& b){
          auto data = b->data();
          eosio::input_stream bin = {(const char*)data.data(), (const char*)data.data() + data.size()};
-         verify_variant(bin, get_type("result"), "get_blocks_result_v0");
+         verify_variant(bin, get_type("result", abi), "get_blocks_result_v0");
 
          auto block = eosio::from_bin<eosio::ship_protocol::get_blocks_result_v0>(bin);
          return block;
@@ -206,12 +188,6 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
          latest_height = block.this_block->block_num;
 
          received_blocks++;
-
-         uint32_t new_lib = block.last_irreversible.block_num;
-         if (new_lib > lib) {
-            SILK_DEBUG << "LIB advanced from " << lib << " to " << new_lib;
-            lib = new_lib;
-         }
 
          if (block.traces) {
             uint32_t num;
@@ -235,6 +211,8 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
             }
          }
 
+         current_block.lib = block.last_irreversible.block_num;
+
          return current_block.building ? std::optional<native_block_t>(std::move(current_block)) : std::nullopt;
       }
 
@@ -253,7 +231,7 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
       inline native_block_t& append_to_block(native_block_t& block, Trx&& trx) {
          channels::native_trx native_trx = {trx.id, trx.cpu_usage_us, trx.elapsed};
          const auto& actions = trx.action_traces;
-         SILK_INFO  << "Appending transaction ";
+         SILK_DEBUG << "Appending transaction ";
          for (std::size_t j=0; j < actions.size(); j++) {
             const auto& act = std::get<eosio::ship_protocol::action_trace_v1>(actions[j]);
             channels::native_action action = {
@@ -264,7 +242,7 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
                std::move(act.act.data)
             };
             native_trx.actions.emplace_back(std::move(action));
-            SILK_INFO  << "Appending action " << native_trx.actions.back().name.to_string();
+            SILK_DEBUG << "Appending action " << native_trx.actions.back().name.to_string();
          }
          block.transactions.emplace_back(std::move(native_trx));
          return block;
@@ -285,30 +263,7 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
          });
       }
 
-      void verify_variant(eosio::input_stream& bin, const eosio::abi_type& type, const char* expected) const {
-         uint32_t index;
-         eosio::varuint32_from_bin(index, bin);
-         auto v = type.as_variant();
-
-         if (!v) {
-            SILK_CRIT << type.name << " not a variant";
-            throw std::runtime_error("not a variant");
-         }
-         if (index >= v->size()) {
-            SILK_CRIT << "Expected " << expected << " got " << std::to_string(index);
-            throw std::runtime_error("not expected");
-         }
-         if (v->at(index).name != expected) {
-            SILK_CRIT << "Expected " << expected << " got " << v->at(index).name;
-            throw std::runtime_error("not expected");
-         }
-
-         SILK_DEBUG << "check_variant successful <variant = " << v->at(index).name << ">";
-      }
-
       void shutdown() {
-         SILK_INFO << "Should shutdown";
-         should_shutdown.store(false);
       }
 
       
@@ -317,13 +272,21 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
          if (next_block <= core_head) {
             get_block(next_block, core_head, [this, next_block, core_head](auto block) {
                if (block) {
+                  block->syncing = true;
                   blocks_channel.publish(80, std::make_shared<channels::native_block>(std::move(*block)));
                }
                uint32_t next = next_block + 1;
                if (next <= core_head) {
                   sync_one(next, core_head);
                } else {
-                  SILK_INFO << "Finished Syncing";
+                  const auto& res = get_block_result(0, 0);
+                  uint32_t head = res.head.block_num;
+                  if (head <= core_head) {
+                     SILK_INFO << "Finished Syncing";
+                  } else {
+                     SILK_INFO << "Now syncing from block #" << genesis << " to block #" << core_head;
+                     sync_one(next_block, head);
+                  }
                }
             });
          }
@@ -347,14 +310,10 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
       abieos::abi                                     abi;
       uint32_t                                        received_blocks = 0;
       uint32_t                                        last_received   = 0;
-      uint32_t                                        lib = 0;
-      uint32_t                                        head = 0; // TODO fix this to point to head for silkworm chain
       channels::native_blocks::channel_type&          blocks_channel;
       block_range_t                                   sync_range;
       uint32_t                                        genesis;
       eosio::name                                     core_account;
-      channels::shutdown_signal::channel_type::handle shutdown_subscription;
-      std::atomic<bool>                               should_shutdown = false;
       uint32_t                                        latest_height;
 };
 
@@ -390,5 +349,5 @@ void ship_receiver_plugin::plugin_startup() {
 }
 
 void ship_receiver_plugin::plugin_shutdown() {
-
+   SILK_INFO << "Shutdown SHiP Receiver";
 }

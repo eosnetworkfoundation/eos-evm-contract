@@ -1,6 +1,7 @@
-#include "silk_engine_plugin.hpp"
+#include "engine_plugin.hpp"
 #include "channels.hpp"
 
+#include <filesystem>
 #include <iostream>
 #include <string>
 
@@ -15,9 +16,9 @@
 #include <silkworm/rpc/util.hpp>
 
 
-class silk_engine_plugin_impl : std::enable_shared_from_this<silk_engine_plugin_impl> {
+class engine_plugin_impl : std::enable_shared_from_this<engine_plugin_impl> {
    public:
-      silk_engine_plugin_impl(uint32_t id, const std::string& data_dir, uint32_t num_of_threads, uint32_t max_readers, std::string address) {
+      engine_plugin_impl(uint32_t id, const std::string& data_dir, uint32_t num_of_threads, uint32_t max_readers, std::string address) {
          silkworm::ChainConfig config{
             id,  // chain_id
             silkworm::SealEngineType::kNoProof,
@@ -36,7 +37,7 @@ class silk_engine_plugin_impl : std::enable_shared_from_this<silk_engine_plugin_
 
          node_settings.data_directory = std::make_unique<silkworm::DataDirectory>(data_dir, false);
          node_settings.network_id = id;
-         node_settings.etherbase  = silkworm::to_evmc_address(silkworm::from_hex("evdirectory of chaindatam").value()); // TODO determine etherbase name
+         node_settings.etherbase  = silkworm::to_evmc_address(silkworm::from_hex("").value()); // TODO determine etherbase name
          node_settings.chaindata_env_config = {node_settings.data_directory->chaindata().path().string(), false, false};
          node_settings.chaindata_env_config.max_readers = max_readers;
          node_settings.chain_config = config;
@@ -46,6 +47,13 @@ class silk_engine_plugin_impl : std::enable_shared_from_this<silk_engine_plugin_
 
          pid = boost::this_process::get_id();
          tid = std::this_thread::get_id();
+
+         const auto data_path = std::filesystem::path(node_settings.data_directory->chaindata().path().string());
+         if ( std::filesystem::exists(data_path) ) {
+            node_settings.chaindata_env_config.shared = true;
+         } else {
+            node_settings.chaindata_env_config.create = true;
+         }
 
          db_env = silkworm::db::open_env(node_settings.chaindata_env_config);
          SILK_INFO << "Created DB environment at location : " << node_settings.data_directory->chaindata().path().string();
@@ -86,13 +94,12 @@ class silk_engine_plugin_impl : std::enable_shared_from_this<silk_engine_plugin_
       std::unique_ptr<silkworm::rpc::BackEndKvServer> server;
       int                                             pid;
       std::thread::id                                 tid;
-      channels::shutdown_signal::channel_type::handle shutdown_subscription;
 };
 
-silk_engine_plugin::silk_engine_plugin() {}
-silk_engine_plugin::~silk_engine_plugin() {}
+engine_plugin::engine_plugin() {}
+engine_plugin::~engine_plugin() {}
 
-void silk_engine_plugin::set_program_options( appbase::options_description& cli, appbase::options_description& cfg ) {
+void engine_plugin::set_program_options( appbase::options_description& cli, appbase::options_description& cfg ) {
    cfg.add_options()
       ("chain-data", boost::program_options::value<std::string>()->default_value("."),
         "chain data path as a string")
@@ -105,42 +112,37 @@ void silk_engine_plugin::set_program_options( appbase::options_description& cli,
    ;
 }
 
-void silk_engine_plugin::plugin_initialize( const appbase::variables_map& options ) {
+void engine_plugin::plugin_initialize( const appbase::variables_map& options ) {
    const auto& chain_data = options.at("chain-data").as<std::string>();
    const auto& address    = options.at("engine-port").as<std::string>();
    const auto& contexts   = options.at("contexts").as<uint32_t>();
    const auto& threads    = options.at("threads").as<uint32_t>();
    uint32_t id = 0; // get id from action/DB entry
-   my.reset(new silk_engine_plugin_impl(id, chain_data, contexts, threads, address));
-   my->shutdown_subscription = appbase::app().get_channel<channels::shutdown_signal>().subscribe(
-      [this](auto s) {
-         this->shutdown();
-      }
-   );
+   my.reset(new engine_plugin_impl(id, chain_data, contexts, threads, address));
    SILK_INFO << "Initializing Silk Engine Plugin";
 }
 
-void silk_engine_plugin::plugin_startup() {
+void engine_plugin::plugin_startup() {
    my->startup();
 }
 
-void silk_engine_plugin::plugin_shutdown() {
+void engine_plugin::plugin_shutdown() {
    my->shutdown();
-   SILK_INFO << "Shutdown silk_engine plugin";
+   SILK_INFO << "Shutdown engine plugin";
 }
 
-mdbx::env* silk_engine_plugin::get_db() {
+mdbx::env* engine_plugin::get_db() {
    return &my->db_env;
 }
 
-silkworm::NodeSettings* silk_engine_plugin::get_node_settings() {
+silkworm::NodeSettings* engine_plugin::get_node_settings() {
    return &my->node_settings;
 }
 
-std::string silk_engine_plugin::get_address() {
+std::string engine_plugin::get_address() {
    return my->server_settings.address_uri();
 }
 
-uint32_t silk_engine_plugin::get_threads() {
+uint32_t engine_plugin::get_threads() {
    return my->server_settings.num_contexts();
 }

@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <limits>
+#include <map>
 #include <string>
 
 
@@ -20,8 +21,9 @@ class blockchain_plugin_impl : std::enable_shared_from_this<blockchain_plugin_im
       blockchain_plugin_impl() = default;
 
       inline void init() {
-         db_env = appbase::app().get_plugin<silk_engine_plugin>().get_db();
-         node_settings = appbase::app().get_plugin<silk_engine_plugin>().get_node_settings();
+         block_stride = appbase::app().get_plugin<block_conversion_plugin>().get_block_stride();
+         db_env = appbase::app().get_plugin<engine_plugin>().get_db();
+         node_settings = appbase::app().get_plugin<engine_plugin>().get_node_settings();
          engine.reset(new silkworm::consensus::NoProofEngine(*(node_settings->chain_config)));
          SILK_INFO << "Using DB environment at location : " << node_settings->data_directory->chaindata().path().string();
 
@@ -30,25 +32,51 @@ class blockchain_plugin_impl : std::enable_shared_from_this<blockchain_plugin_im
                this->execute_block(*b, 0, 0);
             }
          );
-         txns.emplace_back(std::make_unique<silkworm::db::RWTxn>(*db_env));
+         forks_subscription = appbase::app().get_channel<channels::forks>().subscribe(
+            [this](auto f) {
+               this->unwind(f->block_num);
+            }
+         );
+         lib_subscription = appbase::app().get_channel<channels::lib_advance>().subscribe(
+            [this](auto l) {
+               this->commit(l->block_num);
+            }
+         );
       }
 
-      inline void startup() {
+
+      void unwind(uint32_t block_num) {
+         const auto it = txns.lower_bound(block_num);
+         if (it == txns.end()) {
+            SILK_CRIT << "block not found, internal failure";
+            throw std::runtime_error("internal error");
+         }
+         txns.erase(it, txns.end()); // remove all transactions after this point RAII should invalidate the mdbx managed transactions
       }
 
-      inline void shutdown() {
+      void commit(uint32_t block_num) {
+         const auto it = txns.upper_bound(block_num);
+         if (it == txns.end()) {
+            SILK_CRIT << "block not found, internal failure";
+            throw std::runtime_error("internal error");
+         }
+         for (auto i = txns.begin(); i != it; ++i) {
+            i->second->commit();
+         }
       }
 
       void execute_block(silkworm::Block& block, std::size_t core_block_height, std::size_t core_lib) {
          if (core_block_height > next_core_height) {
-            txns.emplace_back(std::make_unique<silkworm::db::RWTxn>(*db_env));
-            next_core_height = core_block_height + stride;
+            auto txn = std::make_unique<silkworm::db::RWTxn>(*db_env);
+            current_txn = txn.get();
+            txns.emplace(core_block_height, std::move(txn));
+            next_core_height = core_block_height + block_stride;
          }
          const auto t = std::chrono::system_clock::to_time_t(std::chrono::time_point<std::chrono::system_clock>(std::chrono::microseconds(block.header.timestamp)));
 
          SILK_INFO << "Executing Block : " << block.header.number << " at time " << std::ctime(&t);
          try {
-            silkworm::db::Buffer buff{*(*txns.back()), 0};
+            silkworm::db::Buffer buff{*(*current_txn), 0};
             std::vector<silkworm::Receipt> receipts;
 
             silkworm::ExecutionProcessor processor(block, *engine, buff, node_settings->chain_config.value());
@@ -79,11 +107,14 @@ class blockchain_plugin_impl : std::enable_shared_from_this<blockchain_plugin_im
       std::size_t                                        processed_blocks = 0;
       std::size_t                                        processed_transactions = 0;
       std::size_t                                        processed_gas = 0;
-      std::vector<txn_t>                                 txns;
-      std::size_t                                        stride = 10;
+      std::map<uint32_t, txn_t>                          txns;
+      silkworm::db::RWTxn*                               current_txn;
       std::size_t                                        next_core_height;
       std::size_t                                        core_head_block;
+      uint32_t                                           block_stride;
       channels::blocks::channel_type::handle             blocks_subscription;
+      channels::forks::channel_type::handle              forks_subscription;
+      channels::lib_advance::channel_type::handle        lib_subscription;
       silkworm::BaselineAnalysisCache                    analysis_cache{std::size_t(5000)};
       silkworm::ObjectPool<silkworm::EvmoneExecutionState> state_pool;
 };
@@ -92,10 +123,6 @@ blockchain_plugin::blockchain_plugin() : my(new blockchain_plugin_impl()) {}
 blockchain_plugin::~blockchain_plugin() {}
 
 void blockchain_plugin::set_program_options( appbase::options_description& cli, appbase::options_description& cfg ) {
-   cfg.add_options()
-      ("chain-data", boost::program_options::value<std::string>()->default_value("."),
-        "chain data path as a string")
-   ;
 }
 
 void blockchain_plugin::plugin_initialize( const appbase::variables_map& options ) {
@@ -104,10 +131,9 @@ void blockchain_plugin::plugin_initialize( const appbase::variables_map& options
 }
 
 void blockchain_plugin::plugin_startup() {
-   my->startup();
+   SILK_INFO << "Starting Blockchain Plugin";
 }
 
 void blockchain_plugin::plugin_shutdown() {
-   my->shutdown();
-   SILK_INFO << "Shutdown blockchain plugin";
+   SILK_INFO << "Shutdown Blockchain plugin";
 }

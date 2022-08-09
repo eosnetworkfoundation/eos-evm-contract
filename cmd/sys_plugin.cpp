@@ -1,11 +1,11 @@
-#include "logger_plugin.hpp"
+#include "sys_plugin.hpp"
 
 #include <iostream>
 #include <string>
 
 #include <grpcpp/grpcpp.h>
 
-void logger_plugin::set_program_options( appbase::options_description& cli, appbase::options_description& cfg ) {
+void sys_plugin::set_program_options( appbase::options_description& cli, appbase::options_description& cfg ) {
    cfg.add_options()
       ("verbosity", boost::program_options::value<uint32_t>()->default_value(0),
         "verbosity level")
@@ -18,7 +18,7 @@ void logger_plugin::set_program_options( appbase::options_description& cli, appb
    ;
 }
 
-void logger_plugin::plugin_initialize( const appbase::variables_map& options ) {
+void sys_plugin::plugin_initialize( const appbase::variables_map& options ) {
    settings.log_verbosity = static_cast<silkworm::log::Level>(options.at("verbosity").as<uint32_t>());
    settings.log_std_out   = options.at("stdout").as<bool>();
    settings.log_nocolor   = options.at("nocolor").as<bool>();
@@ -26,15 +26,15 @@ void logger_plugin::plugin_initialize( const appbase::variables_map& options ) {
 
    silkworm::log::init(settings);
 
-   SILK_DEBUG << "Initialized Logger Plugin";
+   SILK_DEBUG << "Initialized sys Plugin";
 }
 
-void logger_plugin::plugin_startup() {
+void sys_plugin::plugin_startup() {
 }
 
-void logger_plugin::plugin_shutdown() {
+void sys_plugin::plugin_shutdown() {
 }
 
-uint32_t logger_plugin::get_verbosity() {
+uint32_t sys_plugin::get_verbosity() {
    return static_cast<uint32_t>(settings.log_verbosity);
 }

@@ -1,17 +1,27 @@
 #pragma once
 
 #include <appbase/application.hpp>
-#include "logger_plugin.hpp"
+#include "sys_plugin.hpp"
 
+#include <eosio/name.hpp>
+
+struct pushtx {
+   eosio::name          ram_payer;
+   std::vector<uint8_t> rlpx;
+};
+
+EOSIO_REFLECT(pushtx, ram_payer, rlpx)
 class block_conversion_plugin : public appbase::plugin<block_conversion_plugin> {
    public:
-      APPBASE_PLUGIN_REQUIRES((logger_plugin));
+      APPBASE_PLUGIN_REQUIRES((sys_plugin));
       block_conversion_plugin();
       virtual ~block_conversion_plugin();
       virtual void set_program_options(appbase::options_description& cli, appbase::options_description& cfg) override;
       void plugin_initialize(const appbase::variables_map& options);
       void plugin_startup();
       void plugin_shutdown();
+
+      uint32_t get_block_stride() const;
 
    private:
       std::unique_ptr<class block_conversion_plugin_impl> my;

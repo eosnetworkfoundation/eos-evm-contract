@@ -1,17 +1,16 @@
 #pragma once
 
 #include <appbase/application.hpp>
-#include "logger_plugin.hpp"
-#include "core_system_plugin.hpp"
+#include "sys_plugin.hpp"
 
 #include <silkworm/common/settings.hpp>
 #include <mdbx.h++>
 
-class silk_engine_plugin : public appbase::plugin<silk_engine_plugin> {
+class engine_plugin : public appbase::plugin<engine_plugin> {
    public:
-      APPBASE_PLUGIN_REQUIRES((logger_plugin)(core_system_plugin));
-      silk_engine_plugin();
-      virtual ~silk_engine_plugin();
+      APPBASE_PLUGIN_REQUIRES((sys_plugin));
+      engine_plugin();
+      virtual ~engine_plugin();
       virtual void set_program_options(appbase::options_description& cli, appbase::options_description& cfg) override;
       void plugin_initialize(const appbase::variables_map& options);
       void plugin_startup();
@@ -23,5 +22,5 @@ class silk_engine_plugin : public appbase::plugin<silk_engine_plugin> {
       uint32_t    get_threads();
 
    private:
-      std::unique_ptr<class silk_engine_plugin_impl> my;
+      std::unique_ptr<class engine_plugin_impl> my;
 };

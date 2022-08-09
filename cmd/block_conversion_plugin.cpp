@@ -1,59 +1,54 @@
 #include "block_conversion_plugin.hpp"
 #include "channels.hpp"
+#include "abi_utils.hpp"
 
 #include <fstream>
-
-#include <eosio/abi.hpp>
-#include <abieos.hpp>
 
 #include <silkworm/types/transaction.hpp>
 
 class block_conversion_plugin_impl : std::enable_shared_from_this<block_conversion_plugin_impl> {
    public:
       block_conversion_plugin_impl()
-        : block_event(appbase::app().get_channel<channels::blocks>()){}
+        : block_event(appbase::app().get_channel<channels::blocks>()),
+          fork_event(appbase::app().get_channel<channels::forks>()),
+          lib_event(appbase::app().get_channel<channels::lib_advance>()) {}
 
       inline void init(uint32_t stride, std::string abi_dir) {
          block_stride = stride;
 
-         std::ifstream abi_file(abi_dir);
-         if (abi_file.is_open()) {
-            SILK_CRIT << "ABI file <" << abi_dir << "> not found";
-            throw std::runtime_error("Failed to find ABI file");
-         }
-         std::size_t len = 0;
-         abi_file.seekg(0, std::ios::end);
-         len = abi_file.tellg();
-         abi_file.seekg(0, std::ios::beg);
-
-         char* buffer = new char[len];
-         abi_file.read(buffer, len);
-         abi_file.close();
-
-         eosio::json_token_stream stream = {buffer};
-         eosio::abi_def def = eosio::from_json<eosio::abi_def>(stream);
-         SILK_DEBUG << "TrustEVM ABI Version " << def.version;
-         eosio::convert(def, abi);
-
-         delete[] buffer;
+         load_abi(abi_dir);
 
          native_blocks_subscription = appbase::app().get_channel<channels::native_blocks>().subscribe(
             [this](auto b) {
+               if (b->block_num > current_height) {
+                  SILK_DEBUG << "Advancing current height to " << b->block_num;
+                  current_height = b->block_num;
+               } else if (b->block_num < current_height) {
+                  SILK_WARN << "Fork encountered at block " << b->block_num << " current head is at " << current_height;
+               }
+
                if (b->block_num > next_block_bound) {
-                  SILK_INFO << "Creating EVM Block " << b->block_num;
+                  SILK_DEBUG << "Creating EVM Block " << b->block_num;
+                  if (b->syncing)
+                     SILK_DEBUG << "Block is Syncing";
                   current_block = {};
                   current_block.header.number     = b->block_num;
                   current_block.header.difficulty = 0;
                   current_block.header.gas_limit  = std::numeric_limits<uint64_t>::max();
                   current_block.header.timestamp  = b->timestamp / 1000;
                }
-               SILK_INFO << b->transactions.size() << " # of transactions";
+               if (b->lib > current_lib) {
+                  SILK_DEBUG << "Advancing LIB from " << current_lib << " to " << b->lib;
+                  current_lib = b->lib;
+                  lib_event.publish(80, std::make_shared<channels::lib_change>(current_lib));
+               }
                for (const auto& ntrx : b->transactions) {
                   for (const auto& act : ntrx.actions) {
                      silkworm::Transaction trx;
-                     silkworm::ByteView    view = {(const uint8_t*)act.data.pos, act.data.remaining()};
-                     SILK_INFO << "Decoding Transaction";
-                     if (silkworm::rlp::decode<silkworm::Transaction>(view, trx) != silkworm::DecodingResult::kOk) {
+                     auto dtx = deserialize_tx(eosio::input_stream(act.data.pos, act.data.remaining()));
+                     silkworm::ByteView bv = {(const uint8_t*)dtx.rlpx.data(), dtx.rlpx.size()};
+                     SILK_DEBUG << "Decoding Transaction";
+                     if (silkworm::rlp::decode<silkworm::Transaction>(bv, trx) != silkworm::DecodingResult::kOk) {
                         SILK_CRIT << "Failed to decode transaction";
                         throw std::runtime_error("Failed to decode transaction");
                      }
@@ -64,21 +59,25 @@ class block_conversion_plugin_impl : std::enable_shared_from_this<block_conversi
          );
       }
 
-      const auto& get_type(const std::string& n) {
-         auto it = abi.abi_types.find(n);
-         if (it == abi.abi_types.end())
-            throw std::runtime_error("unknown ABI type <"+n+">");
-         return it->second;
+      template <typename Stream>
+      inline pushtx deserialize_tx(Stream&& s) const {
+         pushtx tx;
+         eosio::from_bin(tx, s);
+         return tx;
       }
 
-      inline void shutdown() {
-      }
+      inline uint32_t get_stride() const { return block_stride; }
+
+      void shutdown() {}
 
       channels::blocks::channel_type&               block_event;
+      channels::forks::channel_type&                fork_event;
+      channels::lib_advance::channel_type&          lib_event;
       channels::native_blocks::channel_type::handle native_blocks_subscription;
-      uint32_t                                      block_stride;
-      uint32_t                                      current_height;
-      uint32_t                                      next_block_bound;
+      uint32_t                                      block_stride = 0;
+      uint32_t                                      current_height = 0;
+      uint32_t                                      next_block_bound = 0;
+      uint32_t                                      current_lib = 0;
       channels::block                               current_block;
       abieos::abi                                   abi;
 };
@@ -109,4 +108,8 @@ void block_conversion_plugin::plugin_startup() {
 void block_conversion_plugin::plugin_shutdown() {
    my->shutdown();
    SILK_INFO << "Shutdown block_conversion plugin";
+}
+
+uint32_t block_conversion_plugin::get_block_stride() const {
+   return my->get_stride();
 }

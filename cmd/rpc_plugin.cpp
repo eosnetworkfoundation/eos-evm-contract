@@ -1,4 +1,4 @@
-#include "silkrpc_plugin.hpp"
+#include "rpc_plugin.hpp"
 
 #include <silkrpc/config.hpp>
 
@@ -11,9 +11,9 @@
 #include <silkrpc/daemon.hpp>
 #include <silkworm/common/settings.hpp>
 
-class silkrpc_plugin_impl : std::enable_shared_from_this<silkrpc_plugin_impl> {
+class rpc_plugin_impl : std::enable_shared_from_this<rpc_plugin_impl> {
    public:
-      silkrpc_plugin_impl(silkrpc::DaemonSettings settings)
+      rpc_plugin_impl(silkrpc::DaemonSettings settings)
          : settings(settings) {}
 
       void init(const silkrpc::DaemonSettings& s) {
@@ -23,10 +23,10 @@ class silkrpc_plugin_impl : std::enable_shared_from_this<silkrpc_plugin_impl> {
       silkrpc::DaemonSettings settings;
 };
 
-silkrpc_plugin::silkrpc_plugin() {}
-silkrpc_plugin::~silkrpc_plugin() {}
+rpc_plugin::rpc_plugin() {}
+rpc_plugin::~rpc_plugin() {}
 
-void silkrpc_plugin::set_program_options( appbase::options_description& cli, appbase::options_description& cfg ) {
+void rpc_plugin::set_program_options( appbase::options_description& cli, appbase::options_description& cfg ) {
    cfg.add_options()
       ("http-port", boost::program_options::value<std::string>()->default_value("127.0.0.1:8881"),
         "http port for JSON RPC of the form <address>:<port>"),
@@ -41,7 +41,7 @@ void silkrpc_plugin::set_program_options( appbase::options_description& cli, app
    ;
 }
 
-void silkrpc_plugin::plugin_initialize( const appbase::variables_map& options ) {
+void rpc_plugin::plugin_initialize( const appbase::variables_map& options ) {
    const auto& http_port   = options.at("rpc-endpoint").as<std::string>();
    const auto  threads     = options.at("rpc-threads").as<uint32_t>();
    const auto  max_readers = options.at("rpc-max-readers").as<uint32_t>();
@@ -52,7 +52,7 @@ void silkrpc_plugin::plugin_initialize( const appbase::variables_map& options ) 
    //const auto node_settings   = engine.get_node_settings();
    const auto& data_dir   = options.at("chaindata").as<std::string>();
 
-   auto verbosity         = appbase::app().get_plugin<logger_plugin>().get_verbosity();
+   auto verbosity         = appbase::app().get_plugin<sys_plugin>().get_verbosity();
 
    silkworm::ChainConfig config{
       0,  // chain_id
@@ -88,14 +88,14 @@ void silkrpc_plugin::plugin_initialize( const appbase::variables_map& options ) 
       silkrpc::WaitMode::blocking
    };
 
-   my.reset(new silkrpc_plugin_impl(settings));
+   my.reset(new rpc_plugin_impl(settings));
 
-   SILK_INFO << "Initialized SilkRPC Plugin";
+   SILK_INFO << "Initialized RPC Plugin";
 }
 
-void silkrpc_plugin::plugin_startup() {
+void rpc_plugin::plugin_startup() {
    silkrpc::Daemon::run(my->settings, {"trust-evm-rpc", "version: "+appbase::app().full_version_string()});
 }
 
-void silkrpc_plugin::plugin_shutdown() {
+void rpc_plugin::plugin_shutdown() {
 }
