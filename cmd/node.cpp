@@ -33,7 +33,7 @@ int main(int argc, char* argv[]) {
         appbase::app().register_plugin<sys_plugin>();
         appbase::app().register_plugin<block_conversion_plugin>();
 
-        if (!appbase::app().initialize<sys_plugin, block_conversion_plugin>(argc, argv))
+        if (!appbase::app().initialize<sys_plugin>(argc, argv))
            return -1;
         appbase::app().startup();
         appbase::app().set_thread_priority_max();

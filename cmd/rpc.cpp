@@ -14,19 +14,15 @@
    limitations under the License.
 */
 
-#include <silkrpc/config.hpp>
-#include <silkworm/common/log.hpp>
 
 #include <iostream>
 #include <string>
 
 #include <appbase/application.hpp>
-#include "silkrpc_plugin.hpp"
-#include "logger_plugin.hpp"
+#include "rpc_plugin.hpp"
+#include "sys_plugin.hpp"
 
 #include <trustevm_node/buildinfo.h>
-#include <silkrpc/common/log.hpp>
-#include <silkrpc/daemon.hpp>
 
 std::string get_version_from_build_info() {
     const auto build_info{trustevm_node_get_buildinfo()};
@@ -39,10 +35,10 @@ std::string get_version_from_build_info() {
 int main(int argc, char* argv[]) {
     try {
         appbase::app().set_version_string(get_version_from_build_info());
-        appbase::app().register_plugin<logger_plugin>();
-        appbase::app().register_plugin<silkrpc_plugin>();
+        appbase::app().register_plugin<sys_plugin>();
+        appbase::app().register_plugin<rpc_plugin>();
 
-        if (!appbase::app().initialize<logger_plugin, silkrpc_plugin>(argc, argv))
+        if (!appbase::app().initialize<sys_plugin, rpc_plugin>(argc, argv))
            return -1;
         appbase::app().startup();
         appbase::app().set_thread_priority_max();

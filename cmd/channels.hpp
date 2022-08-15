@@ -50,9 +50,11 @@ namespace channels {
       bool                    building = false;
       bool                    syncing  = false;
    };
-
    using native_blocks = appbase::channel_decl<struct blocks_tag, std::shared_ptr<native_block>>;
 
-   using block = silkworm::Block;
+   struct block {
+      silkworm::Block data;
+      uint32_t        core_block_num;
+   };
    using blocks = appbase::channel_decl<struct blocks_tag, std::shared_ptr<block>>;
 } // ns channels

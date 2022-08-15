@@ -11,10 +11,12 @@ class block_conversion_plugin_impl : std::enable_shared_from_this<block_conversi
       block_conversion_plugin_impl()
         : block_event(appbase::app().get_channel<channels::blocks>()),
           fork_event(appbase::app().get_channel<channels::forks>()),
-          lib_event(appbase::app().get_channel<channels::lib_advance>()) {}
+          lib_event(appbase::app().get_channel<channels::lib_advance>()),
+          current_block(std::make_shared<channels::block>()) {}
 
-      inline void init(uint32_t stride, std::string abi_dir) {
+      inline void init(uint32_t stride, std::string abi_dir, uint32_t block_num) {
          block_stride = stride;
+         next_block_num = block_num;
 
          load_abi(abi_dir);
 
@@ -25,17 +27,18 @@ class block_conversion_plugin_impl : std::enable_shared_from_this<block_conversi
                   current_height = b->block_num;
                } else if (b->block_num < current_height) {
                   SILK_WARN << "Fork encountered at block " << b->block_num << " current head is at " << current_height;
+                  fork_event.publish(90, std::make_shared<channels::fork>(b->block_num));
                }
 
                if (b->block_num > next_block_bound) {
                   SILK_DEBUG << "Creating EVM Block " << b->block_num;
                   if (b->syncing)
                      SILK_DEBUG << "Block is Syncing";
-                  current_block = {};
-                  current_block.header.number     = b->block_num;
-                  current_block.header.difficulty = 0;
-                  current_block.header.gas_limit  = std::numeric_limits<uint64_t>::max();
-                  current_block.header.timestamp  = b->timestamp / 1000;
+                  current_block->data.header.number     = next_block_num++;
+                  current_block->data.header.difficulty = 0;
+                  current_block->data.header.gas_limit  = std::numeric_limits<uint64_t>::max();
+                  current_block->data.header.timestamp  = b->timestamp / 1000;
+                  next_block_bound = b->block_num + block_stride;
                }
                if (b->lib > current_lib) {
                   SILK_DEBUG << "Advancing LIB from " << current_lib << " to " << b->lib;
@@ -52,9 +55,15 @@ class block_conversion_plugin_impl : std::enable_shared_from_this<block_conversi
                         SILK_CRIT << "Failed to decode transaction";
                         throw std::runtime_error("Failed to decode transaction");
                      }
-                     current_block.transactions.emplace_back(std::move(trx));
+                     trx.from.reset();
+                     trx.recover_sender();
+                     current_block->data.transactions.emplace_back(std::move(trx));
                   }
                }
+
+               current_block->core_block_num = b->block_num;
+
+               block_event.publish(80, current_block);
             }
          );
       }
@@ -78,7 +87,8 @@ class block_conversion_plugin_impl : std::enable_shared_from_this<block_conversi
       uint32_t                                      current_height = 0;
       uint32_t                                      next_block_bound = 0;
       uint32_t                                      current_lib = 0;
-      channels::block                               current_block;
+      std::shared_ptr<channels::block>              current_block;
+      uint32_t                                      next_block_num = 0;
       abieos::abi                                   abi;
 };
 
@@ -98,7 +108,9 @@ void block_conversion_plugin::set_program_options( appbase::options_description&
 void block_conversion_plugin::plugin_initialize( const appbase::variables_map& options ) {
    auto stride  = options.at("block-stride").as<uint32_t>();
    auto abi_dir = options.at("evm-abi").as<std::string>();
-   my->init(stride, abi_dir);
+
+   auto cs      = appbase::app().get_plugin<ship_receiver_plugin>().get_chain_state();
+   my->init(stride, abi_dir, cs.head_trust_block_num);
    SILK_INFO << "Initialized block_conversion Plugin";
 }
 

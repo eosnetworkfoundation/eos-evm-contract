@@ -29,13 +29,13 @@ rpc_plugin::~rpc_plugin() {}
 void rpc_plugin::set_program_options( appbase::options_description& cli, appbase::options_description& cfg ) {
    cfg.add_options()
       ("http-port", boost::program_options::value<std::string>()->default_value("127.0.0.1:8881"),
-        "http port for JSON RPC of the form <address>:<port>"),
+        "http port for JSON RPC of the form <address>:<port>")
       ("trust-evm-node", boost::program_options::value<std::string>()->default_value("127.0.0.1:8001"),
-        "address to trust-evm-node of the form <address>:<port>"),
+        "address to trust-evm-node of the form <address>:<port>")
       ("rpc-threads", boost::program_options::value<uint32_t>()->default_value(16),
-        "number of threads for use with rpc"),
+        "number of threads for use with rpc")
       ("chaindata", boost::program_options::value<std::string>()->default_value("./"),
-        "directory of chaindata"),
+        "directory of chaindata")
       ("rpc-max-readers", boost::program_options::value<uint32_t>()->default_value(16),
         "maximum number of rpc readers")
    ;
@@ -71,7 +71,7 @@ void rpc_plugin::plugin_initialize( const appbase::variables_map& options ) {
    silkworm::NodeSettings node_settings;
    node_settings.data_directory = std::make_unique<silkworm::DataDirectory>(data_dir, false);
    node_settings.network_id = config.chain_id;
-   node_settings.etherbase  = silkworm::to_evmc_address(silkworm::from_hex("evm").value()); // TODO determine etherbase name
+   node_settings.etherbase  = silkworm::to_evmc_address(silkworm::from_hex("").value()); // TODO determine etherbase name
    node_settings.chaindata_env_config = {node_settings.data_directory->chaindata().path().string(), false, false};
    node_settings.chaindata_env_config.max_readers = max_readers;
    node_settings.chain_config = config;

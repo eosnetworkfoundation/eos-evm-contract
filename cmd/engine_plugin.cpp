@@ -40,6 +40,7 @@ class engine_plugin_impl : std::enable_shared_from_this<engine_plugin_impl> {
          node_settings.etherbase  = silkworm::to_evmc_address(silkworm::from_hex("").value()); // TODO determine etherbase name
          node_settings.chaindata_env_config = {node_settings.data_directory->chaindata().path().string(), false, false};
          node_settings.chaindata_env_config.max_readers = max_readers;
+         node_settings.chaindata_env_config.exclusive = false;
          node_settings.chain_config = config;
 
          server_settings.set_address_uri(address);
@@ -68,17 +69,6 @@ class engine_plugin_impl : std::enable_shared_from_this<engine_plugin_impl> {
       inline void startup() {
          server->build_and_start();
          SILK_INFO << "Started Engine Server";
-         boost::asio::io_context& sched = server->next_io_context();
-         boost::asio::signal_set sigs{sched, SIGINT, SIGTERM};
-
-         SILK_DEBUG << "Signals registered on scheduler " << &sched;
-
-         const auto& handler = [&](const boost::system::error_code& ec, int sig) {
-            SILK_DEBUG << "Signal caught " << sig;
-            shutdown();
-         };
-
-         sigs.async_wait(handler);
       }
 
       inline void shutdown() {
@@ -119,7 +109,7 @@ void engine_plugin::plugin_initialize( const appbase::variables_map& options ) {
    const auto& threads    = options.at("threads").as<uint32_t>();
    uint32_t id = 0; // get id from action/DB entry
    my.reset(new engine_plugin_impl(id, chain_data, contexts, threads, address));
-   SILK_INFO << "Initializing Silk Engine Plugin";
+   SILK_INFO << "Initializing Engine Plugin";
 }
 
 void engine_plugin::plugin_startup() {
@@ -139,10 +129,14 @@ silkworm::NodeSettings* engine_plugin::get_node_settings() {
    return &my->node_settings;
 }
 
-std::string engine_plugin::get_address() {
+std::string engine_plugin::get_address() const {
    return my->server_settings.address_uri();
 }
 
-uint32_t engine_plugin::get_threads() {
+uint32_t engine_plugin::get_threads() const {
    return my->server_settings.num_contexts();
+}
+
+std::string engine_plugin::get_chain_data_dir() const {
+   return my->node_settings.data_directory->chaindata().path().string();
 }

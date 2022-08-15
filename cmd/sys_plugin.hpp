@@ -16,11 +16,11 @@ class sys_plugin : public appbase::plugin<sys_plugin> {
 
       static inline void error(std::string msg) {
          SILK_CRIT << "System Error: " << msg;
-         appbase::app().shutdown();
+         error();
       }
 
       static inline void error() {
-         appbase::app().shutdown();
+         raise(SIGTERM);
       }
 
       uint32_t get_verbosity();

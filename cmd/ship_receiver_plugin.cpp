@@ -1,8 +1,9 @@
 #include "ship_receiver_plugin.hpp"
 #include "abi_utils.hpp"
-//#include "thread_pool.hpp"
+#include "chain_state.hpp"
 
 #include <atomic>
+#include <filesystem>
 #include <iostream>
 #include <string>
 #include <unordered_set>
@@ -42,21 +43,38 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
          : blocks_channel(appbase::app().get_channel<channels::native_blocks>()) {
          }
 
-      using block_range_t  = std::pair<std::uint32_t, std::uint32_t>;
       using block_result_t = eosio::ship_protocol::get_blocks_result_v0;
       using native_block_t = channels::native_block;
 
-      void init(std::string h, std::string p, uint32_t g, eosio::name ca) {
+      void init(std::string h, std::string p, uint32_t g, eosio::name ca, std::string_view cs_dir) {
          host = h;
          port = p;
          genesis = g;
          core_account = ca;
+         core_chain_state = chain_state{{cs_dir.data(), cs_dir.size()}};
          resolver = std::make_shared<tcp::resolver>(appbase::app().get_io_service());
          stream   = std::make_shared<websocket::stream<tcp::socket>>(appbase::app().get_io_service());
          stream->binary(true);
          stream->read_message_max(0x1ull << 36);
          connect_stream();
+         if (core_chain_state.exists()) {
+            core_chain_state.read();
+            if (core_chain_state.head_block_num > genesis)
+               genesis = core_chain_state.head_block_num;
+         }
       }
+
+      void update_core_chain_state(uint32_t block_num) {
+         core_chain_state.head_block_num = block_num;
+         core_chain_state.write();
+      }
+
+      void update_trust_chain_state(uint32_t block_num) {
+         core_chain_state.head_trust_block_num = block_num;
+         core_chain_state.write();
+      }
+
+      inline chain_state get_chain_state() const { return core_chain_state; }
 
       void initial_read() {
          flat_buffer buff;
@@ -138,11 +156,11 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
       }
 
 
-      void get_blocks_request(std::size_t start, std::size_t end, bool deltas = false) {
+      void get_blocks_request(std::size_t start, std::size_t end) {
          abieos::jarray positions = {};
          bool fetch_block  = true;
          bool fetch_traces = true;
-         bool fetch_deltas = deltas;
+         bool fetch_deltas = false;
 
          send_request(
             abieos::jvalue{abieos::jarray{{"get_blocks_request_v0"},
@@ -159,12 +177,8 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
       }
 
       void get_blocks_request() {
-         get_blocks_request(received_blocks, received_blocks+1, false);
+         get_blocks_request(received_blocks, received_blocks+1);
       } 
-
-      void get_deltas_request() {
-         get_blocks_request(received_blocks, received_blocks+1, true);
-      }
 
       template <typename Buffer>
       eosio::ship_protocol::get_blocks_result_v0 get_result(Buffer&& b){
@@ -181,13 +195,14 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
          native_block_t current_block;
          auto block = get_result(std::forward<Buffer>(b));
 
-         if (!block.this_block || block.this_block->block_num <= latest_height) {
+         if (!block.this_block) {
             return std::nullopt;
          }
 
          latest_height = block.this_block->block_num;
 
          received_blocks++;
+
 
          if (block.traces) {
             uint32_t num;
@@ -250,13 +265,13 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
 
      
       auto get_block_result(std::size_t s, std::size_t e){
-         get_blocks_request(s, e, false);
+         get_blocks_request(s, e);
          return get_result(read());
       }
 
       template <typename F>
       void get_block(std::size_t s, std::size_t e, F&& func){
-         get_blocks_request(s, e, false);
+         get_blocks_request(s, e);
          async_read([this, func](auto buff) {
             auto res = on_block_result(buff);
             func(res);
@@ -265,31 +280,15 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
 
       void shutdown() {
       }
-
       
       void sync_one(uint32_t next_block, uint32_t core_head) {
-
-         if (next_block <= core_head) {
-            get_block(next_block, core_head, [this, next_block, core_head](auto block) {
-               if (block) {
-                  block->syncing = true;
-                  blocks_channel.publish(80, std::make_shared<channels::native_block>(std::move(*block)));
-               }
-               uint32_t next = next_block + 1;
-               if (next <= core_head) {
-                  sync_one(next, core_head);
-               } else {
-                  const auto& res = get_block_result(0, 0);
-                  uint32_t head = res.head.block_num;
-                  if (head <= core_head) {
-                     SILK_INFO << "Finished Syncing";
-                  } else {
-                     SILK_INFO << "Now syncing from block #" << genesis << " to block #" << core_head;
-                     sync_one(next_block, head);
-                  }
-               }
-            });
-         }
+         get_block(next_block, core_head, [this, next_block, core_head](auto block) {
+            if (block) {
+               block->syncing = true;
+               blocks_channel.publish(80, std::make_shared<channels::native_block>(std::move(*block)));
+            }
+            sync_one(next_block+1, core_head);
+         });
       }
 
       void sync() {
@@ -311,10 +310,10 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
       uint32_t                                        received_blocks = 0;
       uint32_t                                        last_received   = 0;
       channels::native_blocks::channel_type&          blocks_channel;
-      block_range_t                                   sync_range;
       uint32_t                                        genesis;
       eosio::name                                     core_account;
-      uint32_t                                        latest_height;
+      uint32_t                                        latest_height = 0;
+      chain_state                                     core_chain_state;
 };
 
 ship_receiver_plugin::ship_receiver_plugin() : my(new ship_receiver_plugin_impl) {}
@@ -328,6 +327,9 @@ void ship_receiver_plugin::set_program_options( appbase::options_description& cl
         "SHiP genesis block to start at")
       ("ship-core-account", boost::program_options::value<std::string>()->default_value("evmevmevmevm"),
         "Account on the core blockchain that hosts the Trust EVM runtime")
+      ("ship-chain-state-dir", boost::program_options::value<std::string>()->default_value("./chaindata"),
+        "Directory for SHiP chain state information")
+
    ;
 }
 
@@ -336,7 +338,9 @@ void ship_receiver_plugin::plugin_initialize( const appbase::variables_map& opti
    const auto& i = endpoint.find(":");
    auto genesis  = options.at("ship-genesis").as<uint32_t>();
    auto core     = options.at("ship-core-account").as<std::string>();
-   my->init(endpoint.substr(0, i), endpoint.substr(i+1), genesis, eosio::name(core));
+   auto cs_dir   = appbase::app().get_plugin<engine_plugin>().get_chain_data_dir();
+   SILK_INFO << "CHAIN_DATA DIR" << cs_dir;
+   my->init(endpoint.substr(0, i), endpoint.substr(i+1), genesis, eosio::name(core), cs_dir);
    SILK_INFO << "Initialized SHiP Receiver Plugin";
 }
 
@@ -344,10 +348,20 @@ void ship_receiver_plugin::plugin_startup() {
    SILK_INFO << "Started SHiP Receiver";
    my->initial_read();
    my->sync();
-   //my->get_blocks();
-   //my->read();
 }
 
 void ship_receiver_plugin::plugin_shutdown() {
    SILK_INFO << "Shutdown SHiP Receiver";
+}
+
+void ship_receiver_plugin::update_core_chain_state(uint32_t block_num) {
+   my->update_core_chain_state(block_num);
+}
+
+void ship_receiver_plugin::update_trust_chain_state(uint32_t block_num) {
+   my->update_trust_chain_state(block_num);
+}
+
+chain_state ship_receiver_plugin::get_chain_state() const {
+   return my->get_chain_state();
 }

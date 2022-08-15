@@ -38,12 +38,9 @@ endif()
 set(NODE_LIBRARIES
     trustevm_node-buildinfo
     silkrpc
-    absl::flags_parse
-    silkinterfaces)
+    absl::flags_parse)
+    #silkinterfaces)
 
-add_library(rpc_plugin rpc_plugin.cpp)
-target_include_directories(rpc_plugin PUBLIC ${CMAKE_SOURCE_DIR})
-target_link_libraries(rpc_plugin PUBLIC ${NODE_LIBRARIES} appbase fc ${Boost_PROGRAM_OPTIONS_LIBRARY})
 
 add_library(blockconversion_plugin block_conversion_plugin.cpp)
 target_include_directories(blockconversion_plugin PUBLIC ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/external/mandel-abieos/src)
@@ -65,13 +62,17 @@ add_library(sys_plugin sys_plugin.cpp)
 target_include_directories(sys_plugin PUBLIC ${CMAKE_SOURCE_DIR})
 target_link_libraries(sys_plugin PUBLIC silkworm_core silkworm_node appbase ${Boost_PROGRAM_OPTIONS_LIBRARY})
 
+add_library(rpc_plugin rpc_plugin.cpp)
+target_include_directories(rpc_plugin PUBLIC ${CMAKE_SOURCE_DIR})
+target_link_libraries(rpc_plugin PUBLIC ${NODE_LIBRARIES} sys_plugin appbase ${Boost_PROGRAM_OPTIONS_LIBRARY})
+
 add_executable(trustevm-node node.cpp)
 target_include_directories(trustevm-node PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR})
 target_link_libraries(trustevm-node PRIVATE engine_plugin shipreceiver_plugin sys_plugin blockchain_plugin)
 
-#add_executable(trustevm-rpc rpc.cpp)
-#target_include_directories(trustevm-rpc PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR})
-#target_link_libraries(trustevm-rpc PRIVATE sys_plugin rpc_plugin)
+add_executable(trustevm-rpc rpc.cpp)
+target_include_directories(trustevm-rpc PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR})
+target_link_libraries(trustevm-rpc PRIVATE rpc_plugin)
 
 # Unit tests
 enable_testing()
