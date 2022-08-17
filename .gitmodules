@@ -1,6 +1,3 @@
-[submodule "silkworm"]
-	path = silkworm
-	url = https://github.com/torquem-ch/silkworm
 [submodule "interfaces"]
 	path = interfaces
 	url = https://github.com/ledgerwatch/interfaces
@@ -16,3 +13,6 @@
 [submodule "external/mandel-abieos"]
 	path = external/mandel-abieos
 	url = https://github.com/eosnetworkfoundation/mandel-abieos
+[submodule "silkworm"]
+	path = silkworm
+	url = https://github.com/eosnetworkfoundation/silkworm
