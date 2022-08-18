@@ -20,6 +20,9 @@ if (WITH_LOGTIME)
     add_compile_definitions(WITH_LOGTIME)
 endif()
 
+add_compile_definitions(ANTELOPE)
+add_compile_definitions(PROJECT_VERSION="1.0.0")
+
 # ethash
 list(APPEND SOURCES 
     ${CMAKE_CURRENT_SOURCE_DIR}/../external/ethash/lib/keccak/keccak.c
@@ -29,49 +32,49 @@ list(APPEND SOURCES
 
 # evmone
 list(APPEND SOURCES 
-    ${CMAKE_CURRENT_SOURCE_DIR}/../external/evmone/lib/evmone/instructions.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../external/evmone/lib/evmone/instructions_calls.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../external/evmone/lib/evmone/execution.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../external/evmone/lib/evmone/analysis.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../external/evmone/lib/evmone/vm.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../external/evmone/lib/evmone/baseline.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../external/evmone/lib/evmone/baseline_instruction_table.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../silkworm/third_party/evmone/lib/evmone/instructions_calls.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../silkworm/third_party/evmone/lib/evmone/advanced_analysis.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../silkworm/third_party/evmone/lib/evmone/advanced_instructions.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../silkworm/third_party/evmone/lib/evmone/advanced_execution.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../silkworm/third_party/evmone/lib/evmone/vm.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../silkworm/third_party/evmone/lib/evmone/baseline.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../silkworm/third_party/evmone/lib/evmone/baseline_instruction_table.cpp
 )
 
 # silkworm
 list(APPEND SOURCES 
-    ${CMAKE_CURRENT_SOURCE_DIR}/../external/silkworm/common/util.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../external/silkworm/common/endian.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../external/silkworm/execution/evm.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../external/silkworm/execution/precompiled.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../external/silkworm/execution/address.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../external/silkworm/state/intra_block_state.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../external/silkworm/state/delta.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../external/silkworm/types/account.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../external/silkworm/types/transaction.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../external/silkworm/types/receipt.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../external/silkworm/types/block.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../external/silkworm/types/log.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../external/silkworm/rlp/encode.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../external/silkworm/rlp/decode.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../external/silkworm/crypto/ecdsa.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../external/silkworm/chain/intrinsic_gas.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../silkworm/core/silkworm/common/util.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../silkworm/core/silkworm/common/endian.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../silkworm/core/silkworm/execution/evm.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../silkworm/core/silkworm/execution/precompiled.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../silkworm/core/silkworm/execution/analysis_cache.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../silkworm/core/silkworm/execution/address.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../silkworm/core/silkworm/state/intra_block_state.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../silkworm/core/silkworm/state/delta.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../silkworm/core/silkworm/types/account.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../silkworm/core/silkworm/types/transaction.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../silkworm/core/silkworm/types/receipt.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../silkworm/core/silkworm/types/block.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../silkworm/core/silkworm/types/log.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../silkworm/core/silkworm/rlp/encode.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../silkworm/core/silkworm/rlp/decode.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../silkworm/core/silkworm/crypto/ecdsa.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../silkworm/core/silkworm/chain/intrinsic_gas.cpp
 )
 
 add_contract( evm_contract evm_runtime ${SOURCES})
 
 target_include_directories( evm_runtime PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/../include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../external
     ${CMAKE_CURRENT_SOURCE_DIR}/../external/intx/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../external/ethash/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../external/rlpvalue/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../external/evmone/evmc/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../external/evmone/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../external/evmone/lib
+    ${CMAKE_CURRENT_SOURCE_DIR}/../external/GSL/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../silkworm/core
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../silkworm/third_party/evmone/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../silkworm/third_party/evmone/lib
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../silkworm/third_party/evmone/evmc/include
 )
 
-target_include_directories( evm_runtime PUBLIC ${CMAKE_SOURCE_DIR}/../include )
 target_link_options(evm_runtime PUBLIC -stack-size=20000)
 
 add_custom_command(TARGET evm_runtime
