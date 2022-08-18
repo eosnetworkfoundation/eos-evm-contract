@@ -44,7 +44,8 @@ struct state : State {
     std::optional<BlockHeader> read_header(uint64_t block_number,
                                            const evmc::bytes32& block_hash) const noexcept override;
 
-    std::optional<BlockBody> read_body(uint64_t block_number, const evmc::bytes32& block_hash) const noexcept override;
+    bool read_body(BlockNum block_number, const evmc::bytes32& block_hash,
+                                            BlockBody& out) const noexcept override;
 
     std::optional<intx::uint256> total_difficulty(uint64_t block_number,
                                                   const evmc::bytes32& block_hash) const noexcept override;

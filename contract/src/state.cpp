@@ -203,8 +203,8 @@ std::optional<BlockHeader> state::read_header(uint64_t block_number,
     return {};
 }
 
-std::optional<BlockBody> state::read_body(uint64_t block_number,
-                                                  const evmc::bytes32& block_hash) const noexcept {
+bool state::read_body(BlockNum block_number, const evmc::bytes32& block_hash,
+                                        BlockBody& out) const noexcept {
     eosio::check(false, "read_body not implemented");
     return {};
 }

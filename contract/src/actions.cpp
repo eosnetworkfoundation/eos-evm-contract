@@ -35,7 +35,7 @@ db_stats evm_contract::pushtx( eosio::name ram_payer, const bytes& rlptx ) {
 
     Transaction tx;
     ByteView bv{(const uint8_t*)rlptx.data(), rlptx.size()};
-    eosio::check(rlp::decode(bv,tx) == rlp::DecodingResult::kOk && bv.empty(), "unable to decode transaction");
+    eosio::check(rlp::decode(bv,tx) == DecodingResult::kOk && bv.empty(), "unable to decode transaction");
     LOGTIME("EVM TX DECODE");
 
     tx.from.reset();
