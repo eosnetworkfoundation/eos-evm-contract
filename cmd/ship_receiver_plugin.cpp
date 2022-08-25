@@ -235,7 +235,7 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
       inline native_block_t start_native_block(BlockResult&& res) const {
          native_block_t block;
          block.block_num = res.this_block->block_num;
-         eosio::ship_protocol::signed_block sb;
+         eosio::ship_protocol::signed_block_v1 sb;
          eosio::from_bin(sb, *res.block);
          block.timestamp = sb.timestamp.to_time_point().time_since_epoch().count();
          SILK_INFO << "Started native block " << block.block_num;
