@@ -9,9 +9,13 @@ tags: Proposal
 
 ## Problem
 
-#### Opportunity: Currently block mapping between TrustEVM on EOS and TrustEVM node do not map to the same numbers. To allow for block hash to work consistently between these two we need a consistent mapping system.
-#### Target audience: API node operators, contract developers
-#### Strategic alignment: It will allow for consistency between on an Antelope chain and TrustEVM node which will allow for more tooling to work correctly and some allow for more operations at the EVM layer. 
+#### Opportunity:
+Currently block mapping between TrustEVM on EOS and TrustEVM node do not map to the same numbers. To allow for block hash to work consistently between these two we need a consistent mapping system.
+#### Target audience:
+- API node operators
+- contract developers
+#### Strategic alignment:
+It will allow for consistency between on an Antelope chain and TrustEVM node which will allow for more tooling to work correctly and some allow for more operations at the EVM layer. 
 
 ## Solution
 
