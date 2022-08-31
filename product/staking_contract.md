@@ -26,16 +26,27 @@ We may want more complicated mechanism for the staking, which will cause this st
 #### Functionality
 - The staking contract should allow permitted RPC operators to stake EVM to take part in the RPC reward mechanism. 
 - The staking contract should serve as a location to save PRC operator upstream info and rewards info.
+- The staking contract should expose data for users to view.
+- The staking contract should be able to accept and hold tokens as source of rewards.
 #### Features
 See user stories
 #### User stories
-1. Operator can stake EVM
-2. Operator can set upstream address (optionally separate read/write) when staking
-3. API for proxy to read upstream address and weight(staking amount)
-4. Allow list to let admin set valid operator/workload verifier
-5. API for workload verifier to update the payment
-6. Operator can claim rewards, rewards is coming from the EVM the contract holds
-7. The contract can accept EVM tokens as the source of payment
+- A detailed API definition first (deliverable)
+- A Staking Contract in solidity (deliverable)
+  - Operator API 
+    - Methods for Operator to stake EVM
+    - Methods for Operator to set upstream address (optionally separate read/write) when staking
+    - Methods for Operator to claim rewards, rewards is coming from the EVM the contract holds
+    - Methods for Operator to view related data
+  - Proxy API
+    - Methods for proxy to read upstream address and weight(based on staking amount)
+  - Workload Verifier API
+    - Methods for workload verifier to update the payment
+  - Admin API
+    - Methods for admin to set allow list for valid operator/workload verifier
+    - Methods for admin to view related data in an aggragate way
+  - Extra functionality
+    - Make the contract be capable of accepting EVM tokens as the source of payment.
 #### Additional tasks
 - [ ] #issue number
 
