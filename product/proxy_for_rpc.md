@@ -33,14 +33,16 @@ This task will need multiple 3rd party tools. This may impose some risk in safet
 #### Features
 See user stories
 #### User stories
-- The proxy is based on nginx
-- Access log is formatted to meet the need of other modules
-- Upsync module for nginx is used to update upstream
-- Storage service (e.g. Redis or Consul) to hold upstream info for upsync module to read
-- A small helper service reading staking info from chain, translate it into upstream info and save it to storage service
+- A proxy that based on nginx (deliverable)
+  - Access log is formatted to meet the need of other modules
+  - Upsync module for nginx is used to update upstream
+- Storage service (e.g. Redis or Consul) to hold upstream info for upsync module to read (deliverable)
+- A small helper service reading staking info from chain, translate it into upstream info and save it to storage service (deliverable)
+
 
 #### Additional tasks
 
 
 ## Open questions
+Need to decide whether we should use docker or not.
 The central proxy solution may have sub-optimized performance if upstream servers are located in a far way location. This is something beyond fix with this task alone.
