@@ -1,0 +1,49 @@
+---
+tags: Proposal
+---
+
+# Nodes - Rollout & Airdrop & Initial
+
+## Purpose: Trust EVM need a ditributed RPC Network builded by multiple RPC nodes all over the world
+
+
+## Prerequisites
+#### Dependencies: The tech design of the Token mechanism
+
+## Problem
+
+#### Opportunity: What are the needs of our target user groups?
+###### A new opportunity to be an RPC nodes who will sever the Trust EVM network and will get paid by EVM Tokens. It's a staking buusiness so that many exchanges and groups want to be part of it
+
+#### Target audience: Who is the target audience and why? 
+###### BPs of EOS network and some groups who are running staking business such as Everstake
+
+
+## Solution
+
+#### Solution name: How should we refer to this product opportunity?
+###### Online and Offline recruitment
+
+#### Success definition: What are the top metrics for the product (up to 5) to define success?
+###### Have more than 30 nodes to start the mainnet
+
+
+#### Risks: What risks should be considered? https://www.svpg.com/four-big-risks/
+###### 1. APR is not high enough to attract users to stake EVM tokens, so we may not have enough nodes to start the mainnet
+###### 2. The delay of the development of token mechanism will also have a bad influence on the staking
+
+
+#### Functionality
+###### 1. APR estimation, staking workflow, and requirements of configurations for Nodes'  operationg hardwares need to be prepared
+###### 2. Offline recruitment with the BPs of EOS
+###### 3. Business development with groups like Everstake and Exchange
+###### 4. Airdrop the tokens to old BPs
+###### 5. Token sales to staking nodes
+###### 6. A Website to identify ID, staking EVM tokens to regiter to be one nodes
+###### 7. Test all RPC nodes and pre-launch
+
+#### User stories
+#### Additional tasks
+- [ ] #issue number
+
+## Open questions
