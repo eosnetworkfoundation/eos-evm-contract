@@ -30,10 +30,11 @@ If the token economy model changes, it might happen that we may need complicated
 #### Features
 See user stories
 #### User stories
-- The service can read access log
-- The service can calcualte rewards according to what it read
-- The service can save the result to the Staking Contract
-- Can config the update period
+- A service that tracking reading rewards (deliverable)
+  - The service can read access log
+  - The service can calcualte rewards according to what it read
+  - The service can save the result to the Staking Contract
+  - Can config the update period via config file
 #### Additional tasks
 - [ ] #issue number
 
