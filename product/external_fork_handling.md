@@ -5,20 +5,29 @@ tags: Proposal
 # External Fork Handling
 
 ## Prerequisites
-#### Dependencies: Block mapping
+#### Dependencies:
+Block mapping
 
 ## Problem
 
-#### Opportunity: Support forks occuring and not relying on Silkworm's "native" forking logic.
-#### Target audience: TrustEVM node admins, RPC providers 
-#### Strategic alignment: Ensure quick and succinct forking resolution immediately when determined from Antelope blocks.
+#### Opportunity:
+Support forks occuring and not relying on Silkworm's "native" forking logic.
+#### Target audience:
+- TrustEVM node admins
+- RPC providers 
+#### Strategic alignment:
+Ensure quick and succinct forking resolution immediately when determined from Antelope blocks.
 
 ## Solution
 
-#### Solution name: External Fork Handling
-#### Purpose: When the Antelope chain that is running TrustEVM forks that forking will impact the "fake" EVM chain and we need to handle it.
-#### Success definition: We can successfully rollback the TrustEVM node chain immediately. The forking depth should not cause failure but can impact overall performance.
-#### Risks: The TrustEVM node software already has code inplace to handle this forking. The ultimate issue is that libmdbx has some deep internal failures that cause it fail at seemingly random times.  So, the risk is that the solution to fix libmdbx will be too intensive, we won't be able to fix without redesign, we won't be able to determine the root cause of failure.
+#### Solution name:
+External Fork Handling
+#### Purpose:
+When the Antelope chain that is running TrustEVM forks that forking will impact the "fake" EVM chain and we need to handle it.
+#### Success definition:
+We can successfully rollback the TrustEVM node chain immediately. The forking depth should not cause failure but can impact overall performance.
+#### Risks:
+The TrustEVM node software already has code inplace to handle this forking. The ultimate issue is that libmdbx has some deep internal failures that cause it fail at seemingly random times.  So, the risk is that the solution to fix libmdbx will be too intensive, we won't be able to fix without redesign, we won't be able to determine the root cause of failure.
 #### Functionality
 On each new block we create a new `RWTxn` object from libmdbx that is using the previous `RWTxn` object as its parent state.
 
