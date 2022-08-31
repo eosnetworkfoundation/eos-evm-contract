@@ -9,19 +9,24 @@ tags: Proposal
 
 ## Problem
 
-#### Opportunity: Currently block mapping between TrustEVM on EOS and TrustEVM node do not map to the same numbers. To allow for block hash to work consistently between these two we need a consistent mapping system.
-#### Target audience: API node operators, contract developers
-#### Strategic alignment: It will allow for consistency between on an Antelope chain and TrustEVM node which will allow for more tooling to work correctly and some allow for more operations at the EVM layer. 
+#### Opportunity:
+Currently block mapping between TrustEVM on EOS and TrustEVM node do not map to the same numbers. To allow for block hash to work consistently between these two we need a consistent mapping system.
+#### Target audience:
+- API node operators
+- Contract developers
+#### Strategic alignment:
+It will allow for consistency between on an Antelope chain and TrustEVM node which will allow for more tooling to work correctly and some allow for more operations at the EVM layer. 
 
 ## Solution
 
-#### Solution name: Consistent Block Mapping
+#### Solution name:
+Consistent Block Mapping
 #### Purpose: 
 Define and implement the block mapping used by TrustEVM on EOS and by TrustEVM node.
 #### Success definition: 
 The block numbers on TrustEVM contract and TrustEVM node are the same. Running block hash produces the same hash.
 #### Assumptions:
-- The contract block mapping needs to be finished first in this feature.
+The contract block mapping needs to be finished first in this feature.
 
 #### Risks:
 The inclusion of producing empty blocks to take up slack might be slow.
