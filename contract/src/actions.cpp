@@ -27,11 +27,14 @@ db_stats evm_contract::pushtx( eosio::name ram_payer, const bytes& rlptx ) {
     LOGTIME("EVM START");
     eosio::require_auth(ram_payer);
 
+    const silkworm::ChainConfig current_network = kJungle4;
+
     Block block;
     block.header.difficulty  = 0;
     block.header.gas_limit   = INT64_MAX;
     block.header.number      = eosio::internal_use_do_not_use::get_block_num();
     block.header.timestamp   = eosio::current_time_point().sec_since_epoch();
+    block.header.parent_hash = calculate_block_hash(block.header.number, current_network.chain_id, get_self().value);
 
     Transaction tx;
     ByteView bv{(const uint8_t*)rlptx.data(), rlptx.size()};
@@ -44,8 +47,8 @@ db_stats evm_contract::pushtx( eosio::name ram_payer, const bytes& rlptx ) {
     LOGTIME("EVM RECOVER SENDER");
 
     evm_runtime::engine engine;
-    evm_runtime::state state{get_self(), ram_payer};
-    evm_runtime::ExecutionProcessor ep{block, engine, state, kJungle4};
+    evm_runtime::state state{get_self(), current_network.chain_id, ram_payer};
+    evm_runtime::ExecutionProcessor ep{block, engine, state, current_network};
 
     Receipt receipt;
     ep.execute_transaction(tx, receipt);

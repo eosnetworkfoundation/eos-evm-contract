@@ -1,5 +1,6 @@
 #include <eosio/eosio.hpp>
 #include <eosio/fixed_bytes.hpp>
+#include <eosio/crypto.hpp>
 #include <evm_runtime/types.hpp>
 
 namespace evm_runtime {
@@ -52,12 +53,27 @@ evmc::bytes32 to_bytes32(const bytes& data) {
     return res;
 }
 
+evmc::bytes32 to_bytes32(const checksum256& data) {
+    evmc::bytes32 res;
+    auto ba = data.extract_as_byte_array();
+    eosio::check(ba.size() == sizeof(res.bytes), "wrong length");
+    memcpy(res.bytes, ba.data(), ba.size());
+    return res;
+}
+
 uint256 to_uint256(const bytes& value) {
     uint8_t tmp[32]{0};
     eosio::check(value.size() <= 32, "wrong length");
     size_t l = 32-value.size();
     memcpy(tmp+l, value.data(), value.size());
     return intx::be::load<uint256>(tmp);
+}
+
+evmc::bytes32 calculate_block_hash(uint64_t block_height, uint64_t chain_id, uint64_t contract) {
+    char buffer[32]{0};
+    eosio::datastream<char*> ds(buffer, 32);
+    ds << uint8_t{0} << block_height << chain_id << contract;
+    return to_bytes32(eosio::sha256(buffer, ds.tellp()));
 }
 
 }  // namespace silkworm

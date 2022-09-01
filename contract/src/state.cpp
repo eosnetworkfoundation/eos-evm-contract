@@ -199,8 +199,10 @@ void state::update_storage(const evmc::address& address, uint64_t incarnation, c
 
 std::optional<BlockHeader> state::read_header(uint64_t block_number,
                                                       const evmc::bytes32& block_hash) const noexcept {
-    eosio::check(false, "read_header not implemented");
-    return {};
+    BlockHeader block_header;
+    block_header.number      = block_number;
+    block_header.parent_hash = calculate_block_hash(block_header.number-1, _chain_id, _self.value);
+    return block_header;
 }
 
 bool state::read_body(BlockNum block_number, const evmc::bytes32& block_hash,

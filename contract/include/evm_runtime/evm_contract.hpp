@@ -14,7 +14,7 @@ namespace evm_runtime {
 CONTRACT evm_contract : public contract {
    public:
       using contract::contract;
-
+      
       [[eosio::action]]
       db_stats pushtx(eosio::name ram_payer, const bytes& rlptx);
 

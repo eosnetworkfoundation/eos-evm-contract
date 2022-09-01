@@ -15,6 +15,8 @@ namespace evm_runtime {
    typedef evmc::bytes32           bytes32;
    typedef evmc::bytes32           uint256be;
 
+   evmc::bytes32 calculate_block_hash(uint64_t block_height, uint64_t chain_id, uint64_t contract);
+
    eosio::checksum256 make_key(bytes data);
    eosio::checksum256 make_key(const evmc::address& addr);
    eosio::checksum256 make_key(const evmc::bytes32& data);
@@ -25,6 +27,7 @@ namespace evm_runtime {
 
    evmc::address to_address(const bytes& addr);
    evmc::bytes32 to_bytes32(const bytes& data);
+   evmc::bytes32 to_bytes32(const eosio::checksum256& data);
    uint256 to_uint256(const bytes& value);
 
 } //namespace evm_runtime
