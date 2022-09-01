@@ -8,6 +8,13 @@ tags: Proposal
 #### Dependencies: What work must be completed before this part of the solution is actionable?
 #### Silkworm testnet launch to test the bridge
 
+## Problem
+
+#### Opportunity: What are the needs of our target user groups?
+#### Target audience: Who is the target audience and why? 
+#### Strategic alignment: How does this problem align with our core strategic pillars?
+
+
 ## Solution
 
 #### Solution name: How should we refer to this product opportunity?
