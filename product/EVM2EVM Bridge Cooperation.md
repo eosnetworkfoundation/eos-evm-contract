@@ -2,7 +2,7 @@
 tags: Proposal
 ---
 
-# Product brief of EVM2EVM Bridge Frontend Design
+# Product brief of EVM2EVM Bridge Cooperation
 
 ## Prerequisites
 #### Dependencies: What work must be completed before this part of the solution is actionable?
@@ -11,7 +11,9 @@ tags: Proposal
 ## Problem
 
 #### Opportunity: What are the needs of our target user groups?
+#### Who are holding BTC, ETH, USDT and some other crypto assets want to trade, play and make profit in Trust EVM, so they will bridge their assets to exchange for new assets or staking get a APR in EVM
 #### Target audience: Who is the target audience and why? 
+#### Who are holding BTC, ETH, USDT and some other crypto assets, 
 #### Strategic alignment: How does this problem align with our core strategic pillars?
 
 
