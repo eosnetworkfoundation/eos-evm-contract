@@ -35,14 +35,14 @@ tags: Proposal
 
 
 #### Functionality
-#### 1. APR estimation, staking workflow, and requirements of configurations for Nodes'  operationg hardwares need to be prepared
+#### 1. APR estimation, staking workflow, and requirements of configurations for Nodes'  operationg hardwares need to be prepared - 1 weeks
 #### 2. Offline recruitment with the BPs of EOS - 2 weeks
-#### 3. Business development with groups like Everstake and Exchange - 2 weeks
-#### 4. Airdrop the tokens to old BPs
-#### 5. Token sales to staking nodes
+#### 3. Business development with groups like Everstake and Exchange - parallel with 2# in 2 weeks
+#### 4. Airdrop the tokens to old BPs - 1 weeks
+#### 5. Token sales to staking nodes - parallel with 2#,3# in 2 weeks
 #### 6. A Website to identify ID, staking EVM tokens to regiter to be one nodes - 2 weeks
-#### 7. Test all RPC nodes and pre-launch
-
+#### 7. Test all RPC nodes and pre-launch - 3 days
+ 
 #### Features
 #### User stories
 #### Additional tasks
