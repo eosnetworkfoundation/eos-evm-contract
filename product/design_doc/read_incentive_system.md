@@ -14,7 +14,7 @@ We consider using Nginx as the core of the proxy. The reason for that is:
 2. Nginx with upsync module can easily meet our need
 3. It might be hard to develop an efficient and reliable proxy in such short time
 
-![Figure 1: General Design]
+![Figure 1: General Design](https://github.com/eosnetworkfoundation/TrustEVM/blob/yarkinwho-product-desc-update/product/design_doc/proxy%20design.drawio.png)
 
 Figure 1: General Design
 
@@ -46,7 +46,7 @@ https://github.com/weibocom/nginx-upsync-module
 
 The upsync module can dynamically update upstream info from external source without reloading the config. We can let the nginx to sync upstream list from either the Upstream helper directly or use some storage such as redis or consul for it.
 
-![Figure 2: Design with some storage service]
+![Figure 2: Design with some storage service](https://github.com/eosnetworkfoundation/TrustEVM/blob/yarkinwho-product-desc-update/product/design_doc/Copy%20of%20proxy%20design.drawio.png)
 
 Figure 2: Design with some storage service
 
