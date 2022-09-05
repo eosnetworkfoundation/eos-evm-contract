@@ -2,7 +2,7 @@
 tags: Proposal
 ---
 
-# Product brief template
+# Proxy for Read Incentive System
 
 ## Prerequisites
 #### Dependencies: 
