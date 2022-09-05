@@ -2,7 +2,7 @@
 tags: Proposal
 ---
 
-# Product brief template
+# Read Incentive System
 
 ## Prerequisites
 #### Dependencies:
