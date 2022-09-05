@@ -50,6 +50,12 @@ The upsync module can dynamically update upstream info from external source with
 
 Figure 2: Design with some storage service
 
+Reliability and Performance:
+
+This module should be designed with enough concerns regarding reliablity and performance.
+- Proxy needs high availability design
+- Access log needs backup
+
 ### Upstream helper
 
 The helper that read the contract for staking info and translate it to nginx upstream info.
@@ -59,6 +65,10 @@ It then either allow nginx to directly read from it or save the info to some sto
 A tiny python/nodejs can do the work nicely. If we want to write to storage instead of serving http requests directly, even a bash script with curl might be enough.
 
 This module should be developed together with the proxy.
+
+Reliability and Performance:
+
+This module should have relatively low reliability and performance requirement.
 
 Dependency:
 
@@ -73,6 +83,11 @@ The access log should be text files in standard nginx format  with $upstream_ad
 A simple python/nodejs can do the job nicely. C++ is fine if figure out a good lib to use.
 
 If we want to distinct read/write, the Nginx have to look into the request and that will introduce some overhead.
+
+
+Reliability and Performance:
+
+This module should have relatively low reliability and performance requirement.
 
 Dependency:
 
@@ -90,5 +105,10 @@ The contract must have the following features:
 6. The contract can accept EVM tokens as the source of payment
 
 It should be a standard Ethereum contract in solidity as simple as possible.
+
+
+Reliability and Performance:
+
+This module should have relatively low reliability and performance requirement.
 
 The API should be defined first so other modules can start working.
