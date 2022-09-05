@@ -2,7 +2,7 @@
 tags: Proposal
 ---
 
-# Product brief template
+# Workload Verifier
 
 ## Prerequisites
 #### Dependencies: 
