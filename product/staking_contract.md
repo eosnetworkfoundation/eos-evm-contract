@@ -2,7 +2,7 @@
 tags: Proposal
 ---
 
-# Product brief template
+# Staking Contract
 
 ## Prerequisites
 #### Dependencies: What work must be completed before this part of the solution is actionable?
