@@ -2,7 +2,7 @@
 tags: Proposal
 ---
 
-# Product brief template
+# Staking UI
 
 ## Prerequisites
 #### Dependencies: 
