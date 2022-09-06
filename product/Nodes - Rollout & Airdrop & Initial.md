@@ -5,7 +5,8 @@ tags: Proposal
 # Nodes - Rollout & Airdrop & Initial
 
 ## Prerequisites
-#### Dependencies: The tech design of the Token mechanism
+#### Dependencies: What work must be completed before this part of the solution is actionable?
+#### The tech design of the Token mechanism
 
 ## Problem
 
@@ -15,6 +16,8 @@ tags: Proposal
 #### Target audience: Who is the target audience and why? 
 #### BPs of EOS network and some groups who are running staking business such as Everstake
 
+#### Strategic alignment: How does this problem align with our core strategic pillars?
+#### Conducive to unifying the interests of all EOS nodes and contributors
 
 ## Solution
 
@@ -28,6 +31,7 @@ tags: Proposal
 #### Have more than 30 nodes to start the mainnet
 
 #### Assumptions
+#### N/A
 
 #### Risks: What risks should be considered? https://www.svpg.com/four-big-risks/
 #### 1. APR is not high enough to attract users to stake EVM tokens, so we may not have enough nodes to start the mainnet
@@ -44,7 +48,9 @@ tags: Proposal
 #### 7. Test all RPC nodes and pre-launch - 3 days
  
 #### Features
+#### N/A
 #### User stories
+#### N/A
 #### Additional tasks
 - [ ] #issue number
 
