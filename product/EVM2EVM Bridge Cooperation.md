@@ -22,14 +22,20 @@ tags: Proposal
 
 #### Solution name: How should we refer to this product opportunity?
 #### EVM2EVM bridge will be done through partnership with existing bridge solutions. We have partnership with Multichain and Meson.fi now for non-stable and stable assets.
-
 #### Purpose: Define the product’s purpose briefly
+#### N/A
 #### Success definition: What are the top metrics for the product (up to 5) to define success?
+#### N/A
 #### Assumptions
+#### N/A
 #### Risks: What risks should be considered? https://www.svpg.com/four-big-risks/
+#### Securtiy risk is the biggest risk for both users and EVM projects, need to cooperate with Recovery+
 #### Functionality
+#### N/A
 #### Features
+#### N/A
 #### User stories
+#### N/A
 #### Additional tasks
 - [ ] #issue number
 
