@@ -11,19 +11,30 @@ tags: Proposal
 ## Problem
 
 #### Opportunity: What are the needs of our target user groups?
+#### N/A
 #### Target audience: Who is the target audience and why? 
+#### N/A
 #### Strategic alignment: How does this problem align with our core strategic pillars?
+#### N/A
 
 ## Solution
 
 #### Solution name: How should we refer to this product opportunity?
+#### N/A
 #### Purpose: Define the product’s purpose briefly
+#### N/A
 #### Success definition: What are the top metrics for the product (up to 5) to define success?
+#### N/A
 #### Assumptions
+#### N/A
 #### Risks: What risks should be considered? https://www.svpg.com/four-big-risks/
+#### N/A
 #### Functionality
+#### N/A
 #### Features
+#### N/A
 #### User stories
+#### N/A
 #### Additional tasks
 
 
@@ -35,6 +46,7 @@ tags: Proposal
 #### Static code review
 #### Dynamic differential testing
 #### Private deployment of the differential testing framework and continuous testing
+#### Audit Scope: Code in the directory of "contract/tests" and "contract/external/nlohmann is not in the scope
 
 
 ## Support
