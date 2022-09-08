@@ -44,4 +44,11 @@ see user stories.
 #### Additional tasks
 - [ ] #issue number
 
+
 ## Open questions
+
+We may also want to incluse some off-chain tasks here:
+- Apply to be operator
+- Arrange for quitting
+- Provide supporting materials for Application
+
