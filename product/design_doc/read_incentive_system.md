@@ -112,3 +112,11 @@ Reliability and Performance:
 This module should have relatively low reliability and performance requirement.
 
 The API should be defined first so other modules can start working.
+
+## Important issues
+- Should the operator be paid according to what they have done (calculated from access log), or be paid according to staking shares only while access log is used for monitor the activity. Foundation can punish malicious oprators according to the log.
+- Should we distinct read and write when recording access
+  - Consensus is NO. The gain is too little.
+- Should we use a kv storage in upstream helper
+  - Yes.
+- How our current proxy based read-incentive system deal with performance problems? e.g. what happen if the proxy is in us and the upstream node is in asia?
