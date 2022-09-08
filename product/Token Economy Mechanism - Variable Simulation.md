@@ -11,8 +11,11 @@ tags: Proposal
 ## Problem
 
 #### Opportunity: What are the needs of our target user groups?
+#### N/A
 #### Target audience: Who is the target audience and why? 
+#### The whole EVM team needs to know the simulation of token price, circulation and the influence by vesting time
 #### Strategic alignment: How does this problem align with our core strategic pillars?
+#### At the beginning of the project, controlling liquidity to realize the basic support for value capture for token price, to seek for the balance of inflation 
 
 ## Solution
 
@@ -21,16 +24,19 @@ tags: Proposal
 #### Purpose: Define the product’s purpose briefly
 #### To simulate the circulation of token in the market and the price of token based on the value capture model, with that to finalize the design of the token economy
 #### Success definition: What are the top metrics for the product (up to 5) to define success?
-#### Token based APR > 20%, moderate inflation, reduce circulation if market is terrible
+#### Token based APR > 20% in bull market/ APR > 7.5% in bear market, moderate inflation, reduce circulation if market is terrible
 #### Assumptions
+#### N/A
 #### Risks: What risks should be considered? https://www.svpg.com/four-big-risks/
+#### The market is so terrible and EVM token needs to avoid launching Liquidity pool.
 #### Functionality
+#### N/A
 #### Features
+#### N/A
 #### User stories
+#### N/A
 #### Additional tasks
 - [ ] #issue number
-
-
 
 
 ## Open questions
