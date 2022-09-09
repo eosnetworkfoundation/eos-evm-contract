@@ -40,8 +40,8 @@ See user stories
     - Methods for Operator to view related data
   - Proxy API
     - Methods for proxy to read upstream address and weight(based on staking amount)
-  - Workload Verifier API
-    - Methods for workload verifier to update the payment
+  - Workload Verifier API (Not needed for the first version)
+    - Methods for workload verifier to update the payment 
   - Admin API
     - Methods for admin to set allow list for valid operator/workload verifier
     - Methods for admin to view related data in an aggragate way
@@ -51,3 +51,8 @@ See user stories
 - [ ] #issue number
 
 ## Open questions
+- Need decision on the detailed mechanism for payment:
+  - What is the frequency should the contract receive tokens
+  - Whether this token is for next payment cycle or previous one.
+  - How should payment be calculated.(The general idea would be by share of payment, but how in detail, whether it should be similar to a Farm or something else)
+  - What if some operator join/quit in the middle of a payment cycle
