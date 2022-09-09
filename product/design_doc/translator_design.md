@@ -17,7 +17,7 @@ The proof of concept translator works as the following:
 
 The Geth client is then used to serve all read access.
 
-![Figure 1: Overview of the system.]([https://s3-us-west-2.amazonaws.com/secure.notion-static.com/9c4472c1-969f-4032-8739-923be9f4f67a/EOS-EVM_design.drawio.png](https://github.com/eosnetworkfoundation/TrustEVM/blob/yarkinwho-product-desc-update/product/design_doc/EOS-EVM%20design.drawio.png)
+![Figure 1: Overview of the system.](https://github.com/eosnetworkfoundation/TrustEVM/blob/yarkinwho-product-desc-update/product/design_doc/EOS-EVM%20design.drawio.png)
 
 Figure 1: Overview of the system.
 
