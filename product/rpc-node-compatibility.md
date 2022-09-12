@@ -86,8 +86,9 @@ Propossed extensions to the already implemented functionality:
 `blockchain_plugin`:
  - receives a stream of EVM blocks
  - persists EOS and EVM LIB (ship_receiver_plugin)
- - apply EVM block using `DefaultForwardOrder`
- - if a fork is detected (unwind needed), unwind stages based on the `DefaultUnwindOrder`
+ - uses `HeaderPersistence` and `BodyPersistence` to store the new EVM block
+ - apply stages using `DefaultForwardOrder`
+ - if a fork is detected when `HeaderPersistence` (unwind needed), unwind stages based on the `DefaultUnwindOrder`
  - when shuting down => revert all blocks in the fake chain that are not irreversible
 
 On stages execution:
