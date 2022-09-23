@@ -79,7 +79,7 @@ If we have gaps in the EVM block numbering, i.e. the next Antelope block that is
 ##### Making Forking Logic Work
 We will be using the built-in forking handling of Silkworm to handle the EVM forking, but we still need to determine when a fork has occurred and determine how many empty blocks to create to fill the reverted gap.
 
-To determine that a fork has occurred we keep the last block that we received from the block receiver and determine see if it is the previous of the block we are currently operating on.  If the block  does not link, then we roll back the entirety of the chain from the last LIB to now and replay from the last LIB+1.
+To determine that a fork has occurred we keep the last block that we received from the block receiver and determine see if it is the previous of the block we are currently operating on.  If the block  does not link, then we roll back the entirety of the chain from the block whose timestamp is after the fork to now and replay from that block.
 
 Because we will now have a gap in the block numbering as the forked block will be at a different time but link to a predecessor.
 
@@ -93,20 +93,24 @@ Because we will now have a gap in the block numbering as the forked block will b
 </pre>
 A fork occurs at antelope block 404.
 So now we have a new block `block 4 : antelope 404 at time 4`, this fails because we no longer have block 2 and block 3
+Antelope Chain
 <pre>
 | block 0 ← block 1 ← block 2 ← block3 |
 |                   ↖ block 4          |
 </pre>
 
 We need to produce the intermediate empty blocks to fill the gaps.
+TrustEVMNode Chain
 <pre>
 | block 0 ← block 1 ← block 2 ← block3              |
 |                   ↖ block 2' ← block 3' ← block 4 |
 </pre>
 
-#### Features
-#### User stories
-#### Additional tasks
+### Motivations for Doing Timebased Block Mapping
+Unlike other implementations that are using the block height or block number of the parent chain to direct their EVM block numbers, we have decided to use time as that basis for that mapping.
 
-## Open questions
+- Using time as the basis for determining block number is useful in a few ways. It allows for the TrustEVMNode chain and the TrustEVM (on Antelope) chain to stay in sync with block numbering very easily.
 
+- We can change the duration of Antelope block production and not have to worry about that breaking our TrustEVM system.  If you use block height of the Antelope chain then you have to account for the fact that EVM can only work with seconds in precision, so you would need to coalesce blocks which would ultimately mean that as changes are made to the underlying chain TrustEVM would need to handle those.  By this I mean if we have a protocol feature on Antelope that changes the time span for a block and we have a coalesing of N blocks to satisfy our second interval precision, then when that protocol feature is activated we then need to "fix" TrustEVM to be able to know that the change has happened and support both ways.  By abstracting this of time, we know that if is never going to change and therefore will continue to operate with any changes we need.
+
+- It will allow us to easily adapt this model for things like multiple blocks sharing the same timestamp to increase throughput by modifying one parameter.
