@@ -213,7 +213,7 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
                eosio::ship_protocol::transaction_trace tt;
                try {
                   tt = eosio::from_bin<eosio::ship_protocol::transaction_trace>(*block.traces);
-               } catch (std::exception e) {
+               } catch (const std::exception &e) {
                   SILK_ERROR << "failed to decode transaction_trace trace data remaining = " << block.traces->remaining() << ", " << e.what();
                   throw;
                }
@@ -239,14 +239,14 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
          return current_block.building ? std::optional<native_block_t>(std::move(current_block)) : std::nullopt;
       }
 
-      template <typename BlockResult>
-      inline native_block_t start_native_block(BlockResult&& res) const {
+      inline native_block_t start_native_block(eosio::ship_protocol::get_blocks_result_v0& res) const {
+         SILK_INFO << "start native block " << res.this_block->block_num; 
          native_block_t block;
          block.block_num = res.this_block->block_num;
-         eosio::ship_protocol::signed_block_v1 sb;
+         eosio::ship_protocol::signed_block_v0 sb;
          eosio::from_bin(sb, *res.block);
          block.timestamp = sb.timestamp.to_time_point().time_since_epoch().count();
-         SILK_INFO << "Started native block " << block.block_num;
+         SILK_DEBUG << "Leave native block " << block.block_num;
          return block;
       }
 
