@@ -167,7 +167,7 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
                {abieos::jobject{
                   {{"start_block_num"}, {std::to_string(start)}},
                   {{"end_block_num"}, {std::to_string(end)}},
-                  {{"max_messages_in_flight"}, {std::to_string(4*1024)}},
+                  {{"max_messages_in_flight"}, {std::to_string(0xffffffff)}},
                   {{"have_positions"}, {positions}},
                   {{"irreversible_only"}, {false}},
                   {{"fetch_block"}, {fetch_block}},
@@ -203,17 +203,25 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
 
          received_blocks++;
 
-
+         SILK_DEBUG << "on_block_result #" << block.this_block->block_num << ", received_blocks " << received_blocks;
+         
          if (block.traces) {
             uint32_t num;
             eosio::varuint32_from_bin(num, *block.traces);
             //SILK_DEBUG << "Block #" << ptr->block_num << " with " << num << " transactions and produced by : " << sb.producer.to_string();
             for (std::size_t i = 0; i < num; i++) {
-               auto tt = eosio::from_bin<eosio::ship_protocol::transaction_trace>(*block.traces);
+               eosio::ship_protocol::transaction_trace tt;
+               try {
+                  tt = eosio::from_bin<eosio::ship_protocol::transaction_trace>(*block.traces);
+               } catch (const std::exception &e) {
+                  SILK_ERROR << "failed to decode transaction_trace trace data remaining = " << block.traces->remaining() << ", " << e.what();
+                  throw;
+               }
                const auto& trace = std::get<eosio::ship_protocol::transaction_trace_v0>(tt);
                const auto& actions = trace.action_traces;
                for (std::size_t j=0; j < actions.size(); j++) {
                   const auto& act = std::get<eosio::ship_protocol::action_trace_v1>(actions[j]);
+                  SILK_DEBUG << "act " << std::string(act.act.name) << " receiver " << std::string(act.receiver);
                   if (act.act.name == eosio::name("pushtx") && core_account == act.receiver) {
                      if (!current_block.building) {
                         
@@ -231,14 +239,14 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
          return current_block.building ? std::optional<native_block_t>(std::move(current_block)) : std::nullopt;
       }
 
-      template <typename BlockResult>
-      inline native_block_t start_native_block(BlockResult&& res) const {
+      inline native_block_t start_native_block(eosio::ship_protocol::get_blocks_result_v0& res) const {
+         SILK_INFO << "start native block " << res.this_block->block_num; 
          native_block_t block;
          block.block_num = res.this_block->block_num;
-         eosio::ship_protocol::signed_block_v1 sb;
+         eosio::ship_protocol::signed_block_v0 sb;
          eosio::from_bin(sb, *res.block);
          block.timestamp = sb.timestamp.to_time_point().time_since_epoch().count();
-         SILK_INFO << "Started native block " << block.block_num;
+         SILK_DEBUG << "Leave native block " << block.block_num;
          return block;
       }
 
@@ -280,24 +288,25 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
 
       void shutdown() {
       }
-      
-      void sync_one(uint32_t next_block, uint32_t core_head) {
-         get_block(next_block, core_head, [this, next_block, core_head](auto block) {
+
+      void read_next_block() {
+         async_read([this](auto buff) {
+            std::optional<native_block_t> block = on_block_result(buff);
             if (block) {
                block->syncing = true;
                blocks_channel.publish(80, std::make_shared<channels::native_block>(std::move(*block)));
             }
-            sync_one(next_block+1, core_head);
+            read_next_block();
          });
       }
 
       void sync() {
-         // get the block range we can grab
          const auto& res = get_block_result(0, 0);
          uint32_t core_head = res.head.block_num;
-         SILK_INFO << "Syncing from block #" << genesis << " to block #" << core_head;
+         SILK_INFO << "Syncing from block #" << genesis << " and stay up to date";
          last_received = genesis;
-         sync_one(genesis, res.head.block_num);
+         get_blocks_request(genesis, 0xffffffff);
+         read_next_block();
       }
 
    private:
