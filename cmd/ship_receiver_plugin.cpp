@@ -239,11 +239,12 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
          return current_block.building ? std::optional<native_block_t>(std::move(current_block)) : std::nullopt;
       }
 
-      inline native_block_t start_native_block(eosio::ship_protocol::get_blocks_result_v0& res) const {
+      template <typename BlockResult>
+      inline native_block_t start_native_block(BlockResult&& res) const {
          SILK_INFO << "start native block " << res.this_block->block_num; 
          native_block_t block;
          block.block_num = res.this_block->block_num;
-         eosio::ship_protocol::signed_block_v0 sb;
+         eosio::ship_protocol::signed_block sb;
          eosio::from_bin(sb, *res.block);
          block.timestamp = sb.timestamp.to_time_point().time_since_epoch().count();
          SILK_DEBUG << "Leave native block " << block.block_num;
