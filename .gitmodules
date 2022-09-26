@@ -6,7 +6,7 @@
 	url = https://github.com/lemire/CRoaringUnityBuild
 [submodule "silkworm"]
 	path = silkworm
-	url = https://github.com/eosnetworkfoundation/silkworm
+	url = git@github.com:eosnetworkfoundation/silkworm
 [submodule "contract/external/ethash"]
 	path = contract/external/ethash
 	url = git@github.com:eosnetworkfoundation/ethash
