@@ -19,3 +19,9 @@
 [submodule "contract/external/GSL"]
 	path = contract/external/GSL
 	url = https://github.com/microsoft/GSL
+[submodule "external/appbase"]
+	path = external/appbase
+	url = https://github.com/antelopeio/appbase
+[submodule "external/abieos"]
+	path = external/abieos
+	url = https://github.com/antelopeio/abieos
