@@ -251,6 +251,24 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
          return block;
       }
 
+      template <typename Meta>
+      inline void handle_tx_meta(Meta&& obj) {
+         constexpr trust_evm::tx_meta_v0 system_version;
+         if (std::holds_alternative<trust_evm::tx_meta_v0>(obj)) {
+            const auto& txm = std::get<trust_evm::tx_meta_v0>(obj);
+            if (!(txm.major == system_version.major && txm.minor == system_version.minor && txm.patch == system_version.patch)) {
+               SILK_CRIT << "tx_meta version doesn't match system version system v"
+                         << system_version.major << "." << system_version.minor << "." << system_version.patch
+                         << " : tx_meta v" << txm.major << "." << txm.minor << "." << txm.patch;
+               sys::error();
+            }
+         } else {
+            SILK_CRIT << "tx_meta is an incompatible variant version";
+            sys::error();
+         }
+
+      }
+
       template <typename Trx>
       inline native_block_t& append_to_block(native_block_t& block, Trx&& trx) {
          channels::native_trx native_trx = {trx.id, trx.cpu_usage_us, trx.elapsed};
@@ -258,6 +276,8 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
          SILK_DEBUG << "Appending transaction ";
          for (std::size_t j=0; j < actions.size(); j++) {
             const auto& act = std::get<eosio::ship_protocol::action_trace_v1>(actions[j]);
+            eosio::input_stream retval = act.return_value;
+            handle_tx_meta(eosio::from_bin<trust_evm::tx_meta>(retval));
             channels::native_action action = {
                act.action_ordinal,
                act.receiver,

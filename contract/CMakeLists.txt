@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.19)
+cmake_minimum_required(VERSION 3.16)
 project(evm_runtime)
 
 include(ExternalProject)
@@ -15,12 +15,16 @@ option(WITH_LOGTIME
 
 ExternalProject_Add(
    evm_runtime_project
-   SOURCE_DIR ${CMAKE_SOURCE_DIR}/src
-   BINARY_DIR ${CMAKE_BINARY_DIR}/evm_runtime
+   SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src
+   BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/evm_runtime
    CMAKE_ARGS -DCMAKE_BUILD_TYPE=Release
               -DCMAKE_TOOLCHAIN_FILE=${CDT_ROOT}/lib/cmake/cdt/CDTWasmToolchain.cmake
               -DWITH_TEST_ACTIONS=${WITH_TEST_ACTIONS}
               -DWITH_LOGTIME=${WITH_LOGTIME}
+              -DTRUST_EVM_SHARED_DIR=${CMAKE_CURRENT_BINARY_DIR}/../shared
+              -DTRUST_EVM_MAJOR=${PROJECT_VERSION_MAJOR}
+              -DTRUST_EVM_MINOR=${PROJECT_VERSION_MINOR}
+              -DTRUST_EVM_PATCH=${PROJECT_VERSION_PATCH}
    UPDATE_COMMAND ""
    PATCH_COMMAND ""
    TEST_COMMAND ""

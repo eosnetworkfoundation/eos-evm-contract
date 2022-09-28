@@ -1,0 +1,20 @@
+#pragma once
+
+#include <cstdint>
+#include <variant>
+
+#ifndef EOSIO_REFLECT
+#define EOSIO_REFLECT(...)
+#endif
+
+namespace trust_evm {
+   // structure to contain meta data needed for external consumption
+   struct tx_meta_v0 {
+      uint16_t major = @PROJECT_VERSION_MAJOR@;
+      uint16_t minor = @PROJECT_VERSION_MINOR@;
+      uint16_t patch = @PROJECT_VERSION_PATCH@;
+   };
+
+   EOSIO_REFLECT(tx_meta_v0, major, minor, patch)
+   using tx_meta = std::variant<tx_meta_v0>;
+} // ns trust_evm

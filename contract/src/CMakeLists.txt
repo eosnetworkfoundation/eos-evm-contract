@@ -1,7 +1,6 @@
-cmake_minimum_required(VERSION 3.19)
+cmake_minimum_required(VERSION 3.16)
 project(evm_runtime)
 
-set(EOSIO_WASM_OLD_BEHAVIOR "Off")
 find_package(cdt)
 
 set(SOURCES, "")
@@ -21,7 +20,7 @@ if (WITH_LOGTIME)
 endif()
 
 add_compile_definitions(ANTELOPE)
-add_compile_definitions(PROJECT_VERSION="1.0.0")
+add_compile_definitions(PROJECT_VERSION="${TRUST_EVM_MAJOR}.${TRUST_EVM_MINOR}.${TRUST_EVM_PATCH}")
 
 # ethash
 list(APPEND SOURCES 
@@ -65,6 +64,7 @@ list(APPEND SOURCES
 add_contract( evm_contract evm_runtime ${SOURCES})
 
 target_include_directories( evm_runtime PUBLIC
+    ${TRUST_EVM_SHARED_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/../include
     ${CMAKE_CURRENT_SOURCE_DIR}/../external/intx/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../external/ethash/include
@@ -77,14 +77,14 @@ target_include_directories( evm_runtime PUBLIC
 
 target_link_options(evm_runtime PUBLIC -stack-size=20000)
 
-add_custom_command(TARGET evm_runtime
-   # make wasm data segments 8k long max
-   POST_BUILD
-   COMMENT "#### making wasm data segments 8k long max ####"
-   COMMAND eosio-wasm2wast ${CMAKE_CURRENT_BINARY_DIR}/evm_runtime.wasm | grep -v "(data" > ${CMAKE_CURRENT_BINARY_DIR}/evm_runtime.wat
-   COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../fix-data-segment.py ${CMAKE_CURRENT_BINARY_DIR}/evm_runtime.wasm > ${CMAKE_CURRENT_BINARY_DIR}/fixed-segments.wat
-   COMMAND cat ${CMAKE_CURRENT_BINARY_DIR}/fixed-segments.wat >> ${CMAKE_CURRENT_BINARY_DIR}/evm_runtime.wat
-   COMMAND echo ")" >> ${CMAKE_CURRENT_BINARY_DIR}/evm_runtime.wat
-   COMMAND eosio-wast2wasm ${CMAKE_CURRENT_BINARY_DIR}/evm_runtime.wat -o ${CMAKE_CURRENT_BINARY_DIR}/evm_runtime.wasm
-   VERBATIM
-)
+#add_custom_command(TARGET evm_runtime
+#   # make wasm data segments 8k long max
+#   POST_BUILD
+#   COMMENT "#### making wasm data segments 8k long max ####"
+#   COMMAND eosio-wasm2wast ${CMAKE_CURRENT_BINARY_DIR}/evm_runtime.wasm | grep -v "(data" > ${CMAKE_CURRENT_BINARY_DIR}/evm_runtime.wat
+#   COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../fix-data-segment.py ${CMAKE_CURRENT_BINARY_DIR}/evm_runtime.wasm > ${CMAKE_CURRENT_BINARY_DIR}/fixed-segments.wat
+#   COMMAND cat ${CMAKE_CURRENT_BINARY_DIR}/fixed-segments.wat >> ${CMAKE_CURRENT_BINARY_DIR}/evm_runtime.wat
+#   COMMAND echo ")" >> ${CMAKE_CURRENT_BINARY_DIR}/evm_runtime.wat
+#   COMMAND eosio-wast2wasm ${CMAKE_CURRENT_BINARY_DIR}/evm_runtime.wat -o ${CMAKE_CURRENT_BINARY_DIR}/evm_runtime.wasm
+#   VERBATIM
+#)

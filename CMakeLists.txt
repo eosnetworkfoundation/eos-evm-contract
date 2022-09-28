@@ -80,5 +80,7 @@ endif()
 
 add_subdirectory(silkrpc)
 add_subdirectory(external)
+add_subdirectory(shared)
 add_subdirectory(cmd)
 add_subdirectory(examples)
+add_subdirectory(contract)

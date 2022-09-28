@@ -11,7 +11,6 @@ std::optional<Account> state::read_account(const evmc::address& address) const n
     account_table accounts(_self, _self.value);
     auto inx = accounts.get_index<"by.address"_n>();
     auto itr = inx.find(make_key(address));
-    ++stats.account.read;
 
     if (itr == inx.end()) {
         return {};
@@ -34,7 +33,6 @@ ByteView state::read_code(const evmc::bytes32& code_hash) const noexcept {
     account_table accounts(_self, _self.value);
     auto inx = accounts.get_index<"by.codehash"_n>();
     auto itr = inx.find(make_key(code_hash));
-    ++stats.account.read;
 
     if (itr == inx.end() || itr->code.size() == 0) {
         return ByteView{};
@@ -53,7 +51,6 @@ evmc::bytes32 state::read_storage(const evmc::address& address, uint64_t incarna
         account_table accounts(_self, _self.value);
         auto inx = accounts.get_index<"by.address"_n>();
         auto itr = inx.find(make_key(address));
-        ++stats.account.read;
         if (itr == inx.end()) return {};
         addr2id[address] = itr->id;
     }
@@ -63,7 +60,6 @@ evmc::bytes32 state::read_storage(const evmc::address& address, uint64_t incarna
     storage_table db(_self, account_id);
     auto inx2 = db.get_index<"by.key"_n>();
     auto itr2 = inx2.find(make_key(location));
-    ++stats.storage.read;
     
     if(itr2 == inx2.end()) return {};
 
@@ -88,7 +84,6 @@ void state::update_account(const evmc::address& address, std::optional<Account> 
     account_table accounts(_self, _self.value);
     auto inx = accounts.get_index<"by.address"_n>();
     auto itr = inx.find(make_key(address));
-    ++stats.account.read;
 
     if (current.has_value()) {
         if (itr == inx.end()) {
@@ -99,14 +94,12 @@ void state::update_account(const evmc::address& address, std::optional<Account> 
                 row.balance = to_bytes(current->balance);
                 row.code_hash = to_bytes(current->code_hash);
             });
-            ++stats.account.create;
         } else {
             accounts.modify(*itr, eosio::same_payer, [&](auto& row){
                 row.nonce = current->nonce;
                 row.code_hash = to_bytes(current->code_hash);
                 row.balance = to_bytes(current->balance);
             });
-            ++stats.account.update;
         }
     } else {
         if(itr != inx.end()) {
@@ -114,10 +107,8 @@ void state::update_account(const evmc::address& address, std::optional<Account> 
             auto sitr = db.begin();
             while( sitr != db.end() ) {
                 sitr = db.erase(sitr);
-                ++stats.storage.remove;
             }
             accounts.erase(*itr);
-            ++stats.account.remove;
         }
     }
 }
@@ -126,13 +117,11 @@ void state::update_account_code(const evmc::address& address, uint64_t, const ev
     account_table accounts(_self, _self.value);
     auto inx = accounts.get_index<"by.address"_n>();
     auto itr = inx.find(make_key(address));
-    ++stats.account.read;
     if( itr != inx.end() ) {
         accounts.modify(*itr, eosio::same_payer, [&](auto& row){
             row.code = bytes{code.begin(), code.end()};
             row.code_hash = to_bytes(code_hash);
         });
-        ++stats.account.update;
     } else {
         accounts.emplace(_ram_payer, [&](auto& row){
             row.id = accounts.available_primary_key();;
@@ -141,7 +130,6 @@ void state::update_account_code(const evmc::address& address, uint64_t, const ev
             row.code = bytes{code.begin(), code.end()};
             row.code_hash = to_bytes(code_hash);
         });
-        ++stats.account.create;
     }
 }
 
@@ -151,17 +139,14 @@ void state::update_storage(const evmc::address& address, uint64_t incarnation, c
     account_table accounts(_self, _self.value);
     auto inx = accounts.get_index<"by.address"_n>();
     auto itr = inx.find(make_key(address));
-    ++stats.account.read;
 
     if (is_zero(current)) {
         if(itr == inx.end()) return;
         storage_table db(_self, itr->id);
         auto inx2 = db.get_index<"by.key"_n>();
         auto itr2 = inx2.find(make_key(location));
-        ++stats.storage.read;
         if(itr2 == inx2.end()) return;
         db.erase(*itr2);
-        ++stats.storage.remove;
     } else {
         uint64_t table_id;
         if(itr == inx.end()){
@@ -172,7 +157,6 @@ void state::update_storage(const evmc::address& address, uint64_t incarnation, c
                 row.nonce = 0;
                 row.code_hash = to_bytes(kEmptyHash);
             });
-            ++stats.account.read;
         } else {
             table_id = itr->id;
         }
@@ -180,19 +164,16 @@ void state::update_storage(const evmc::address& address, uint64_t incarnation, c
         storage_table db(_self, table_id);
         auto inx2 = db.get_index<"by.key"_n>();
         auto itr2 = inx2.find(make_key(location));
-        ++stats.storage.read;
         if(itr2 == inx2.end()) {
             db.emplace(_ram_payer, [&](auto& row){
                 row.id = db.available_primary_key();
                 row.key = to_bytes(location);
                 row.value = to_bytes(current);
             });
-            ++stats.storage.create;
         } else {
             db.modify(*itr2, eosio::same_payer, [&](auto& row){
                 row.value = to_bytes(current);
             });
-            ++stats.storage.update;
         }
     }
 }

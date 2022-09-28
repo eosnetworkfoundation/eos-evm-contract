@@ -7,6 +7,7 @@
 #include <eosio/chain_types.hpp>
 #include <eosio/crypto.hpp>
 #include <eosio/ship_protocol.hpp>
+#include <tx_meta.hpp>
 
 #include <boost/beast/core/flat_buffer.hpp>
 
@@ -29,7 +30,7 @@ namespace channels {
       eosio::name         name;
       eosio::input_stream data;
    };
-   
+
    struct native_trx {
       inline native_trx(eosio::checksum256 id, uint32_t cpu, int64_t elapsed)
          : id(id), cpu_usage_us(cpu), elapsed(elapsed) {}
@@ -57,4 +58,7 @@ namespace channels {
       uint32_t        core_block_num;
    };
    using blocks = appbase::channel_decl<struct blocks_tag, std::shared_ptr<block>>;
+
+   // reflect tx_meta
+   //EOSIO_REFLECT(trust_evm::tx_meta_v0 major, minor, patch)
 } // ns channels

@@ -22,8 +22,9 @@
 namespace evm_runtime {
 
 using namespace silkworm;
+using namespace trust_evm;
 
-db_stats evm_contract::pushtx( eosio::name ram_payer, const bytes& rlptx ) {
+tx_meta evm_contract::pushtx( eosio::name ram_payer, const bytes& rlptx ) {
     LOGTIME("EVM START");
     eosio::require_auth(ram_payer);
 
@@ -51,7 +52,7 @@ db_stats evm_contract::pushtx( eosio::name ram_payer, const bytes& rlptx ) {
     ep.execute_transaction(tx, receipt);
     
     LOGTIME("EVM EXECUTE");
-    return state.stats;
+    return {tx_meta_v0{}};
 }
 
 #ifdef WITH_TEST_ACTIONS

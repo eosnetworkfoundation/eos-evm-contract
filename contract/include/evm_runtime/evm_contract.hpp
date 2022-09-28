@@ -1,7 +1,8 @@
 #include <eosio/eosio.hpp>
-#include <evm_runtime/types.hpp>
 
 #include <evm_runtime/state.hpp>
+#include <evm_runtime/types.hpp>
+#include <tx_meta.hpp>
 
 #ifdef WITH_TEST_ACTIONS
 #include <evm_runtime/test/block_info.hpp>
@@ -16,7 +17,7 @@ CONTRACT evm_contract : public contract {
       using contract::contract;
 
       [[eosio::action]]
-      db_stats pushtx(eosio::name ram_payer, const bytes& rlptx);
+      trust_evm::tx_meta pushtx(eosio::name ram_payer, const bytes& rlptx);
 
 #ifdef WITH_TEST_ACTIONS
       ACTION testtx( const bytes& rlptx, const evm_runtime::test::block_info& bi );
