@@ -126,7 +126,7 @@ ValidationResult ExecutionProcessor::validate_transaction(const Transaction& txn
     return ValidationResult::kOk;
 }
 
-void ExecutionProcessor::execute_transaction(const Transaction& txn, Receipt& receipt) noexcept {
+CallResult ExecutionProcessor::execute_transaction(const Transaction& txn, Receipt& receipt) noexcept {
     auto res = validate_transaction(txn);
     if(res != ValidationResult::kOk) {
         std::string msg = "validate_transaction error: ";
@@ -165,7 +165,7 @@ void ExecutionProcessor::execute_transaction(const Transaction& txn, Receipt& re
     const intx::uint128 g0{intrinsic_gas(txn, rev >= EVMC_HOMESTEAD, rev >= EVMC_ISTANBUL)};
     eosio::check(g0 <= UINT64_MAX, "g0 <= UINT64_MAX");  // true due to the precondition (transaction must be valid)
 
-    const CallResult vm_res{evm_.execute(txn, txn.gas_limit - static_cast<uint64_t>(g0))};
+    CallResult vm_res{evm_.execute(txn, txn.gas_limit - static_cast<uint64_t>(g0))};
 
     const uint64_t gas_used{txn.gas_limit - refund_gas(txn, vm_res.gas_left)};
 
@@ -189,6 +189,8 @@ void ExecutionProcessor::execute_transaction(const Transaction& txn, Receipt& re
 
     consensus_engine_.finalize(state_, evm_.block(), evm_.revision());
     state_.write_to_db(evm_.block().header.number);
+
+    return std::move(vm_res);
 }
 
 uint64_t ExecutionProcessor::available_gas() const noexcept {

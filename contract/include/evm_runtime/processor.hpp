@@ -47,7 +47,7 @@ class ExecutionProcessor {
 
     // Execute a transaction, but do not write to the DB yet.
     // Precondition: transaction must be valid.
-    void execute_transaction(const Transaction& txn, Receipt& receipt) noexcept;
+    CallResult execute_transaction(const Transaction& txn, Receipt& receipt) noexcept;
 
     uint64_t cumulative_gas_used() const noexcept { return cumulative_gas_used_; }
 
