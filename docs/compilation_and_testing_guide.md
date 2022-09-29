@@ -2,12 +2,13 @@
  
 Prerequisite:
 
-cmake 3.19 or later
-Compile and install cdt project (https://github.com/AntelopeIO/cdt.git), please refer to https://github.com/AntelopeIO/cdt. 
-After install, you need to ensure the following soft links exist (if not, please manually create these soft links). 
-/usr/local/bin/cdt-cpp
-/usr/local/bin/eosio-wast2wasm
-/usr/local/bin/eosio-wasm2wast
+   cmake 3.19 or later
+   Compile and install cdt project (https://github.com/AntelopeIO/cdt.git), please refer to https://github.com/AntelopeIO/cdt. 
+   After install, you need to ensure the following soft links exist (if not, please manually create these soft links). 
+   
+      /usr/local/bin/cdt-cpp
+      /usr/local/bin/eosio-wast2wasm
+      /usr/local/bin/eosio-wasm2wast
 
 Checkout Trust EVM repo:
 ```
@@ -26,8 +27,8 @@ make -j
 ```
 You should now see the compile contract
 
-TrustEVM/contract/build/evm_runtime/evm_runtime.wasm
-TrustEVM/contract/build/evm_runtime/evm_runtime.abi
+   TrustEVM/contract/build/evm_runtime/evm_runtime.wasm
+   TrustEVM/contract/build/evm_runtime/evm_runtime.abi
 
 
 [Optional, but required for EVM token testings] to compile contract with debug actions, use
@@ -61,9 +62,9 @@ TrustEVM/build/cmd/unit_test
 
 Prerequisites:
 
-	- Successfully built nodeos in leap repo (https://github.com/AntelopeIO/leap.git)
-	- Successfully built system contracts in eos-system-contracts repo (https://github.com/eosnetworkfoundation/eos-system-contracts.git)
-	- Successfully compiled EVM smart contracts
+   Successfully built nodeos in leap repo (https://github.com/AntelopeIO/leap.git)
+   Successfully built system contracts in eos-system-contracts repo (https://github.com/eosnetworkfoundation/eos-system-contracts.git)
+   Successfully compiled EVM smart contracts
 
 <b> Bootstrapping Protocol Features </b>
 
@@ -127,12 +128,11 @@ code hash: 8789fe904edbe10aafb5330da7ab41395f8ae1620a6d2a0a4f68fe75464c1e19
 ## Set balance and transfer native EVM token via EVM smart contract: ##
 
 Prerequisite:
-Compiled EVM smart contract using debug mode (with setbalance action)
-Complied leap
-Compiled CDT
-EVM smart contract deployed
-[Optional] Able to access the EVM script repo (https://github.com/elmato/evm-scripts.git), if not, please use the script code from this doc below
-
+   Compiled EVM smart contract using debug mode (with setbalance action)
+   Complied leap
+   Compiled CDT
+   EVM smart contract deployed
+   [Optional] Able to access the EVM script repo (https://github.com/elmato/evm-scripts.git), if not, please use the script code from this doc below
 
 
 <b>Create test accounts</b>
@@ -301,10 +301,10 @@ TrustEVM/silkworm/core/silkworm/consensus/validation.hpp
 
 ## [Debug only] Playing with ethereum contract
 Prerequisite:
-Compiled EVM smart contract using debug mode (with setbalance action & updatecode action)
-Complied leap
-Compiled CDT
-EVM smart contract deployed
+   Compiled EVM smart contract using debug mode (with setbalance action & updatecode action)
+   Complied leap
+   Compiled CDT
+   EVM smart contract deployed
 
 <b>Compile a simple solidity code in https://remix.ethereum.org/ </b>
 
