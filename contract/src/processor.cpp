@@ -102,7 +102,7 @@ ValidationResult ExecutionProcessor::validate_transaction(const Transaction& txn
 
     const uint64_t nonce{state_.get_nonce(*txn.from)};
     if (nonce != txn.nonce) {
-        eosio::print("nonce");
+        eosio::print("nonce:", nonce);
         return ValidationResult::kWrongNonce;
     }
 
