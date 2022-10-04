@@ -34,7 +34,30 @@ elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     add_compile_options(-stdlib=libc++)
 endif()
 
+# Silkrpc toolbox
+add_executable(silkrpc_toolbox
+    silkrpc_toolbox.cpp
+    ethbackend_async.cpp ethbackend_coroutines.cpp ethbackend.cpp
+    kv_seek_async_callback.cpp kv_seek_async_coroutines.cpp kv_seek_async.cpp kv_seek.cpp
+    kv_seek_both.cpp
+)
+target_include_directories(silkrpc_toolbox PRIVATE ${CMAKE_SOURCE_DIR})
+target_link_libraries(silkrpc_toolbox absl::flags_parse gRPC::grpc++_unsecure protobuf::libprotobuf silkrpc)
+
 # Silkrpc daemon
+set(SILKRPC_DAEMON_LIBRARIES
+    silkrpc-buildinfo
+    silkrpc
+    absl::flags_parse
+    silkinterfaces)
+if(SILKRPC_USE_MIMALLOC)
+    list(APPEND SILKRPC_DAEMON_LIBRARIES mimalloc)
+endif()
+
+add_executable(silkrpcdaemon silkrpc_daemon.cpp)
+target_include_directories(silkrpcdaemon PUBLIC ${CMAKE_SOURCE_DIR})
+target_link_libraries(silkrpcdaemon PRIVATE ${SILKRPC_DAEMON_LIBRARIES})
+
 set(NODE_LIBRARIES
     trustevm_node-buildinfo
     silkrpc
@@ -79,10 +102,11 @@ enable_testing()
 
 find_package(Catch2 CONFIG REQUIRED)
 find_package(GTest CONFIG REQUIRED)
+find_package(asio-grpc CONFIG REQUIRED)
 
 file(GLOB_RECURSE SILKRPC_TESTS CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/silkrpc/*_test.cpp")
 add_executable(unit_test unit_test.cpp ${SILKRPC_TESTS})
-target_link_libraries(unit_test silkrpc Catch2::Catch2 GTest::gmock)
+target_link_libraries(unit_test silkrpc Catch2::Catch2 GTest::gmock asio-grpc::asio-grpc)
 
 include(CTest)
 include(Catch)
