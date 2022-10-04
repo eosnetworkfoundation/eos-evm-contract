@@ -8,7 +8,7 @@
 
 #include <trustevm_node/buildinfo.h>
 #include <silkrpc/common/log.hpp>
-#include <silkrpc/daemon.hpp>
+//#include <silkrpc/daemon.hpp>
 
 #include "engine_plugin.hpp"
 #include "ship_receiver_plugin.hpp"

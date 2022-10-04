@@ -11,16 +11,6 @@
 #include <boost/beast/core/flat_buffer.hpp>
 
 namespace channels {
-   struct fork {
-      uint32_t    block_num;
-   };
-   using forks = appbase::channel_decl<struct forks_tag, std::shared_ptr<fork>>;
-
-
-   struct lib_change {
-      uint32_t block_num;
-   };
-   using lib_advance = appbase::channel_decl<struct lib_advance_tag, std::shared_ptr<lib_change>>;
 
    struct native_action {
       uint32_t            ordinal;
@@ -41,20 +31,16 @@ namespace channels {
 
    struct native_block {
       native_block() = default;
-      inline native_block(uint32_t bn, int64_t tm, bool sync = false)
-        : block_num(bn), timestamp(tm), syncing(sync) {}
+      inline native_block(uint32_t bn, int64_t tm)
+        : block_num(bn), timestamp(tm) {}
+      eosio::checksum256      id;
+      eosio::checksum256      prev;
       uint32_t                block_num = 0;
       int64_t                 timestamp = 0;
       uint32_t                lib = 0;
       std::vector<native_trx> transactions;
-      bool                    building = false;
-      bool                    syncing  = false;
    };
-   using native_blocks = appbase::channel_decl<struct blocks_tag, std::shared_ptr<native_block>>;
-
-   struct block {
-      silkworm::Block data;
-      uint32_t        core_block_num;
-   };
-   using blocks = appbase::channel_decl<struct blocks_tag, std::shared_ptr<block>>;
+   
+   using native_blocks = appbase::channel_decl<struct native_blocks_tag, std::shared_ptr<native_block>>;
+   using evm_blocks = appbase::channel_decl<struct evm_blocks_tag, std::shared_ptr<silkworm::Block>>;
 } // ns channels

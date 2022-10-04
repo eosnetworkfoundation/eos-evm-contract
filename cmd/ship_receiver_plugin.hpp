@@ -22,10 +22,6 @@ class ship_receiver_plugin : public appbase::plugin<ship_receiver_plugin> {
       void plugin_startup();
       void plugin_shutdown();
 
-      void update_core_chain_state(uint32_t block_num);
-      void update_trust_chain_state(uint32_t block_num);
-      chain_state get_chain_state() const;
-
    private:
       std::unique_ptr<class ship_receiver_plugin_impl> my;
 };

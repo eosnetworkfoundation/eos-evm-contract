@@ -21,6 +21,7 @@ class sys_plugin : public appbase::plugin<sys_plugin> {
 
       static inline void error() {
          raise(SIGTERM);
+         raise(SIGINT);
       }
 
       uint32_t get_verbosity();

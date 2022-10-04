@@ -1,6 +1,5 @@
 #include "ship_receiver_plugin.hpp"
 #include "abi_utils.hpp"
-#include "chain_state.hpp"
 
 #include <atomic>
 #include <filesystem>
@@ -24,6 +23,8 @@
 #include <boost/interprocess/sync/interprocess_mutex.hpp>
 #include <boost/interprocess/sync/scoped_lock.hpp>
 #include <boost/algorithm/string.hpp> 
+#include <silkworm/db/stages.hpp>
+#include <silkworm/db/access_layer.hpp>
 
 namespace asio      = boost::asio;
 namespace bio       = boost::iostreams;
@@ -40,41 +41,23 @@ using sys = sys_plugin;
 class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plugin_impl> {
    public:
       ship_receiver_plugin_impl()
-         : blocks_channel(appbase::app().get_channel<channels::native_blocks>()) {
+         : native_blocks_channel(appbase::app().get_channel<channels::native_blocks>()) {
          }
 
       using block_result_t = eosio::ship_protocol::get_blocks_result_v0;
       using native_block_t = channels::native_block;
 
-      void init(std::string h, std::string p, uint32_t g, eosio::name ca, std::string_view cs_dir) {
+      void init(std::string h, std::string p, eosio::name ca) {
+         SILK_DEBUG << "ship_receiver_plugin_impl INIT";
          host = h;
          port = p;
-         genesis = g;
          core_account = ca;
-         core_chain_state = chain_state{{cs_dir.data(), cs_dir.size()}};
          resolver = std::make_shared<tcp::resolver>(appbase::app().get_io_service());
          stream   = std::make_shared<websocket::stream<tcp::socket>>(appbase::app().get_io_service());
          stream->binary(true);
          stream->read_message_max(0x1ull << 36);
          connect_stream();
-         if (core_chain_state.exists()) {
-            core_chain_state.read();
-            if (core_chain_state.head_block_num > genesis)
-               genesis = core_chain_state.head_block_num;
-         }
       }
-
-      void update_core_chain_state(uint32_t block_num) {
-         core_chain_state.head_block_num = block_num;
-         core_chain_state.write();
-      }
-
-      void update_trust_chain_state(uint32_t block_num) {
-         core_chain_state.head_trust_block_num = block_num;
-         core_chain_state.write();
-      }
-
-      inline chain_state get_chain_state() const { return core_chain_state; }
 
       void initial_read() {
          flat_buffer buff;
@@ -84,17 +67,11 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
             SILK_CRIT << "SHiP initial read failed : " << ec.message();
             sys::error();
          }
-
          abi = load_abi(eosio::json_token_stream{(char*)buff.data().data()});
       }
 
-      void send_request(const abieos::jvalue& v) {
-         std::vector<char> bin;
-         try {
-            abieos::json_to_bin(bin, &get_type("request", abi), v, [&](){});
-         } catch (std::runtime_error err) {
-            sys::error(err.what());
-         }
+      void send_request(const eosio::ship_protocol::request& req) {
+         auto bin = eosio::convert_to_bin(req);
          boost::system::error_code ec;
          stream->write(asio::buffer(bin), ec);
          if (ec) {
@@ -155,79 +132,58 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
          );
       }
 
-
-      void get_blocks_request(std::size_t start, std::size_t end) {
-         abieos::jarray positions = {};
-         bool fetch_block  = true;
-         bool fetch_traces = true;
-         bool fetch_deltas = false;
-
-         send_request(
-            abieos::jvalue{abieos::jarray{{"get_blocks_request_v0"},
-               {abieos::jobject{
-                  {{"start_block_num"}, {std::to_string(start)}},
-                  {{"end_block_num"}, {std::to_string(end)}},
-                  {{"max_messages_in_flight"}, {std::to_string(0xffffffff)}},
-                  {{"have_positions"}, {positions}},
-                  {{"irreversible_only"}, {false}},
-                  {{"fetch_block"}, {fetch_block}},
-                  {{"fetch_traces"}, {fetch_traces}},
-                  {{"fetch_deltas"}, {fetch_deltas}},
-               }}}});
+      void send_get_blocks_request(uint32_t start) {
+         eosio::ship_protocol::request req = eosio::ship_protocol::get_blocks_request_v0{
+            .start_block_num        = start,
+            .end_block_num          = std::numeric_limits<uint32_t>::max(),
+            .max_messages_in_flight = 4*1024,
+            .have_positions         = {},
+            .irreversible_only      = false,
+            .fetch_block            = true,
+            .fetch_traces           = true,
+            .fetch_deltas           = false
+         };
+         send_request(req);
       }
 
-      void get_blocks_request() {
-         get_blocks_request(received_blocks, received_blocks+1);
-      } 
+      void send_get_status_request() {
+         eosio::ship_protocol::request req = eosio::ship_protocol::get_status_request_v0{};
+         send_request(req);
+      }
+
+      void send_get_blocks_ack_request(uint32_t num_messages) {
+         eosio::ship_protocol::request req = eosio::ship_protocol::get_blocks_ack_request_v0{num_messages};
+         send_request(req);
+      }
 
       template <typename Buffer>
-      eosio::ship_protocol::get_blocks_result_v0 get_result(Buffer&& b){
+      eosio::ship_protocol::result get_result(Buffer&& b){
          auto data = b->data();
          eosio::input_stream bin = {(const char*)data.data(), (const char*)data.data() + data.size()};
-         verify_variant(bin, get_type("result", abi), "get_blocks_result_v0");
-
-         auto block = eosio::from_bin<eosio::ship_protocol::get_blocks_result_v0>(bin);
-         return block;
+         return eosio::from_bin<eosio::ship_protocol::result>(bin);
       }
 
-      template <typename Buffer>
-      std::optional<native_block_t> on_block_result(Buffer&& b) {
-         native_block_t current_block;
-         auto block = get_result(std::forward<Buffer>(b));
+      template <typename T>
+      std::optional<native_block_t> to_native(T&& block) {
 
          if (!block.this_block) {
-            return std::nullopt;
+           //TODO: throw here?
+           return std::nullopt;
          }
 
-         latest_height = block.this_block->block_num;
+         auto current_block = start_native_block(block);
 
-         received_blocks++;
-
-         SILK_DEBUG << "on_block_result #" << block.this_block->block_num << ", received_blocks " << received_blocks;
-         
          if (block.traces) {
             uint32_t num;
             eosio::varuint32_from_bin(num, *block.traces);
-            //SILK_DEBUG << "Block #" << ptr->block_num << " with " << num << " transactions and produced by : " << sb.producer.to_string();
+            //SILK_DEBUG << "Block #" << block.this_block->block_num << " with " << num << " transactions";
             for (std::size_t i = 0; i < num; i++) {
-               eosio::ship_protocol::transaction_trace tt;
-               try {
-                  tt = eosio::from_bin<eosio::ship_protocol::transaction_trace>(*block.traces);
-               } catch (const std::exception &e) {
-                  SILK_ERROR << "failed to decode transaction_trace trace data remaining = " << block.traces->remaining() << ", " << e.what();
-                  throw;
-               }
+               auto tt = eosio::from_bin<eosio::ship_protocol::transaction_trace>(*block.traces);
                const auto& trace = std::get<eosio::ship_protocol::transaction_trace_v0>(tt);
                const auto& actions = trace.action_traces;
                for (std::size_t j=0; j < actions.size(); j++) {
                   const auto& act = std::get<eosio::ship_protocol::action_trace_v1>(actions[j]);
-                  SILK_DEBUG << "act " << std::string(act.act.name) << " receiver " << std::string(act.receiver);
                   if (act.act.name == eosio::name("pushtx") && core_account == act.receiver) {
-                     if (!current_block.building) {
-                        
-                        current_block = start_native_block(block);
-                        current_block.building = true;
-                     }
                      append_to_block(current_block, trace);
                   } 
                }
@@ -235,18 +191,22 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
          }
 
          current_block.lib = block.last_irreversible.block_num;
-
-         return current_block.building ? std::optional<native_block_t>(std::move(current_block)) : std::nullopt;
+         return std::optional<native_block_t>(std::move(current_block));
       }
 
-      inline native_block_t start_native_block(eosio::ship_protocol::get_blocks_result_v0& res) const {
-         SILK_INFO << "start native block " << res.this_block->block_num; 
+      template <typename BlockResult>
+      inline native_block_t start_native_block(BlockResult&& res) const {
          native_block_t block;
-         block.block_num = res.this_block->block_num;
-         eosio::ship_protocol::signed_block_v0 sb;
+
+         eosio::ship_protocol::signed_block sb;
          eosio::from_bin(sb, *res.block);
+
+         block.block_num = res.this_block->block_num;
+         block.id        = res.this_block->block_id;
+         block.prev      = res.prev_block->block_id;
          block.timestamp = sb.timestamp.to_time_point().time_since_epoch().count();
-         SILK_DEBUG << "Leave native block " << block.block_num;
+
+         //SILK_INFO << "Started native block " << block.block_num;
          return block;
       }
 
@@ -254,7 +214,7 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
       inline native_block_t& append_to_block(native_block_t& block, Trx&& trx) {
          channels::native_trx native_trx = {trx.id, trx.cpu_usage_us, trx.elapsed};
          const auto& actions = trx.action_traces;
-         SILK_DEBUG << "Appending transaction ";
+         //SILK_DEBUG << "Appending transaction ";
          for (std::size_t j=0; j < actions.size(); j++) {
             const auto& act = std::get<eosio::ship_protocol::action_trace_v1>(actions[j]);
             channels::native_action action = {
@@ -265,48 +225,70 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
                std::move(act.act.data)
             };
             native_trx.actions.emplace_back(std::move(action));
-            SILK_DEBUG << "Appending action " << native_trx.actions.back().name.to_string();
+            //SILK_DEBUG << "Appending action " << native_trx.actions.back().name.to_string();
          }
          block.transactions.emplace_back(std::move(native_trx));
          return block;
       }
 
      
-      auto get_block_result(std::size_t s, std::size_t e){
-         get_blocks_request(s, e);
-         return get_result(read());
-      }
-
-      template <typename F>
-      void get_block(std::size_t s, std::size_t e, F&& func){
-         get_blocks_request(s, e);
-         async_read([this, func](auto buff) {
-            auto res = on_block_result(buff);
-            func(res);
-         });
+      auto get_status(){
+         send_get_status_request();
+         return std::get<eosio::ship_protocol::get_status_result_v0>(get_result(read()));;
       }
 
       void shutdown() {
       }
 
-      void read_next_block() {
+      void start_read() {
+         static size_t num_messages = 0;
          async_read([this](auto buff) {
-            std::optional<native_block_t> block = on_block_result(buff);
-            if (block) {
-               block->syncing = true;
-               blocks_channel.publish(80, std::make_shared<channels::native_block>(std::move(*block)));
+            auto block = to_native(std::get<eosio::ship_protocol::get_blocks_result_v0>(get_result(buff)));
+            if(!block) {
+               sys::error("Unable to generate native block");
+               return;
             }
-            read_next_block();
+
+            native_blocks_channel.publish(80, std::make_shared<channels::native_block>(std::move(*block)));
+
+            if(++num_messages % 1024 == 0) {
+               //SILK_INFO << "Block #" << block->block_num;
+               send_get_blocks_ack_request(num_messages);
+            }
+
+            start_read();
          });
       }
 
+      inline uint32_t endian_reverse_u32( uint32_t x )
+      {
+         return (((x >> 0x18) & 0xFF)        )
+            | (((x >> 0x10) & 0xFF) << 0x08)
+            | (((x >> 0x08) & 0xFF) << 0x10)
+            | (((x        ) & 0xFF) << 0x18)
+            ;
+      }
+
       void sync() {
-         const auto& res = get_block_result(0, 0);
-         uint32_t core_head = res.head.block_num;
-         SILK_INFO << "Syncing from block #" << genesis << " and stay up to date";
-         last_received = genesis;
-         get_blocks_request(genesis, 0xffffffff);
-         read_next_block();
+         // get available blocks range we can grab
+         auto res = get_status();
+
+         auto head_header = appbase::app().get_plugin<engine_plugin>().get_head_canonical_header();
+         if (!head_header) {
+            sys::error("Unable to read canonical header");
+            return;
+         }
+         auto start_from = endian_reverse_u32(*reinterpret_cast<uint32_t*>(head_header->mix_hash.bytes)) + 1;
+
+         if( res.trace_begin_block > start_from ) {
+            SILK_ERROR << "Block #" << start_from << " not available in SHiP";
+            sys::error("Start block not available in SHiP");
+            return;
+         }
+
+         SILK_INFO << "Starting from block #" << start_from;
+         send_get_blocks_request(start_from);
+         start_read();
       }
 
    private:
@@ -316,13 +298,8 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
       std::string                                     host;
       std::string                                     port;
       abieos::abi                                     abi;
-      uint32_t                                        received_blocks = 0;
-      uint32_t                                        last_received   = 0;
-      channels::native_blocks::channel_type&          blocks_channel;
-      uint32_t                                        genesis;
+      channels::native_blocks::channel_type&          native_blocks_channel;
       eosio::name                                     core_account;
-      uint32_t                                        latest_height = 0;
-      chain_state                                     core_chain_state;
 };
 
 ship_receiver_plugin::ship_receiver_plugin() : my(new ship_receiver_plugin_impl) {}
@@ -332,24 +309,17 @@ void ship_receiver_plugin::set_program_options( appbase::options_description& cl
    cfg.add_options()
       ("ship-endpoint", boost::program_options::value<std::string>()->default_value("127.0.0.1:8999"),
         "SHiP host address")
-      ("ship-genesis", boost::program_options::value<uint32_t>()->default_value(0),
-        "SHiP genesis block to start at")
       ("ship-core-account", boost::program_options::value<std::string>()->default_value("evmevmevmevm"),
         "Account on the core blockchain that hosts the Trust EVM runtime")
-      ("ship-chain-state-dir", boost::program_options::value<std::string>()->default_value("./chaindata"),
-        "Directory for SHiP chain state information")
-
    ;
 }
 
 void ship_receiver_plugin::plugin_initialize( const appbase::variables_map& options ) {
    auto endpoint = options.at("ship-endpoint").as<std::string>();
    const auto& i = endpoint.find(":");
-   auto genesis  = options.at("ship-genesis").as<uint32_t>();
    auto core     = options.at("ship-core-account").as<std::string>();
-   auto cs_dir   = appbase::app().get_plugin<engine_plugin>().get_chain_data_dir();
-   SILK_INFO << "CHAIN_DATA DIR" << cs_dir;
-   my->init(endpoint.substr(0, i), endpoint.substr(i+1), genesis, eosio::name(core), cs_dir);
+
+   my->init(endpoint.substr(0, i), endpoint.substr(i+1), eosio::name(core));
    SILK_INFO << "Initialized SHiP Receiver Plugin";
 }
 
@@ -361,16 +331,4 @@ void ship_receiver_plugin::plugin_startup() {
 
 void ship_receiver_plugin::plugin_shutdown() {
    SILK_INFO << "Shutdown SHiP Receiver";
-}
-
-void ship_receiver_plugin::update_core_chain_state(uint32_t block_num) {
-   my->update_core_chain_state(block_num);
-}
-
-void ship_receiver_plugin::update_trust_chain_state(uint32_t block_num) {
-   my->update_trust_chain_state(block_num);
-}
-
-chain_state ship_receiver_plugin::get_chain_state() const {
-   return my->get_chain_state();
 }
