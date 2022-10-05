@@ -4,15 +4,6 @@
 [submodule "silkrpc/croaring"]
 	path = silkrpc/croaring
 	url = https://github.com/lemire/CRoaringUnityBuild
-[submodule "external/mandel-fc"]
-	path = external/mandel-fc
-	url = https://github.com/eosnetworkfoundation/mandel-fc
-[submodule "external/mandel-appbase"]
-	path = external/mandel-appbase
-	url = https://github.com/eosnetworkfoundation/mandel-appbase
-[submodule "external/mandel-abieos"]
-	path = external/mandel-abieos
-	url = https://github.com/eosnetworkfoundation/mandel-abieos
 [submodule "silkworm"]
 	path = silkworm
 	url = https://github.com/eosnetworkfoundation/silkworm
@@ -28,3 +19,9 @@
 [submodule "contract/external/GSL"]
 	path = contract/external/GSL
 	url = https://github.com/microsoft/GSL
+[submodule "external/appbase"]
+	path = external/appbase
+	url = https://github.com/AntelopeIO/appbase
+[submodule "external/abieos"]
+	path = external/abieos
+	url = https://github.com/AntelopeIO/abieos
