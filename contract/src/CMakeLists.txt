@@ -76,15 +76,3 @@ target_include_directories( evm_runtime PUBLIC
 )
 
 target_link_options(evm_runtime PUBLIC -stack-size=20000)
-
-#add_custom_command(TARGET evm_runtime
-#   # make wasm data segments 8k long max
-#   POST_BUILD
-#   COMMENT "#### making wasm data segments 8k long max ####"
-#   COMMAND eosio-wasm2wast ${CMAKE_CURRENT_BINARY_DIR}/evm_runtime.wasm | grep -v "(data" > ${CMAKE_CURRENT_BINARY_DIR}/evm_runtime.wat
-#   COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../fix-data-segment.py ${CMAKE_CURRENT_BINARY_DIR}/evm_runtime.wasm > ${CMAKE_CURRENT_BINARY_DIR}/fixed-segments.wat
-#   COMMAND cat ${CMAKE_CURRENT_BINARY_DIR}/fixed-segments.wat >> ${CMAKE_CURRENT_BINARY_DIR}/evm_runtime.wat
-#   COMMAND echo ")" >> ${CMAKE_CURRENT_BINARY_DIR}/evm_runtime.wat
-#   COMMAND eosio-wast2wasm ${CMAKE_CURRENT_BINARY_DIR}/evm_runtime.wat -o ${CMAKE_CURRENT_BINARY_DIR}/evm_runtime.wasm
-#   VERBATIM
-#)

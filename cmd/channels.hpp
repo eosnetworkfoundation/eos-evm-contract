@@ -42,14 +42,13 @@ namespace channels {
 
    struct native_block {
       native_block() = default;
-      inline native_block(uint32_t bn, int64_t tm, bool sync = false)
-        : block_num(bn), timestamp(tm), syncing(sync) {}
+      inline native_block(uint32_t bn, int64_t tm)
+        : block_num(bn), timestamp(tm) {}
       uint32_t                block_num = 0;
       int64_t                 timestamp = 0;
       uint32_t                lib = 0;
       std::vector<native_trx> transactions;
       bool                    building = false;
-      bool                    syncing  = false;
    };
    using native_blocks = appbase::channel_decl<struct blocks_tag, std::shared_ptr<native_block>>;
 
@@ -59,6 +58,9 @@ namespace channels {
    };
    using blocks = appbase::channel_decl<struct blocks_tag, std::shared_ptr<block>>;
 
-   // reflect tx_meta
-   //EOSIO_REFLECT(trust_evm::tx_meta_v0 major, minor, patch)
+   struct force_emit_rec{
+      int64_t timestamp = 0;
+   };
+   using force_emit = appbase::channel_decl<struct force_emit_tag, std::shared_ptr<force_emit_rec>>;
+
 } // ns channels

@@ -24,6 +24,23 @@ namespace evm_runtime {
 using namespace silkworm;
 using namespace trust_evm;
 
+void evm_contract::init() {
+    // get the block
+    eosio::require_auth(get_self());
+    internal_state::set(this, trust_evm::record{(int64_t)current_time_point().sec_since_epoch()});
+}
+
+int64_t evm_contract::get_evm_block_number() const {
+    static const auto& genesis = internal_state::get(this).gen_time;
+    static const auto& now     = current_time_point().sec_since_epoch();
+
+    return now - genesis;
+}
+
+int64_t evm_contract::gentime() {
+    return internal_state::get(this).gen_time;
+}
+
 tx_meta evm_contract::pushtx( eosio::name ram_payer, const bytes& rlptx ) {
     LOGTIME("EVM START");
     eosio::require_auth(ram_payer);
@@ -31,7 +48,7 @@ tx_meta evm_contract::pushtx( eosio::name ram_payer, const bytes& rlptx ) {
     Block block;
     block.header.difficulty  = 0;
     block.header.gas_limit   = INT64_MAX;
-    block.header.number      = eosio::internal_use_do_not_use::get_block_num();
+    block.header.number      = get_evm_block_number();
     block.header.timestamp   = eosio::current_time_point().sec_since_epoch();
 
     Transaction tx;
@@ -64,7 +81,7 @@ ACTION evm_contract::testtx( const bytes& rlptx, const evm_runtime::test::block_
 
     Transaction tx;
     ByteView bv{(const uint8_t *)rlptx.data(), rlptx.size()};
-    eosio::check(rlp::decode(bv,tx) == rlp::DecodingResult::kOk && bv.empty(), "unable to decode transaction");
+    eosio::check(rlp::decode(bv,tx) == DecodingResult::kOk && bv.empty(), "unable to decode transaction");
 
     tx.from.reset();
     tx.recover_sender();
@@ -187,26 +204,27 @@ ACTION evm_contract::updatestore(const bytes& address, uint64_t incarnation, con
     state.update_storage(to_address(address), incarnation, to_bytes32(location), to_bytes32(initial), to_bytes32(current));
 }
 
-ACTION evm_contract::updateaccnt(const bytes& address, const bytes& initial, const bytes& current) {
-    eosio::require_auth(get_self());
-    evm_runtime::state state{get_self(), get_self()};
-    auto maybe_account = [](const bytes& data) -> std::optional<Account> {
-        std::optional<Account> res{};
-        if(data.size()) {
-            Account tmp;
-            ByteView bv{(const uint8_t *)data.data(), data.size()};
-            auto dec_res = decode_account_from_storage(bv);
-            eosio::check(dec_res.second == rlp::DecodingResult::kOk, "unable to decode account");
-            res = dec_res.first;
-        }
-        return res;
-    };
-
-    auto oinitial = maybe_account(initial);
-    auto ocurrent = maybe_account(current);
-
-    state.update_account(to_address(address), oinitial, ocurrent);
-}
+ACTION evm_contract::updateaccnt(const bytes& address, const bytes& initial, const bytes& current) {}
+//ACTION evm_contract::updateaccnt(const bytes& address, const bytes& initial, const bytes& current) {
+//    eosio::require_auth(get_self());
+//    evm_runtime::state state{get_self(), get_self()};
+//    auto maybe_account = [](const bytes& data) -> std::optional<Account> {
+//        std::optional<Account> res{};
+//        if(data.size()) {
+//            Account tmp;
+//            ByteView bv{(const uint8_t *)data.data(), data.size()};
+//            auto dec_res = decode_account_from_storage(bv);
+//            eosio::check(dec_res.second == rlp::DecodingResult::kOk, "unable to decode account");
+//            res = dec_res.first;
+//        }
+//        return res;
+//    };
+//
+//    auto oinitial = maybe_account(initial);
+//    auto ocurrent = maybe_account(current);
+//
+//    state.update_account(to_address(address), oinitial, ocurrent);
+//}
 
 ACTION evm_contract::setbal(const bytes& addy, const bytes& bal) {
     eosio::require_auth(get_self());

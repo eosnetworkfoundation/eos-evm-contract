@@ -3,6 +3,7 @@
 #include <evm_runtime/state.hpp>
 #include <evm_runtime/types.hpp>
 #include <tx_meta.hpp>
+#include <record.hpp>
 
 #ifdef WITH_TEST_ACTIONS
 #include <evm_runtime/test/block_info.hpp>
@@ -17,7 +18,16 @@ CONTRACT evm_contract : public contract {
       using contract::contract;
 
       [[eosio::action]]
+      void init();
+
+      [[eosio::action]]
       trust_evm::tx_meta pushtx(eosio::name ram_payer, const bytes& rlptx);
+
+      [[eosio::action]]
+      int64_t gentime();
+      int64_t get_evm_block_number() const;
+
+
 
 #ifdef WITH_TEST_ACTIONS
       ACTION testtx( const bytes& rlptx, const evm_runtime::test::block_info& bi );
@@ -29,7 +39,23 @@ CONTRACT evm_contract : public contract {
       ACTION dumpall();
       ACTION setbal(const bytes& addy, const bytes& bal);
 #endif
+   private:
+      struct internal_state {
+         typedef multi_index< "internal"_n, ::trust_evm::record> state;
 
+         static inline ::trust_evm::record get(const evm_contract* ec) {
+            state s(ec->get_self(), ec->get_self().value);
+            auto itr = s.find(0);
+            return *itr;
+         }
+
+         static inline void set(const evm_contract* ec, const ::trust_evm::record& rec) {
+            state s(ec->get_self(), ec->get_self().value);
+            s.emplace(ec->get_self(), [&](auto& o) {
+               o = rec;
+            });
+         }
+      };
 };
 
 

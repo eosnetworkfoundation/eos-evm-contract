@@ -40,7 +40,8 @@ using sys = sys_plugin;
 class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plugin_impl> {
    public:
       ship_receiver_plugin_impl()
-         : blocks_channel(appbase::app().get_channel<channels::native_blocks>()) {
+         : blocks_channel(appbase::app().get_channel<channels::native_blocks>()),
+           force_emit_channel(appbase::app().get_channel<channels::force_emit>()) {
          }
 
       using block_result_t = eosio::ship_protocol::get_blocks_result_v0;
@@ -74,7 +75,7 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
          core_chain_state.write();
       }
 
-      inline chain_state get_chain_state() const { return core_chain_state; }
+      inline chain_state& get_chain_state() { return core_chain_state; }
 
       void initial_read() {
          flat_buffer buff;
@@ -222,14 +223,25 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
                for (std::size_t j=0; j < actions.size(); j++) {
                   const auto& act = std::get<eosio::ship_protocol::action_trace_v1>(actions[j]);
                   SILK_DEBUG << "act " << std::string(act.act.name) << " receiver " << std::string(act.receiver);
-                  if (act.act.name == eosio::name("pushtx") && core_account == act.receiver) {
-                     if (!current_block.building) {
-                        
-                        current_block = start_native_block(block);
-                        current_block.building = true;
-                     }
-                     append_to_block(current_block, trace);
-                  } 
+                  eosio::ship_protocol::signed_block sb;
+                  eosio::from_bin(sb, *block.block);
+                  if (core_account == act.receiver) {
+                     if (act.act.name == eosio::name("init")) {
+                        // set the genesis time
+                        core_chain_state.genesis_time = sb.timestamp.to_time_point().time_since_epoch().count();
+                        core_chain_state.write();
+                     } else if (act.act.name == eosio::name("pushtx") && core_account == act.receiver) {
+                        if (!current_block.building) {
+                           current_block = start_native_block(block);
+                           current_block.building = true;
+                        }
+                        append_to_block(current_block, trace);
+                     } else {
+                        auto rec = std::make_shared<channels::force_emit_rec>();
+                        rec->timestamp = sb.timestamp.to_time_point().time_since_epoch().count(); 
+                        force_emit_channel.publish(80,std::move(rec));
+                     } 
+                  }
                }
             }
          }
@@ -314,7 +326,6 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
          async_read([this](auto buff) {
             std::optional<native_block_t> block = on_block_result(buff);
             if (block) {
-               block->syncing = true;
                blocks_channel.publish(80, std::make_shared<channels::native_block>(std::move(*block)));
             }
             read_next_block();
@@ -340,6 +351,7 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
       uint32_t                                        received_blocks = 0;
       uint32_t                                        last_received   = 0;
       channels::native_blocks::channel_type&          blocks_channel;
+      channels::force_emit::channel_type&             force_emit_channel;
       uint32_t                                        genesis;
       eosio::name                                     core_account;
       uint32_t                                        latest_height = 0;
@@ -392,6 +404,6 @@ void ship_receiver_plugin::update_trust_chain_state(uint32_t block_num) {
    my->update_trust_chain_state(block_num);
 }
 
-chain_state ship_receiver_plugin::get_chain_state() const {
-   return my->get_chain_state();
+chain_state* ship_receiver_plugin::get_chain_state() {
+   return &my->get_chain_state();
 }
