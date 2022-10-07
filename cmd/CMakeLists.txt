@@ -46,7 +46,7 @@ target_link_libraries(silkrpc_toolbox absl::flags_parse gRPC::grpc++_unsecure pr
 
 # Silkrpc daemon
 set(SILKRPC_DAEMON_LIBRARIES
-    silkrpc-buildinfo
+    #silkrpc-buildinfo
     silkrpc
     absl::flags_parse
     silkinterfaces)
@@ -80,11 +80,11 @@ target_link_libraries(sys_plugin PUBLIC silkworm_core silkworm_node appbase ${Bo
 
 add_library(rpc_plugin rpc_plugin.cpp)
 target_include_directories(rpc_plugin PUBLIC ${CMAKE_SOURCE_DIR})
-target_link_libraries(rpc_plugin PUBLIC ${SILKRPC_LIBRARIES} sys_plugin appbase ${Boost_PROGRAM_OPTIONS_LIBRARY})
+target_link_libraries(rpc_plugin PUBLIC ${SILKRPC_LIBRARIES} ${SILKRPC_DAEMON_LIBRARIES} sys_plugin appbase ${Boost_PROGRAM_OPTIONS_LIBRARY})
 
 add_executable(trustevm-node node.cpp)
 target_include_directories(trustevm-node PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR})
-target_link_libraries(trustevm-node PRIVATE engine_plugin shipreceiver_plugin sys_plugin blockchain_plugin trustevm_node-buildinfo)
+target_link_libraries(trustevm-node PRIVATE engine_plugin shipreceiver_plugin sys_plugin blockchain_plugin rpc_plugin trustevm_node-buildinfo)
 
 add_executable(trustevm-rpc rpc.cpp)
 target_include_directories(trustevm-rpc PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR})

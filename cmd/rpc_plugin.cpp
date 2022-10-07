@@ -55,8 +55,10 @@ void rpc_plugin::plugin_initialize( const appbase::variables_map& options ) {
 
    auto verbosity         = appbase::app().get_plugin<sys_plugin>().get_verbosity();
 
+   using evmc::operator""_bytes32;
    silkworm::ChainConfig config{
       0,  // chain_id
+      0_bytes32,
       silkworm::SealEngineType::kNoProof,
       {
          0,          // Homestead

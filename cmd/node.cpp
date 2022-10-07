@@ -15,6 +15,7 @@
 #include "sys_plugin.hpp"
 #include "blockchain_plugin.hpp"
 #include "block_conversion_plugin.hpp"
+#include "rpc_plugin.hpp"
 
 std::string get_version_from_build_info() {
     const auto build_info{trustevm_node_get_buildinfo()};
@@ -32,6 +33,7 @@ int main(int argc, char* argv[]) {
         appbase::app().register_plugin<ship_receiver_plugin>();
         appbase::app().register_plugin<sys_plugin>();
         appbase::app().register_plugin<block_conversion_plugin>();
+        appbase::app().register_plugin<rpc_plugin>();
 
         if (!appbase::app().initialize<sys_plugin>(argc, argv))
            return -1;
