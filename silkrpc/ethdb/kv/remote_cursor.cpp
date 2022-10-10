@@ -47,6 +47,7 @@ asio::awaitable<KeyValue> RemoteCursor::seek_exact(silkworm::ByteView key) {
     auto seek_pair = co_await kv_awaitable_.async_seek_exact(cursor_id_, key, asio::use_awaitable);
     const auto k = silkworm::bytes_of_string(seek_pair.k());
     const auto v = silkworm::bytes_of_string(seek_pair.v());
+    SILKRPC_TRACE << "RemoteCursor::seek_exact === keylen:" << seek_pair.k().length() << " vallen:" << seek_pair.v().length() << "\n";
     SILKRPC_DEBUG << "RemoteCursor::seek_exact k: " << k << " v: " << v << " c=" << cursor_id_ << " t=" << clock_time::since(start_time) << "\n";
     co_return KeyValue{k, v};
 }

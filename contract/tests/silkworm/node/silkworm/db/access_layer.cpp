@@ -266,12 +266,13 @@ std::vector<evmc::address> read_senders(mdbx::txn& txn, BlockNum block_number, c
 
 std::vector<evmc::address> read_senders(mdbx::txn& txn, const Bytes& key) {
     std::vector<evmc::address> senders{};
-    auto data_view{read_senders_raw(txn, key)};
-    if (!data_view.empty()) {
-        SILKWORM_ASSERT(data_view.length() % kAddressLength == 0);
-        senders.resize(data_view.length() / kAddressLength);
-        std::memcpy(senders.data(), data_view.data(), data_view.length());
-    }
+    SILK_INFO << "enter access_layer.cpp:read_senders, will return []";
+    // auto data_view{read_senders_raw(txn, key)};
+    // if (!data_view.empty()) {
+    //     SILKWORM_ASSERT(data_view.length() % kAddressLength == 0);
+    //     senders.resize(data_view.length() / kAddressLength);
+    //     std::memcpy(senders.data(), data_view.data(), data_view.length());
+    // }
     return senders;
 }
 

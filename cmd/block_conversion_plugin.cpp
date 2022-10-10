@@ -16,7 +16,7 @@ class block_conversion_plugin_impl : std::enable_shared_from_this<block_conversi
 
       inline void init(uint32_t stride, std::string abi_dir, uint32_t block_num) {
          block_stride = stride;
-         next_block_num = block_num;
+         next_block_num = block_num + 1;
 
          load_abi(abi_dir);
 
@@ -57,6 +57,14 @@ class block_conversion_plugin_impl : std::enable_shared_from_this<block_conversi
                      }
                      trx.from.reset();
                      trx.recover_sender();
+                     if ((bool)trx.from) {
+                        char msg[100];
+                        sprintf(msg, "recoverred from addr ");
+                        for (int i = 0; i < 20; ++i) {
+                           sprintf(msg + strlen(msg), "%02x", trx.from->bytes[i]);
+                        }
+                        SILK_DEBUG << msg;
+                     }
                      current_block->data.transactions.emplace_back(std::move(trx));
                   }
                }
@@ -64,6 +72,9 @@ class block_conversion_plugin_impl : std::enable_shared_from_this<block_conversi
                current_block->core_block_num = b->block_num;
 
                block_event.publish(80, current_block);
+               SILK_INFO << "published block event of #" << b->block_num << " with " << current_block->data.transactions.size() << " trxs";
+
+               current_block = std::make_shared<channels::block>();
             }
          );
       }

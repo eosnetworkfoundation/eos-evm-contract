@@ -187,14 +187,20 @@ asio::awaitable<void> EthereumRpcApi::handle_eth_get_block_by_hash(const nlohman
     auto tx = co_await database_->begin();
 
     try {
+        SILKRPC_INFO << "=== in EthereumRpcApi::handle_eth_get_block_by_hash";
         ethdb::TransactionDatabase tx_database{*tx};
 
+        SILKRPC_INFO << "=== before read_block_by_hash()";
         const auto block_with_hash = co_await core::read_block_by_hash(*block_cache_, tx_database, block_hash);
         const auto block_number = block_with_hash.block.header.number;
+        SILKRPC_INFO << "=== block_number is " << block_number;
         const auto total_difficulty = co_await core::rawdb::read_total_difficulty(tx_database, block_hash, block_number);
+        SILKRPC_INFO << "=== total_difficulty " << total_difficulty;
         const Block extended_block{block_with_hash, total_difficulty, full_tx};
+        SILKRPC_INFO << "=== after extended_block";
 
         reply = make_json_content(request["id"], extended_block);
+        SILKRPC_INFO << "=== after make_json_content";
     } catch (const std::invalid_argument& iv) {
         SILKRPC_WARN << "invalid_argument: " << iv.what() << " processing request: " << request.dump() << "\n";
         reply = make_json_content(request["id"], {});
@@ -1040,11 +1046,22 @@ asio::awaitable<void> EthereumRpcApi::handle_eth_call(const nlohmann::json& requ
     auto tx = co_await database_->begin();
 
     try {
+        SILKRPC_TRACE << "=== before tx_database";
         ethdb::kv::CachedDatabase tx_database{BlockNumberOrHash{block_id}, *tx, *state_cache_};
 
-        const auto chain_id = co_await core::rawdb::read_chain_id(tx_database);
+        SILKRPC_TRACE << "=== before read_chain_id";
+
+        const uint64_t chain_id = 0; //co_await core::rawdb::read_chain_id(tx_database);
+
+         SILKRPC_TRACE << "=== before lookup_chain_config";
+
         const auto chain_config_ptr = silkworm::lookup_chain_config(chain_id);
+
+         SILKRPC_TRACE << "=== before get_block_number";
+
         const auto block_number = co_await core::get_block_number(block_id, tx_database);
+
+        SILKRPC_TRACE << "=== block number is " << block_number;
 
         EVMExecutor executor{*context_.io_context(), tx_database, *chain_config_ptr, workers_, block_number};
         const auto block_with_hash = co_await core::read_block_by_number(*block_cache_, tx_database, block_number);

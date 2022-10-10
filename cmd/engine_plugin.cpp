@@ -59,6 +59,13 @@ class engine_plugin_impl : std::enable_shared_from_this<engine_plugin_impl> {
          db_env = silkworm::db::open_env(node_settings.chaindata_env_config);
          SILK_INFO << "Created DB environment at location : " << node_settings.data_directory->chaindata().path().string();
 
+         // if (node_settings.chaindata_env_config.create) {
+         //    SILK_INFO << "Check or create chaindata tables";
+         //    silkworm::db::RWTxn txn(chaindata_env);
+         //    silkworm::db::table::check_or_create_chaindata_tables(*txn);
+         //    txn.commit(true);
+         // }
+
          eth.reset(new silkworm::EthereumBackEnd(node_settings, &db_env));
          eth->set_node_name("Trust Node");
          SILK_INFO << "Created Ethereum Backend with network id <" << node_settings.network_id << ">, etherbase <" << node_settings.etherbase->bytes << ">";
