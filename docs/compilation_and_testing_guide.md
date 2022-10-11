@@ -156,46 +156,8 @@ python3 ./get_balance.py 2787b98fc4e731d0456b3941f0b3fe2e01439961
 ```
 You’ll get 0 as the current balance
 
-If you can’t access evm-script, please use the following code as get_balance.py
-```
-import sys
-import os
-import string
-from ethereum.utils import privtoaddr, encode_hex, decode_hex, bytes_to_int
-from ethereum import transactions
-from ueosio.rpc import Api
+Please find the get_balance.py from https://github.com/eosnetworkfoundation/TrustEVM/tree/kayan-rpc-fix/testing-utils
 
-NODEOS_ENDPOINT = os.environ.get('NODEOS_ENDPOINT', 'http://127.0.0.1:8888')
-
-if len(sys.argv) < 2:
-    print("{0} ACCOUNT".format(sys.argv[0]))
-    sys.exit(1)
-
-_account = sys.argv[1].lower()
-if _account[:2] == '0x': _account = _account[2:]
-
-if not all(c in string.hexdigits for c in _account) or len(_account) != 40:
-    print("invalid address")
-    sys.exit(1)
- 
-api = Api(NODEOS_ENDPOINT)
-res = api.v1.chain.get_table_rows(
-    code="evmevmevmevm",
-    scope="evmevmevmevm",
-    table="account",
-    key_type="sha256",
-    index_position="2",
-    lower_bound=_account,
-    limit=1,
-    json=True
-)
-
-bal = 0
-if len(res['rows']) and res['rows'][0]['eth_address'] == _account:
-    bal = bytes_to_int(decode_hex(res['rows'][0]['balance']))
-
-print(bal)
-```
 
 Push debug action setbal:
 ```
@@ -212,61 +174,7 @@ You should see a non-zero number. Whether or not it looks like garbage, but that
 
 <b>Step 3: send balance</b>
 
-create script send_via_cleos.py with content as follow:
-
-```
-import os
-import sys
-from datetime import datetime, timedelta
-from getpass import getpass
-from binascii import hexlify
-from ethereum.utils import privtoaddr, encode_hex, decode_hex, bytes_to_int
-from ethereum import transactions
-from binascii import unhexlify
-import subprocess
-import requests as r
-import rlp
-import json
-
-EVM_CONTRACT    = os.getenv("EVM_CONTRACT", "evmevmevmevm")
-NODEOS_ENDPOINT = os.getenv("NODEOS_ENDPOINT", "http://localhost:8888")
-EOS_SENDER      = os.getenv("EOS_SENDER", "evmevmevmevm")
-EVM_SENDER_KEY  = os.getenv("EVM_SENDER_KEY", None)
-EOS_SENDER_KEY  = os.getenv("EOS_SENDER_KEY", None)
-EVM_CHAINID     = int(os.getenv("EVM_CHAINID", "15555"))
-
-if len(sys.argv) < 4:
-    print("{0} FROM TO AMOUNT".format(sys.argv[0]))
-    sys.exit(1)
-
-_from = sys.argv[1].lower()
-if _from[:2] == '0x': _from = _from[2:]
-
-_to     = sys.argv[2].lower()
-if _to[:2] == '0x': _to = _to[2:]
-
-_amount = int(sys.argv[3])
-nonce = int(sys.argv[4])
-
-unsigned_tx = transactions.Transaction(
-    nonce,
-    150000000000, #150 GWei
-    100000,       #100k Gas
-    _to,
-    _amount,
-    b''
-)
-
-if not EVM_SENDER_KEY:
-    EVM_SENDER_KEY = getpass('Enter private key for {0}:'.format(_from))
-
-rlptx = rlp.encode(unsigned_tx.sign(EVM_SENDER_KEY, EVM_CHAINID), transactions.Transaction)
-
-act_data = {"ram_payer":EOS_SENDER, "rlptx":rlptx.hex()}
-print("act_data is {}".format(act_data))
-
-subprocess.run(["./cleos", "push", "action", EVM_CONTRACT, "pushtx", json.dumps(act_data), "-p", EOS_SENDER])
-```
+please find send_via_cleos.py from https://github.com/eosnetworkfoundation/TrustEVM/tree/kayan-rpc-fix/testing-utils
 
 command:
 ```
@@ -299,7 +207,7 @@ Other errors are defined in:
 TrustEVM/silkworm/core/silkworm/consensus/validation.hpp
 
 
-## [Debug only] Playing with ethereum contract
+## Playing with ethereum contract
 Prerequisite:
    Compiled EVM smart contract using debug mode (with setbalance action & updatecode action)
    Complied leap
@@ -354,7 +262,24 @@ You will get the bytecode after compilation:
 
 ```
 
-<b>Set EVM bytecode to EVM contract on EOSIO:</b>
+<b> Set EVM bytecode by sending eth transaction to null destination address </b>
+
+The standard way to deploy eth bytecode is to send eth transaction with "TO" address set to null, and with the "input" field set to the corresponding bytecode data. The resulting contract address is determined by the sender address and the nonce value
+
+Example command:
+```
+python3 ./send_data_via_cleos.py 2787b98fc4e731d0456b3941f0b3fe2e01439961 "" 0 608060405234801561001057600080fd5b50610150806100206000396000f3fe608060405234801561001057600080fd5b50600436106100365760003560e01c80632e64cec11461003b5780636057361d14610059575b600080fd5b610043610075565b60405161005091906100d9565b60405180910390f35b610073600480360381019061006e919061009d565b61007e565b005b60008054905090565b8060008190555050565b60008135905061009781610103565b92915050565b6000602082840312156100b3576100b26100fe565b5b60006100c184828501610088565b91505092915050565b6100d3816100f4565b82525050565b60006020820190506100ee60008301846100ca565b92915050565b6000819050919050565b600080fd5b61010c816100f4565b811461011757600080fd5b5056fea26469706673582212209a159a4f3847890f10bfb87871a61eba91c5dbf5ee3cf6398207e292eee22a1664736f6c63430008070033 0
+```
+Please note that the contract address will be 3f4b0f92007341792aa61e065484e48e583ebeb9 for nonce 0
+and will be 51a97d86ae7c83f050056f03ebbe451001046764 for nonce 1
+At this moment please get back the contract address via 
+```
+./cleos get table evmevmevmevm evmevmevmevm account
+```
+
+
+
+<b>[Debug ONLY, doesn't work with TrustEVM-RPC] Set EVM bytecode to EVM contract on EOSIO via debug action updatecode:</b>
 
 Caveat: according to the EVM bytecode standard, the byte code should have the following 3 parts:
 - Deploy code
@@ -430,60 +355,7 @@ Take the above solidity contract in https://remix.ethereum.org/, executing the �
 ```
 0x6057361d000000000000000000000000000000000000000000000000000000000000007b
 ```
-Prepare the script “send_data_via_cleos.py” with the following content:
-```
-import os
-import sys
-from datetime import datetime, timedelta
-from getpass import getpass
-from binascii import hexlify
-from ethereum.utils import privtoaddr, encode_hex, decode_hex, bytes_to_int
-from ethereum import transactions
-from binascii import unhexlify
-import subprocess
-import requests as r
-import rlp
-import json
-
-EVM_CONTRACT    = os.getenv("EVM_CONTRACT", "evmevmevmevm")
-NODEOS_ENDPOINT = os.getenv("NODEOS_ENDPOINT", "http://localhost:8888")
-EOS_SENDER      = os.getenv("EOS_SENDER", "evmevmevmevm")
-EVM_SENDER_KEY  = os.getenv("EVM_SENDER_KEY", None)
-EOS_SENDER_KEY  = os.getenv("EOS_SENDER_KEY", None)
-EVM_CHAINID     = int(os.getenv("EVM_CHAINID", "15555"))
-
-if len(sys.argv) < 4:
-    print("{0} FROM TO AMOUNT".format(sys.argv[0]))
-    sys.exit(1)
-
-_from = sys.argv[1].lower()
-if _from[:2] == '0x': _from = _from[2:]
-
-_to     = sys.argv[2].lower()
-if _to[:2] == '0x': _to = _to[2:]
-
-_amount = int(sys.argv[3])
-nonce = int(sys.argv[5])
-
-unsigned_tx = transactions.Transaction(
-    nonce,
-    1000000000,   #1 GWei
-    100000,       #100k Gas
-    _to,
-    _amount,
-    unhexlify(sys.argv[4])
-)
-
-if not EVM_SENDER_KEY:
-    EVM_SENDER_KEY = getpass('Enter private key for {0}:'.format(_from))
-
-rlptx = rlp.encode(unsigned_tx.sign(EVM_SENDER_KEY, EVM_CHAINID), transactions.Transaction)
-
-act_data = {"ram_payer":EOS_SENDER, "rlptx":rlptx.hex()}
-print("act_data is {}".format(act_data))
-
-subprocess.run(["./cleos", "push", "action", EVM_CONTRACT, "pushtx", json.dumps(act_data), "-p", EOS_SENDER, "-j"])
-```
+please find send_data_via_cleos.py from https://github.com/eosnetworkfoundation/TrustEVM/tree/kayan-rpc-fix/testing-utils
 
 
 To use the script: 
@@ -571,5 +443,73 @@ to get all the storages, for example:
 
 
 
+
+# Connect TrustEVM-node with TrustEVM-RPC [Experimental]
+
+## Prerequisite:
+- use branch kayan-rpc-fix of this repo (https://github.com/eosnetworkfoundation/TrustEVM/tree/kayan-rpc-fix)
+- only use account 2787b98fc4e731d0456b3941f0b3fe2e01439961 (private key a3f1b69da92a0233ce29485d3049a4ace39e8d384bbc2557e3fc60940ce4e954) as genesis account (the balance was hacked)
+- Compile leap, cdt, TrustEVM contracts, TrustEVM-node & TrustEVM-RPC binary
+- Completed the above tests
+
+## Steps
+1. From a clean database, start nodeos with SHIP
+2. clean start TrustEVM-Node, for example:
+```
+./build/cmd/trustevm-node --evm-abi ./evm.abi --chain-data ./chain-data --ship-chain-state-dir ./ship-chain-data --plugin block_conversion_plugin --plugin blockchain_plugin --nocolor 1 --verbosity=5 --ship-genesis 2
+```
+3. start TrustEVM-RPC in the same machine, for example:
+```
+./build/cmd/trustevm-rpc --trust-evm-node=127.0.0.1:8080 --chaindata=./chain-data 
+```
+
+## Make sure RPC response:
+- eth_getBlockByNumber:
+```
+kayan-u20@kayan-u20:~/workspaces/TrustEVM$ curl --location --request POST 'localhost:8881/' --header 'Content-Type: application/json' --data-raw '{"method":"eth_blockNumber","id":0}'
+{"error":{"code":100,"message":"unknown bucket: SyncStage"},"id":0,"jsonrpc":"2.0"}
+```
+At the very beginning it is normal to see "unknown bucket: SyncStage" because there's no block
+
+
+## deploy EVM bytecode to trigger the first vitual ETH block
+```
+python3 ./send_data_via_cleos.py 2787b98fc4e731d0456b3941f0b3fe2e01439961 "" 0 608060405234801561001057600080fd5b50610150806100206000396000f3fe608060405234801561001057600080fd5b50600436106100365760003560e01c80632e64cec11461003b5780636057361d14610059575b600080fd5b610043610075565b60405161005091906100d9565b60405180910390f35b610073600480360381019061006e919061009d565b61007e565b005b60008054905090565b8060008190555050565b60008135905061009781610103565b92915050565b6000602082840312156100b3576100b26100fe565b5b60006100c184828501610088565b91505092915050565b6100d3816100f4565b82525050565b60006020820190506100ee60008301846100ca565b92915050565b6000819050919050565b600080fd5b61010c816100f4565b811461011757600080fd5b5056fea26469706673582212209a159a4f3847890f10bfb87871a61eba91c5dbf5ee3cf6398207e292eee22a1664736f6c63430008070033 0
+```
+
+## get blocknumber again
+```
+kayan-u20@kayan-u20:~/workspaces/TrustEVM$ curl --location --request POST 'localhost:8881/' --header 'Content-Type: application/json' --data-raw '{"method":"eth_blockNumber","id":0}'
+{"id":0,"jsonrpc":"2.0","result":"0x1"}
+```
+
+## now try get block by number
+```
+kayan-u20@kayan-u20:~/workspaces/TrustEVM$ curl --location --request POST 'localhost:8881/' --header 'Content-Type: application/json' --data-raw '{"method":"eth_getBlockByNumber","params":["0x1",true],"id":0}'
+{"id":0,"jsonrpc":"2.0","result":{"difficulty":"0x","extraData":"0x","gasLimit":"0xffffffffffffffff","gasUsed":"0x0","hash":"0x62438d9e228c32a3033a961161f913b700e0d6aecf0ecb141e92ae41d1fb9845","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","miner":"0x0000000000000000000000000000000000000000","mixHash":"0x0000000000000000000000000000000000000000000000000000000000000000","nonce":"0x0000000000000000","number":"0x1","parentHash":"0x0000000000000000000000000000000000000000000000000000000000000000","receiptsRoot":"0x0000000000000000000000000000000000000000000000000000000000000000","sha3Uncles":"0x0000000000000000000000000000000000000000000000000000000000000000","size":"0x3cc","stateRoot":"0x0000000000000000000000000000000000000000000000000000000000000000","timestamp":"0x183c5f2fea0","totalDifficulty":"0x","transactions":[{"blockHash":"0x62438d9e228c32a3033a961161f913b700e0d6aecf0ecb141e92ae41d1fb9845","blockNumber":"0x1","from":"0x2787b98fc4e731d0456b3941f0b3fe2e01439961","gas":"0xf4240","gasPrice":"0x3b9aca00","hash":"0xc4372998d1f7fc02a24fbb381947f7a10ed0826c404b7533e8431df9e48a27d0","input":"0x608060405234801561001057600080fd5b50610150806100206000396000f3fe608060405234801561001057600080fd5b50600436106100365760003560e01c80632e64cec11461003b5780636057361d14610059575b600080fd5b610043610075565b60405161005091906100d9565b60405180910390f35b610073600480360381019061006e919061009d565b61007e565b005b60008054905090565b8060008190555050565b60008135905061009781610103565b92915050565b6000602082840312156100b3576100b26100fe565b5b60006100c184828501610088565b91505092915050565b6100d3816100f4565b82525050565b60006020820190506100ee60008301846100ca565b92915050565b6000819050919050565b600080fd5b61010c816100f4565b811461011757600080fd5b5056fea26469706673582212209a159a4f3847890f10bfb87871a61eba91c5dbf5ee3cf6398207e292eee22a1664736f6c63430008070033","nonce":"0x0","r":"0x8cd1b11f5a5a9a811ad415b3f3d360a4d8aa4a8bae20467ad3649cfbad25a5ae","s":"0x5eab2829885d473747727d54caae01a8076244c3f6a4af8cad742a248b7a19ec","to":null,"transactionIndex":"0x0","type":"0x0","v":"0x79aa","value":"0x0"}],"transactionsRoot":"0x0000000000000000000000000000000000000000000000000000000000000000","uncles":[]}}
+```
+
+## now try to execute "store" function in the bytecode
+```
+python3 ./send_data_via_cleos.py 2787b98fc4e731d0456b3941f0b3fe2e01439961 3f4b0f92007341792aa61e065484e48e583ebeb9 0 6057361d000000000000000000000000000000000000000000000000000000000000007b 1
+```
+
+## and then execute the view action "retrieve" from RPC
+```
+kayan-u20@kayan-u20:~/workspaces/TrustEVM$ curl --location --request POST 'localhost:8881/' --header 'Content-Type: application/json' --data-raw '{"method":"eth_call","params":[{"from":" 2787b98fc4e731d0456b3941f0b3fe2e01439961","to":"3f4b0f92007341792aa61e065484e48e583ebeb9","data":"0x2e64cec1"},"latest"],"id":11}'
+{"id":11,"jsonrpc":"2.0","result":"0x000000000000000000000000000000000000000000000000000000000000007b"}
+```
+
+## try to transfer some money
+```
+python3 ./send_via_cleos.py 2787b98fc4e731d0456b3941f0b3fe2e01439961 0x9edf022004846bc987799d552d1b8485b317b7ed 100 2
+```
+
+## get balance via RPC
+```
+kayan-u20@kayan-u20:~/workspaces/TrustEVM$ curl --location --request POST 'localhost:8881/' --header 'Content-Type: application/json' --data-raw '{"method":"eth_getBalance","params":["9edf022004846bc987799d552d1b8485b317b7ed","latest"],"id":0}'
+{"id":0,"jsonrpc":"2.0","result":"0x100"}
+```
+(Note the balance of 2787b98fc4e731d0456b3941f0b3fe2e01439900 may not work, because it is hacked)
 
 

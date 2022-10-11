@@ -197,7 +197,6 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
       template <typename BlockResult>
       inline native_block_t start_native_block(BlockResult&& res) const {
          native_block_t block;
-
          eosio::ship_protocol::signed_block sb;
          eosio::from_bin(sb, *res.block);
 
@@ -331,4 +330,16 @@ void ship_receiver_plugin::plugin_startup() {
 
 void ship_receiver_plugin::plugin_shutdown() {
    SILK_INFO << "Shutdown SHiP Receiver";
+}
+
+void ship_receiver_plugin::update_core_chain_state(uint32_t block_num) {
+   my->update_core_chain_state(block_num);
+}
+
+void ship_receiver_plugin::update_trust_chain_state(uint32_t block_num) {
+   my->update_trust_chain_state(block_num);
+}
+
+chain_state ship_receiver_plugin::get_chain_state() const {
+   return my->get_chain_state();
 }
