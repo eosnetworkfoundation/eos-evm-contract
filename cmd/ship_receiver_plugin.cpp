@@ -331,15 +331,3 @@ void ship_receiver_plugin::plugin_startup() {
 void ship_receiver_plugin::plugin_shutdown() {
    SILK_INFO << "Shutdown SHiP Receiver";
 }
-
-void ship_receiver_plugin::update_core_chain_state(uint32_t block_num) {
-   my->update_core_chain_state(block_num);
-}
-
-void ship_receiver_plugin::update_trust_chain_state(uint32_t block_num) {
-   my->update_trust_chain_state(block_num);
-}
-
-chain_state ship_receiver_plugin::get_chain_state() const {
-   return my->get_chain_state();
-}
