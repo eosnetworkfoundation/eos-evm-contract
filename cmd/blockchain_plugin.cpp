@@ -191,9 +191,9 @@ class blockchain_plugin_impl : std::enable_shared_from_this<blockchain_plugin_im
                if (silkworm::stagedsync::stage_account_history(*current_txn, chain_data_path) == silkworm::stagedsync::StageResult::kSuccess) {
                   SILK_INFO << "stage_account_history OK";
                }
-               //if (silkworm::stagedsync::stage_storage_history(*current_txn, chain_data_path) == silkworm::stagedsync::StageResult::kSuccess) {
-               //   SILK_INFO << "stage_storage_history OK";
-               //} // FIXME: error System Error: MDBX_NOTFOUND: No matching key/data pair found
+               if (silkworm::stagedsync::stage_storage_history(*current_txn, chain_data_path) == silkworm::stagedsync::StageResult::kSuccess) {
+                  SILK_INFO << "stage_storage_history OK";
+               } // FIXME: error System Error: MDBX_NOTFOUND: No matching key/data pair found
 
                current_txn->commit(true);
             }

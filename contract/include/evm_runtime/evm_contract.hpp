@@ -19,9 +19,9 @@ CONTRACT evm_contract : public contract {
       db_stats pushtx(eosio::name ram_payer, const bytes& rlptx);
 
 #ifdef WITH_TEST_ACTIONS
-      ACTION testtx( const bytes& rlptx, const evm_runtime::test::block_info& bi );
+      //ACTION testtx( const bytes& rlptx, const evm_runtime::test::block_info& bi );
       ACTION updatecode( const bytes& address, uint64_t incarnation, const bytes& code_hash, const bytes& code);
-      ACTION updateaccnt(const bytes& address, const bytes& initial, const bytes& current);
+      //ACTION updateaccnt(const bytes& address, const bytes& initial, const bytes& current);
       ACTION updatestore(const bytes& address, uint64_t incarnation, const bytes& location, const bytes& initial, const bytes& current);
       ACTION dumpstorage(const bytes& addy);
       ACTION clearall();

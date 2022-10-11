@@ -1055,7 +1055,22 @@ asio::awaitable<void> EthereumRpcApi::handle_eth_call(const nlohmann::json& requ
 
          SILKRPC_TRACE << "=== before lookup_chain_config";
 
-        const auto chain_config_ptr = silkworm::lookup_chain_config(chain_id);
+        //const auto chain_config_ptr = silkworm::lookup_chain_config(chain_id);
+        silkworm::ChainConfig config{
+            chain_id,
+            silkworm::SealEngineType::kNoProof,
+            {
+               0,          // Homestead
+               0,          // Tangerine Whistle
+               0,          // Spurious Dragon
+               0,          // Byzantium
+               0,          // Constantinople
+               0,          // Petersburg
+               0,          // Istanbul
+               // 0,          // Berlin
+               // 0,          // London
+            },
+         };
 
          SILKRPC_TRACE << "=== before get_block_number";
 
@@ -1063,7 +1078,7 @@ asio::awaitable<void> EthereumRpcApi::handle_eth_call(const nlohmann::json& requ
 
         SILKRPC_TRACE << "=== block number is " << block_number;
 
-        EVMExecutor executor{*context_.io_context(), tx_database, *chain_config_ptr, workers_, block_number};
+        EVMExecutor executor{*context_.io_context(), tx_database, config, workers_, block_number};
         const auto block_with_hash = co_await core::read_block_by_number(*block_cache_, tx_database, block_number);
         silkworm::Transaction txn{call.to_transaction()};
         const auto execution_result = co_await executor.call(block_with_hash.block, txn);

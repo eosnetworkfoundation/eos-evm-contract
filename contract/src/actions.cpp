@@ -50,32 +50,39 @@ db_stats evm_contract::pushtx( eosio::name ram_payer, const bytes& rlptx ) {
     Receipt receipt;
     ep.execute_transaction(tx, receipt);
     
+    if (!receipt.success) {
+        char msg[64];
+        sprintf(msg, "execution failed, gas_used=%llu", (uint64_t)receipt.cumulative_gas_used);
+        eosio::check(false, msg);
+        return state.stats;
+    }
+
     LOGTIME("EVM EXECUTE");
     return state.stats;
 }
 
 #ifdef WITH_TEST_ACTIONS
-ACTION evm_contract::testtx( const bytes& rlptx, const evm_runtime::test::block_info& bi ) {
-    eosio::require_auth(get_self());
+// ACTION evm_contract::testtx( const bytes& rlptx, const evm_runtime::test::block_info& bi ) {
+//     eosio::require_auth(get_self());
     
-    Block block;
-    block.header = bi.get_block_header();
+//     Block block;
+//     block.header = bi.get_block_header();
 
-    Transaction tx;
-    ByteView bv{(const uint8_t *)rlptx.data(), rlptx.size()};
-    eosio::check(rlp::decode(bv,tx) == rlp::DecodingResult::kOk && bv.empty(), "unable to decode transaction");
+//     Transaction tx;
+//     ByteView bv{(const uint8_t *)rlptx.data(), rlptx.size()};
+//     eosio::check(rlp::decode(bv,tx) == rlp::DecodingResult::kOk && bv.empty(), "unable to decode transaction");
 
-    tx.from.reset();
-    tx.recover_sender();
-    eosio::check(tx.from.has_value(), "unable to recover sender");
+//     tx.from.reset();
+//     tx.recover_sender();
+//     eosio::check(tx.from.has_value(), "unable to recover sender");
 
-    evm_runtime::test::engine engine;
-    evm_runtime::state state{get_self(), get_self()};
-    evm_runtime::ExecutionProcessor ep{block, engine, state, evm_runtime::test::kTestNetwork};
+//     evm_runtime::test::engine engine;
+//     evm_runtime::state state{get_self(), get_self()};
+//     evm_runtime::ExecutionProcessor ep{block, engine, state, evm_runtime::test::kTestNetwork};
 
-    Receipt receipt;
-    ep.execute_transaction(tx, receipt);
-}
+//     Receipt receipt;
+//     ep.execute_transaction(tx, receipt);
+// }
 
 ACTION evm_contract::dumpstorage(const bytes& addy) {
     eosio::require_auth(get_self());
@@ -186,26 +193,26 @@ ACTION evm_contract::updatestore(const bytes& address, uint64_t incarnation, con
     state.update_storage(to_address(address), incarnation, to_bytes32(location), to_bytes32(initial), to_bytes32(current));
 }
 
-ACTION evm_contract::updateaccnt(const bytes& address, const bytes& initial, const bytes& current) {
-    eosio::require_auth(get_self());
-    evm_runtime::state state{get_self(), get_self()};
-    auto maybe_account = [](const bytes& data) -> std::optional<Account> {
-        std::optional<Account> res{};
-        if(data.size()) {
-            Account tmp;
-            ByteView bv{(const uint8_t *)data.data(), data.size()};
-            auto dec_res = decode_account_from_storage(bv);
-            eosio::check(dec_res.second == rlp::DecodingResult::kOk, "unable to decode account");
-            res = dec_res.first;
-        }
-        return res;
-    };
+// ACTION evm_contract::updateaccnt(const bytes& address, const bytes& initial, const bytes& current) {
+//     eosio::require_auth(get_self());
+//     evm_runtime::state state{get_self(), get_self()};
+//     auto maybe_account = [](const bytes& data) -> std::optional<Account> {
+//         std::optional<Account> res{};
+//         if(data.size()) {
+//             Account tmp;
+//             ByteView bv{(const uint8_t *)data.data(), data.size()};
+//             auto dec_res = decode_account_from_storage(bv);
+//             eosio::check(dec_res.second == rlp::DecodingResult::kOk, "unable to decode account");
+//             res = dec_res.first;
+//         }
+//         return res;
+//     };
 
-    auto oinitial = maybe_account(initial);
-    auto ocurrent = maybe_account(current);
+//     auto oinitial = maybe_account(initial);
+//     auto ocurrent = maybe_account(current);
 
-    state.update_account(to_address(address), oinitial, ocurrent);
-}
+//     state.update_account(to_address(address), oinitial, ocurrent);
+// }
 
 ACTION evm_contract::setbal(const bytes& addy, const bytes& bal) {
     eosio::require_auth(get_self());
