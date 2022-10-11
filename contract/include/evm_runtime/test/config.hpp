@@ -4,9 +4,12 @@
 namespace evm_runtime {
 namespace test {
 
-inline constexpr ChainConfig kTestNetwork{
+using evmc::operator""_bytes32;
+
+inline ChainConfig kTestNetwork{
     1,  // chain_id
-    SealEngineType::kNoProof,
+    0_bytes32,
+    silkworm::SealEngineType::kNoProof,
     {
         0,          // Homestead
         0,          // Tangerine Whistle

@@ -1,6 +1,10 @@
 #pragma once
+#include <silkworm/consensus/engine.hpp>
+#include <silkworm/chain/protocol_param.hpp>
 
 namespace evm_runtime {
+
+using namespace silkworm;
 
 struct engine : silkworm::consensus::IEngine {
     
