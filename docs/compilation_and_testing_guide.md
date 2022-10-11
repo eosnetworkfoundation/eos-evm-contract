@@ -156,46 +156,8 @@ python3 ./get_balance.py 2787b98fc4e731d0456b3941f0b3fe2e01439961
 ```
 You’ll get 0 as the current balance
 
-If you can’t access evm-script, please use the following code as get_balance.py
-```
-import sys
-import os
-import string
-from ethereum.utils import privtoaddr, encode_hex, decode_hex, bytes_to_int
-from ethereum import transactions
-from ueosio.rpc import Api
+Please find the get_balance.py from https://github.com/eosnetworkfoundation/TrustEVM/tree/kayan-rpc-fix/testing-utils
 
-NODEOS_ENDPOINT = os.environ.get('NODEOS_ENDPOINT', 'http://127.0.0.1:8888')
-
-if len(sys.argv) < 2:
-    print("{0} ACCOUNT".format(sys.argv[0]))
-    sys.exit(1)
-
-_account = sys.argv[1].lower()
-if _account[:2] == '0x': _account = _account[2:]
-
-if not all(c in string.hexdigits for c in _account) or len(_account) != 40:
-    print("invalid address")
-    sys.exit(1)
- 
-api = Api(NODEOS_ENDPOINT)
-res = api.v1.chain.get_table_rows(
-    code="evmevmevmevm",
-    scope="evmevmevmevm",
-    table="account",
-    key_type="sha256",
-    index_position="2",
-    lower_bound=_account,
-    limit=1,
-    json=True
-)
-
-bal = 0
-if len(res['rows']) and res['rows'][0]['eth_address'] == _account:
-    bal = bytes_to_int(decode_hex(res['rows'][0]['balance']))
-
-print(bal)
-```
 
 Push debug action setbal:
 ```
@@ -212,61 +174,7 @@ You should see a non-zero number. Whether or not it looks like garbage, but that
 
 <b>Step 3: send balance</b>
 
-create script send_via_cleos.py with content as follow:
-
-```
-import os
-import sys
-from datetime import datetime, timedelta
-from getpass import getpass
-from binascii import hexlify
-from ethereum.utils import privtoaddr, encode_hex, decode_hex, bytes_to_int
-from ethereum import transactions
-from binascii import unhexlify
-import subprocess
-import requests as r
-import rlp
-import json
-
-EVM_CONTRACT    = os.getenv("EVM_CONTRACT", "evmevmevmevm")
-NODEOS_ENDPOINT = os.getenv("NODEOS_ENDPOINT", "http://localhost:8888")
-EOS_SENDER      = os.getenv("EOS_SENDER", "evmevmevmevm")
-EVM_SENDER_KEY  = os.getenv("EVM_SENDER_KEY", None)
-EOS_SENDER_KEY  = os.getenv("EOS_SENDER_KEY", None)
-EVM_CHAINID     = int(os.getenv("EVM_CHAINID", "15555"))
-
-if len(sys.argv) < 4:
-    print("{0} FROM TO AMOUNT".format(sys.argv[0]))
-    sys.exit(1)
-
-_from = sys.argv[1].lower()
-if _from[:2] == '0x': _from = _from[2:]
-
-_to     = sys.argv[2].lower()
-if _to[:2] == '0x': _to = _to[2:]
-
-_amount = int(sys.argv[3])
-nonce = int(sys.argv[4])
-
-unsigned_tx = transactions.Transaction(
-    nonce,
-    150000000000, #150 GWei
-    100000,       #100k Gas
-    _to,
-    _amount,
-    b''
-)
-
-if not EVM_SENDER_KEY:
-    EVM_SENDER_KEY = getpass('Enter private key for {0}:'.format(_from))
-
-rlptx = rlp.encode(unsigned_tx.sign(EVM_SENDER_KEY, EVM_CHAINID), transactions.Transaction)
-
-act_data = {"ram_payer":EOS_SENDER, "rlptx":rlptx.hex()}
-print("act_data is {}".format(act_data))
-
-subprocess.run(["./cleos", "push", "action", EVM_CONTRACT, "pushtx", json.dumps(act_data), "-p", EOS_SENDER])
-```
+please find send_via_cleos.py from https://github.com/eosnetworkfoundation/TrustEVM/tree/kayan-rpc-fix/testing-utils
 
 command:
 ```
@@ -430,60 +338,7 @@ Take the above solidity contract in https://remix.ethereum.org/, executing the �
 ```
 0x6057361d000000000000000000000000000000000000000000000000000000000000007b
 ```
-Prepare the script “send_data_via_cleos.py” with the following content:
-```
-import os
-import sys
-from datetime import datetime, timedelta
-from getpass import getpass
-from binascii import hexlify
-from ethereum.utils import privtoaddr, encode_hex, decode_hex, bytes_to_int
-from ethereum import transactions
-from binascii import unhexlify
-import subprocess
-import requests as r
-import rlp
-import json
-
-EVM_CONTRACT    = os.getenv("EVM_CONTRACT", "evmevmevmevm")
-NODEOS_ENDPOINT = os.getenv("NODEOS_ENDPOINT", "http://localhost:8888")
-EOS_SENDER      = os.getenv("EOS_SENDER", "evmevmevmevm")
-EVM_SENDER_KEY  = os.getenv("EVM_SENDER_KEY", None)
-EOS_SENDER_KEY  = os.getenv("EOS_SENDER_KEY", None)
-EVM_CHAINID     = int(os.getenv("EVM_CHAINID", "15555"))
-
-if len(sys.argv) < 4:
-    print("{0} FROM TO AMOUNT".format(sys.argv[0]))
-    sys.exit(1)
-
-_from = sys.argv[1].lower()
-if _from[:2] == '0x': _from = _from[2:]
-
-_to     = sys.argv[2].lower()
-if _to[:2] == '0x': _to = _to[2:]
-
-_amount = int(sys.argv[3])
-nonce = int(sys.argv[5])
-
-unsigned_tx = transactions.Transaction(
-    nonce,
-    1000000000,   #1 GWei
-    100000,       #100k Gas
-    _to,
-    _amount,
-    unhexlify(sys.argv[4])
-)
-
-if not EVM_SENDER_KEY:
-    EVM_SENDER_KEY = getpass('Enter private key for {0}:'.format(_from))
-
-rlptx = rlp.encode(unsigned_tx.sign(EVM_SENDER_KEY, EVM_CHAINID), transactions.Transaction)
-
-act_data = {"ram_payer":EOS_SENDER, "rlptx":rlptx.hex()}
-print("act_data is {}".format(act_data))
-
-subprocess.run(["./cleos", "push", "action", EVM_CONTRACT, "pushtx", json.dumps(act_data), "-p", EOS_SENDER, "-j"])
-```
+please find send_data_via_cleos.py from https://github.com/eosnetworkfoundation/TrustEVM/tree/kayan-rpc-fix/testing-utils
 
 
 To use the script: 
