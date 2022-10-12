@@ -1,0 +1,16 @@
+{
+  "name": "evm_poc_tx_wrapper",
+  "version": "1.0.0",
+  "main": "index.js",
+  "repository": "https://github.com/yarkinwho/evm_poc_tx_wrapper",
+  "author": "yarkin",
+  "license": "MIT",
+  "dependencies": {
+    "dotenv": "^16.0.0",
+    "eosjs": "^22.1.0",
+    "ethereumjs-util": "^7.1.4",
+    "http-jsonrpc-server": "^1.1.0",
+    "is-valid-hostname": "^1.0.2",
+    "node-fetch": "^2.6.6"
+  }
+}
