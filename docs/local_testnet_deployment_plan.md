@@ -50,7 +50,8 @@ Compiled binaries from this repo
   3. deploy evm contract and initilize evm
   4. run a TrustEVM-node(silkworm node) process connecting to the local Antelope node
   5. run a TrustEVM-RPC(silkworm RPC) process locally to serve the eth RPC requests
-  6. setup a trustEVM proxy to route read requests to TrustEVM-RPC and write requests to Antelope public network
+  6. setup the transaction wrapper for write transactions
+  7. setup a trustEVM proxy to route read requests to TrustEVM-RPC and write requests to Antelope public network
   - prepare a eosio account with necessary CPU/NET/RAM resources for signing EVM transactions (this account can be shared to multiple EVM service)
   
 
@@ -66,7 +67,9 @@ Compiled binaries from this repo
 
 ## 5. Start up TrustEVM-RPC (silkworm RPC)
 
-## 6. Setup proxy 
+## 6. Setup transaction wrapper
+
+## 7. Setup proxy 
 
 
 
