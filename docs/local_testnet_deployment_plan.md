@@ -35,8 +35,9 @@ List of compiled system contracts from https://github.com/eosnetworkfoundation/e
 
 Compiled EVM contracts in DEBUG mode, from this repo (see https://github.com/eosnetworkfoundation/TrustEVM/blob/main/docs/compilation_and_testing_guide.md)
 - evm_runtime.wasm
-- evm_runtime.abi 
-<b> Ensure action "setbal" exists in evm_runtime.abi <b/>
+- evm_runtime.abi
+
+<b> Ensure action "setbal" exists in evm_runtime.abi </b>
 
 Compiled binaries from this repo
 - trustevm-node: (silkworm node process that receive data from the main Antelope chain and convert to the EVM chain)
