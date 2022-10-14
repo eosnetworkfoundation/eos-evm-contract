@@ -33,8 +33,10 @@ List of compiled system contracts from https://github.com/eosnetworkfoundation/e
 - eosio.token.wasm (optional, if you want to test token econonmy)
 - eosio.system.wasm (optional, if you want to test resources, RAM, ... etc)
 
-Compiled EVM contracts from this repo (see https://github.com/eosnetworkfoundation/TrustEVM/blob/main/docs/compilation_and_testing_guide.md)
+Compiled EVM contracts in DEBUG mode, from this repo (see https://github.com/eosnetworkfoundation/TrustEVM/blob/main/docs/compilation_and_testing_guide.md)
 - evm_runtime.wasm
+- evm_runtime.abi 
+<b> Ensure action "setbal" exists in evm_runtime.abi <b/>
 
 Compiled binaries from this repo
 - trustevm-node: (silkworm node process that receive data from the main Antelope chain and convert to the EVM chain)
@@ -246,6 +248,7 @@ your wallet password is saved into w123.key
 import one or more private keys into wallet w123
 ```
 ./cleos wallet import -n w123 --private-key 5KQwrPbwdL6PhXujxW37FSSQZ1JiwsST4cqQzDeyXtP79zkvFD3
+./cleos wallet import -n w123 --private-key 5JURSKS1BrJ1TagNBw1uVSzTQL2m9eHGkjknWeZkjSt33Awtior
 ```
 
 Once you have done everything with the wallet, it is fine to bootstrapping the blockchain
@@ -312,18 +315,20 @@ activate the other protocol features:
 
 ## 3. Deploy and initialize EVM contract
 
+Create account evmevmevmevm (using key pair EOS8kE63z4NcZatvVWY4jxYdtLg6UEA123raMGwS6QDKwpQ69eGcP 5JURSKS1BrJ1TagNBw1uVSzTQL2m9eHGkjknWeZkjSt33Awtior)
 ```
 ./cleos create account eosio evmevmevmevm EOS8kE63z4NcZatvVWY4jxYdtLg6UEA123raMGwS6QDKwpQ69eGcP EOS8kE63z4NcZatvVWY4jxYdtLg6UEA123raMGwS6QDKwpQ69eGcP
+```
 
-#EVM contract related
-echo "=== deploy evm smart contract to evmevmevmevm ==="
+deploy evm_runtime contract (wasm & abi file) to account evmevmevmevm
+```
 ./cleos set code evmevmevmevm ../TrustEVM/contract/build/evm_runtime/evm_runtime.wasm
 ./cleos set abi evmevmevmevm ../TrustEVM/contract/build/evm_runtime/evm_runtime.abi
+```
 
-sleep 1.0
+setting initial balance for testing eth account 0x2787b98fc4e731d0456b3941f0b3fe2e01439961, private key a3f1b69da92a0233ce29485d3049a4ace39e8d384bbc2557e3fc60940ce4e954
 
-echo "=== setting balance for evm account:"
-echo "--- 0x2787b98fc4e731d0456b3941f0b3fe2e01439961 private key a3f1b69da92a0233ce29485d3049a4ace39e8d384bbc2557e3fc60940ce4e954 ==="
+```
 ./cleos push action evmevmevmevm setbal '{"addy":"2787b98fc4e731d0456b3941f0b3fe2e01439961", "bal":"0000000000000000000000000000000100000000000000000000000000000000"}' -p evmevmevmevm
 ```
 
