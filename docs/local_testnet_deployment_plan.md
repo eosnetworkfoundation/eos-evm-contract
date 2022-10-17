@@ -327,14 +327,85 @@ deploy evm_runtime contract (wasm & abi file) to account evmevmevmevm
 ./cleos set abi evmevmevmevm ../TrustEVM/contract/build/evm_runtime/evm_runtime.abi
 ```
 
-setting initial balance for testing eth account 0x2787b98fc4e731d0456b3941f0b3fe2e01439961, private key a3f1b69da92a0233ce29485d3049a4ace39e8d384bbc2557e3fc60940ce4e954
+setting initial balance for genesis eth accounts.
+In this document we use ```0x2787b98fc4e731d0456b3941f0b3fe2e01439961```, (private key ```a3f1b69da92a0233ce29485d3049a4ace39e8d384bbc2557e3fc60940ce4e954```) as genesis. Developers can use one or more other genesis eth accounts.
 
+<b>Notice that the balance string must be in hex and must be exactly 64 bytes long (representing a full 256-bit integer value). Failure to meet such criteria will result in incorrect balance calculation in transfers. </b>
 ```
 ./cleos push action evmevmevmevm setbal '{"addy":"2787b98fc4e731d0456b3941f0b3fe2e01439961", "bal":"0000000000000000000000000000000100000000000000000000000000000000"}' -p evmevmevmevm
 ```
+Repeat this action for all genesis accounts.
+
+Now EVM initialization is completed. Verify all EVM account balances directly from Antelope node. 
+the simplest command is (replace your contract name "evmevmevmevm" if needed):
+```
+./cleos get table evmevmevmevm evmevmevmevm account
+```
+example output:
+```
+{
+  "rows": [{
+      "id": 0,
+      "eth_address": "2787b98fc4e731d0456b3941f0b3fe2e01439961",
+      "nonce": 0,
+      "balance": "0000000000000000000000000000000100000000000000000000000000000000",
+      "eos_account": "",
+      "code": "",
+      "code_hash": "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470"
+    }
+  ],
+  "more": false,
+  "next_key": ""
+}
+```
+Notice that the value ```0000000000000000000000000000000100000000000000000000000000000000``` is in hexdecimal form and must be exactly 64 characters long (256-bit integer value).
 
 
 ## 4. Start up TrustEVM-node (silkworm node) 
+
+A TrustEVM-node is a node process of the virtual ethereum blockchain that validates virtual ethereum blocks and service the requests coming from TrustEVM-RPC. It will not produce blocks. However, it will consume blocks from Antelope node and convert Antelope blocks into Virutal Ethereum blocks in a deterministic way. 
+
+To set it up, we need to prepare a genesis of the virtual ethereum that maps to the same EVM state of the evm account of the Antelope chain that just initialized in the previous step.
+
+This is a EVM genesis example:
+```
+    {
+        "alloc": {
+            "0xe7cc2b40ae8f58a7b28cc6e9b47bcadeb4985c42": {
+                "balance": "0x33b2e3c9fd0803ce8000000"
+            }
+        },
+        "coinbase": "0x0000000000000000000000000000000000000000",
+        "config": {
+            "chainId": 15555,
+            "homesteadBlock": 0,
+            "eip150Block": 0,
+            "eip155Block": 0,
+            "byzantiumBlock": 0,
+            "constantinopleBlock": 0,
+            "petersburgBlock": 0,
+            "istanbulBlock": 0,
+            "noproof": {}
+        },
+        "difficulty": "0x01",
+        "extraData": "TrustEVM",
+        "gasLimit": "0x7ffffffffff",
+        "mixHash": "0x005e23106263ebed6c85a238ff1f553fb2990f8b780d8cdc4042b2e48d64d542",
+        "nonce": "0x0",
+        "timestamp": "0x62546fd7"
+    }
+```
+Fields that you may need to consider to change:
+- alloc: all genesis EVM balances (should set to the same value retrieve from ```./cleos get table evmevmevmevm evmevmevmevm account```)
+- mixHash: the block hash of the Antelope block that represent the starting block (genesis EVM block) of the virtual EVM blockchain. You can set it to the block hash of the block containing the "setcode" action of the evmevmevmevm account.
+- timestamp: block timestamp of the genesis EVM block 
+
+
+Starting the TrustEVM process:
+```
+mkdir ./chain-data
+./build/cmd/trustevm-node --chain-data ./chain-data  --plugin block_conversion_plugin --plugin blockchain_plugin --nocolor 1 --verbosity=5
+```
 
 ## 5. Start up TrustEVM-RPC (silkworm RPC)
 
