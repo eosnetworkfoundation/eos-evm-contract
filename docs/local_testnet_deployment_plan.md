@@ -363,9 +363,9 @@ Notice that the value ```0000000000000000000000000000000100000000000000000000000
 
 ## 4. Start up TrustEVM-node (silkworm node) 
 
-A TrustEVM-node is a node process of the virtual ethereum blockchain that validates virtual ethereum blocks and service the requests coming from TrustEVM-RPC. It will not produce blocks. However, it will consume blocks from Antelope node and convert Antelope blocks into Virutal Ethereum blocks in a deterministic way. 
+A TrustEVM-node is a node process of the virtual ethereum blockchain that validates virtual ethereum blocks and serves the requests coming from TrustEVM-RPC. It will not produce blocks. However, it will consume blocks from Antelope node and convert Antelope blocks into Virutal Ethereum blocks in a deterministic way. 
 
-To set it up, we need to prepare a genesis of the virtual ethereum that maps to the same EVM state of the evm account of the Antelope chain that just initialized in the previous step.
+To set it up, we need to first make up a genesis of the virtual ethereum blockchain that maps to the same EVM state of the evm account of the Antelope chain that just initialized in the previous steps.
 
 This is a EVM genesis example:
 ```
@@ -399,6 +399,22 @@ Fields that you may need to consider to change:
 - alloc: all genesis EVM balances (should set to the same value retrieve from ```./cleos get table evmevmevmevm evmevmevmevm account```)
 - mixHash: the block hash of the Antelope block that represent the starting block (genesis EVM block) of the virtual EVM blockchain. You can set it to the block hash of the block containing the "setcode" action of the evmevmevmevm account.
 - timestamp: block timestamp of the genesis EVM block 
+
+### calculate the correct timestamp value:
+The following code (ref TrustEVM/cmd/block_conversion_plugin.cpp) shows the conversion between Antelop block timestamp (where is the offset of micro seconds since 1970-01-01) and the virtual EVM chain timestamp.
+```
+   static constexpr uint64_t genesis_timestamp = 1648673684000000; //us
+   static constexpr uint64_t block_interval    = 1000000;          //us
+
+   inline static uint32_t timestamp_to_evm_block(uint64_t antelope_timestamp) {
+      assert(antelope_timestamp >= genesis_timestamp); // <--- this requires the antelope block timestamp must be at least some time after year 2022
+      return 1 + (antelope_timestamp - genesis_timestamp)/block_interval;
+   }
+   
+   inline static uint64_t evm_block_to_timestamp(uint32_t block_num) {
+      return genesis_timestamp + block_num * block_interval;
+   }
+```
 
 
 Starting the TrustEVM process:
