@@ -48,13 +48,19 @@ Compiled binaries from this repo
 ## Running a local node with Trust EVM service, Overview:
 
   In order to run a Trust EVM service, we need to have the follow items inside one physical server / VM:
+  
+  We need the following steps to setup the Antelope blockchain with capabilities to push EVM transactions:
   1. run a local Antelope node (nodeos process) with SHIP plugin enabled, which is a single block producer
   2. blockchain bootstrapping and initialization
   3. deploy evm contract and initilize evm
-  4. run a TrustEVM-node(silkworm node) process connecting to the local Antelope node
-  5. run a TrustEVM-RPC(silkworm RPC) process locally to serve the eth RPC requests
-  6. setup the transaction wrapper for write transactions
-  7. setup a trustEVM proxy to route read requests to TrustEVM-RPC and write requests to Antelope public network
+  4. setup the transaction wrapper for to wrap ETH write requests into Antelope transactions
+  
+  And we need the following steps to support ETH API compatible read transactions (View transaction) via the virtual ETH chain in TrustEVM node
+  6. run a TrustEVM-node(silkworm node) process connecting to the local Antelope node
+  7. run a TrustEVM-RPC(silkworm RPC) process locally to serve the eth RPC requests
+  
+  And we need a proxy to separate read requests and write requests
+  8. setup a trustEVM proxy to route read requests to TrustEVM-RPC and write requests to Antelope public network
   - prepare a eosio account with necessary CPU/NET/RAM resources for signing EVM transactions (this account can be shared to multiple EVM service)
   
 
@@ -361,7 +367,167 @@ example output:
 Notice that the value ```0000000000000000000000000000000100000000000000000000000000000000``` is in hexdecimal form and must be exactly 64 characters long (256-bit integer value).
 
 
-## 4. Start up TrustEVM-node (silkworm node) 
+
+## 4. setup the transaction wrapper for to wrap ETH write requests into Antelope transactions
+### Install necessary nodejs tools:
+```
+sudo apt install nodejs
+sudo apt install npm
+npm install eosjs
+npm install ethereumjs-util
+```
+
+### prepare the .env file to configure Antelope RPC endpoint, listening port, EVM accounts, sender accounts, ... etc
+```
+EOS_RPC="http://127.0.0.1:8888"
+EOS_KEY="5JURSKS1BrJ1TagNBw1uVSzTQL2m9eHGkjknWeZkjSt33Awtior"
+HOST="127.0.0.1"
+PORT="18888"
+EOS_EVM_ACCOUNT="evmevmevmevm"
+EOS_SENDER="a123"
+```
+
+### Start Tx Wrapper Service (please use index.js from https://github.com/eosnetworkfoundation/TrustEVM/tree/main/peripherals/tx_wrapper)
+```
+node index.js
+```
+
+### check if Tx Wrapper is running
+```
+curl http://127.0.0.1:18888 -X POST -H "Accept: application/json" -H "Content-Type: application/json" --data '{"method":"eth_gasPrice","params":[],"id":1,"jsonrpc":"2.0"}'
+```
+Example output:
+```
+{"jsonrpc":"2.0","id":1,"result":"0x22ecb25c00"}
+```
+
+
+### Sign a normal Ethereum transacation to produce a raw signed eth transaction
+You can skip this if you are already familiar with. This is a example script sign_ethraw.py:
+```
+import os
+import sys
+from getpass import getpass
+from binascii import hexlify
+from ethereum.utils import privtoaddr, encode_hex, decode_hex, bytes_to_int
+from ethereum import transactions
+from binascii import unhexlify
+import rlp
+import json
+
+EVM_SENDER_KEY  = os.getenv("EVM_SENDER_KEY", None)
+EVM_CHAINID     = int(os.getenv("EVM_CHAINID", "15555"))
+
+if len(sys.argv) < 6:
+    print("{0} FROM TO AMOUNT INPUT_DATA NONCE".format(sys.argv[0]))
+    sys.exit(1)
+
+_from = sys.argv[1].lower()
+if _from[:2] == '0x': _from = _from[2:]
+
+_to     = sys.argv[2].lower()
+if _to[:2] == '0x': _to = _to[2:]
+
+_amount = int(sys.argv[3])
+nonce = int(sys.argv[5])
+
+unsigned_tx = transactions.Transaction(
+    nonce,
+    1000000000,   #1 GWei
+    1000000,      #1m Gas
+    _to,
+    _amount,
+    unhexlify(sys.argv[4])
+)
+
+if not EVM_SENDER_KEY:
+    EVM_SENDER_KEY = getpass('Enter private key for {0}:'.format(_from))
+
+rlptx = rlp.encode(unsigned_tx.sign(EVM_SENDER_KEY, EVM_CHAINID), transactions.Transaction)
+
+print("Eth signed raw transaction is {}".format(rlptx.hex()))
+```
+
+Example: sign a eth transaction of transfering amount "1" (minimal positive amount) from 0x2787b98fc4e731d0456b3941f0b3fe2e01439961 to itself without input data, using nonce 0
+```
+python3 sign_ethraw.py 0x2787b98fc4e731d0456b3941f0b3fe2e01439961 0x2787b98fc4e731d0456b3941f0b3fe2e01439961 1 "" 0
+```
+Example output:
+```
+Enter private key for 2787b98fc4e731d0456b3941f0b3fe2e01439961:
+Eth signed raw transaction is f86680843b9aca00830f4240942787b98fc4e731d0456b3941f0b3fe2e0143996101808279aaa00c028e3a5086d2ed6c4fdd8e1612691d6dd715386d35c4764726ad0f9f281fb3a0652f0fbdf0f13b3492ff0e30468efc98bef8774ea15374b64a0a13da24ba8879
+```
+
+
+### push Eth raw transaction via Tx Wrapper
+For example:
+```
+curl http://127.0.0.1:18888 -X POST -H "Accept: application/json" -H "Content-Type: application/json" --data '{"method":"eth_sendRawTransaction","params":["0xf86680843b9aca00830f4240942787b98fc4e731d0456b3941f0b3fe2e0143996101808279aaa00c028e3a5086d2ed6c4fdd8e1612691d6dd715386d35c4764726ad0f9f281fb3a0652f0fbdf0f13b3492ff0e30468efc98bef8774ea15374b64a0a13da24ba8879"],"id":1,"jsonrpc":"2.0"}'
+```
+Example output:
+```
+{"jsonrpc":"2.0","id":1,"result":"0xee030784f84dde7302bdfb07e6d5eb21c406dbc7824926bb7549dad8a2112db5"}
+```
+Example output from Tx Wrapper:
+```
+{"method":"eth_sendRawTransaction","params":["0xf86680843b9aca00830f4240942787b98fc4e731d0456b3941f0b3fe2e0143996101808279aaa00c028e3a5086d2ed6c4fdd8e1612691d6dd715386d35c4764726ad0f9f281fb3a0652f0fbdf0f13b3492ff0e30468efc98bef8774ea15374b64a0a13da24ba8879"],"id":1,"jsonrpc":"2.0"}
+----rlptx-----
+f86680843b9aca00830f4240942787b98fc4e731d0456b3941f0b3fe2e0143996101808279aaa00c028e3a5086d2ed6c4fdd8e1612691d6dd715386d35c4764726ad0f9f281fb3a0652f0fbdf0f13b3492ff0e30468efc98bef8774ea15374b64a0a13da24ba8879
+----response----
+{ transaction_id:
+   '75e1d63107efe7a89f06681df7804de965356ecde91d7d7ce7352ad0c837f1a6',
+  processed:
+   { id:
+      '75e1d63107efe7a89f06681df7804de965356ecde91d7d7ce7352ad0c837f1a6',
+     block_num: 1787,
+     block_time: '2022-10-19T03:59:39.500',
+     producer_block_id: null,
+     receipt:
+      { status: 'executed', cpu_usage_us: 392, net_usage_words: 26 },
+     elapsed: 392,
+     net_usage: 208,
+     scheduled: false,
+     action_traces: [ [Object] ],
+     account_ram_delta: null,
+     except: null,
+     error_code: null } }
+```
+
+
+### check the ETH balance again
+```
+./cleos get table evmevmevmevm evmevmevmevm account
+```
+example output:
+```
+{
+  "rows": [{
+      "id": 0,
+      "eth_address": "2787b98fc4e731d0456b3941f0b3fe2e01439961",
+      "nonce": 1,
+      "balance": "00000000000000000000000000000000ffffffffffffffffffffece68e75b000",
+      "eos_account": "",
+      "code": "",
+      "code_hash": "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470"
+    },{
+      "id": 1,
+      "eth_address": "0000000000000000000000000000000000000000",
+      "nonce": 0,
+      "balance": "00000000000000000000000000000000000000000000000000001319718a5000",
+      "eos_account": "",
+      "code": "",
+      "code_hash": "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470"
+    }
+  ],
+  "more": false,
+  "next_key": ""
+}
+```
+You will notice that the balance of account ```2787b98fc4e731d0456b3941f0b3fe2e01439961``` has changed due to gas fee spent, and nonce was changed to 1 from 0.
+
+
+
+## 5. Start up TrustEVM-node (silkworm node) 
 
 A TrustEVM-node is a node process of the virtual ethereum blockchain that validates virtual ethereum blocks and serves the requests coming from TrustEVM-RPC. It will not produce blocks. However, it will consume blocks from Antelope node and convert Antelope blocks into Virutal Ethereum blocks in a deterministic way. 
 
@@ -423,7 +589,7 @@ mkdir ./chain-data
 ./build/cmd/trustevm-node --chain-data ./chain-data  --plugin block_conversion_plugin --plugin blockchain_plugin --nocolor 1 --verbosity=5
 ```
 
-## 5. Start up TrustEVM-RPC (silkworm RPC)
+## 6. Start up TrustEVM-RPC (silkworm RPC)
 
 The TrustEVM-RPC process provides ethereum compatible RPC service for clients. It queries state (including blocks, accounts, storage) from TrustEVM-node, and it can also run view actions requested by clients.
 
@@ -476,33 +642,9 @@ Response:
 ```
 
 
-## 6. Setup transaction wrapper
 
-## 7. Setup proxy 
-
+## 7. Setup proxy to separate read requests and write requests
 
 
-### configuration and command parameters:
-- nodeos:
-- TrustEVM-node:
-- TrustEVM-RPC
-
-
-
-
-## Bootstrapping protocol features, Deploying EVM contracts, Setup genesis/initial EVM virtual accounts & tokens
-
-### Protocol features required to activate:
-- ACTION_RETURN_VALUE
-- CRYPTO_PRIMITIVES
-- GET_BLOCK_NUM
-
-### Create main EVM account & Deploy EVM contract to Antelope blockchain
-
-
-### Setup EVM token
-
-
-### disturbute EVM tokens according to genesis
 
 
