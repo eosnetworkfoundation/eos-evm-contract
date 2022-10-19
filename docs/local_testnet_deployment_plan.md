@@ -395,8 +395,10 @@ PORT="18888"
 EOS_EVM_ACCOUNT="evmevmevmevm"
 EOS_SENDER="a123"
 ```
+In this environment settings, Tx Wrapper will listen to 127.0.0.1:18888, use ```5JURSKS1BrJ1TagNBw1uVSzTQL2m9eHGkjknWeZkjSt33Awtior``` to wrap and sign the in-coming eth trasnactions into Antelope transactions, and then push them into the Antelope RPC endpoint http://127.0.0.1:8888
 
-### Start Tx Wrapper Service (please use index.js from https://github.com/eosnetworkfoundation/TrustEVM/tree/main/peripherals/tx_wrapper)
+### Start Tx Wrapper Service
+use index.js from https://github.com/eosnetworkfoundation/TrustEVM/tree/main/peripherals/tx_wrapper
 ```
 node index.js
 ```
@@ -536,7 +538,7 @@ You will notice that the balance of account ```2787b98fc4e731d0456b3941f0b3fe2e0
 
 
 ### Play with Solidity smart contract, compile simple solidity smart contract:
-You can skip this one if you're already familiar. This is a example solidity smart contract:
+You can skip this one if you're already familiar. Take this example solidity smart contract:
 ```
 // SPDX-License-Identifier: GPL-3.0
 
@@ -613,7 +615,7 @@ f901c401843b9aca00830f42408080b90170608060405234801561001057600080fd5b5061015080
      error_code: null } }
 ```
 
-### Check account from Antelope blockchain to verify if your solidity bytecode has deployed:
+### Check account from Antelope blockchain to verify if your solidity bytecode has been deployed:
 ```
 ./cleos get table evmevmevmevm evmevmevmevm account
 {
@@ -647,11 +649,116 @@ f901c401843b9aca00830f42408080b90170608060405234801561001057600080fd5b5061015080
   "next_key": ""
 }
 ```
+In the above case the solidity bytecode was deployed into eth address ```51a97d86ae7c83f050056f03ebbe451001046764``` which is determined by the "From" address and "nonce".
+
+### Run functions defined in solidity contract
+In order to execute function ```store(uint256 num)```, we need to first make the signed eth raw transaction:
+```
+python3 sign_ethraw.py 2787b98fc4e731d0456b3941f0b3fe2e01439961 51a97d86ae7c83f050056f03ebbe451001046764 0 6057361d000000000000000000000000000000000000000000000000000000000000007b 2
+```
+in this case ```6057361d``` is the function has of ```store(uint256 num)```, we use 123 as the value of ```num```, which is 7b in hex form.
+Once you get the raw trasnaction, then we can push into Tx wrapper to sign as the Antelope transaction and push to Antelope blockchain
+```
+curl http://127.0.0.1:18888 -X POST -H "Accept: application/json" -H "Content-Type: application/json" --data '{"method":"eth_sendRawTransaction","params":["0xf88a02843b9aca00830f42409451a97d86ae7c83f050056f03ebbe45100104676480a46057361d000000000000000000000000000000000000000000000000000000000000007b8279a9a0a2fc71e4beebd9cd1a3d9a55da213f126641f7ed0bb708a3882fa2b85dd6c30ea0164a5d8a8b9b37950091665194f07b5c4e8f6d1b0d6ef162b0e0a1f9bf10c7a7"],"id":1,"jsonrpc":"2.0"}'
+```
+You'll get a response in Tx Wrapper:
+```
+{"method":"eth_sendRawTransaction","params":["0xf88a02843b9aca00830f42409451a97d86ae7c83f050056f03ebbe45100104676480a46057361d000000000000000000000000000000000000000000000000000000000000007b8279a9a0a2fc71e4beebd9cd1a3d9a55da213f126641f7ed0bb708a3882fa2b85dd6c30ea0164a5d8a8b9b37950091665194f07b5c4e8f6d1b0d6ef162b0e0a1f9bf10c7a7"],"id":1,"jsonrpc":"2.0"}
+----rlptx-----
+f88a02843b9aca00830f42409451a97d86ae7c83f050056f03ebbe45100104676480a46057361d000000000000000000000000000000000000000000000000000000000000007b8279a9a0a2fc71e4beebd9cd1a3d9a55da213f126641f7ed0bb708a3882fa2b85dd6c30ea0164a5d8a8b9b37950091665194f07b5c4e8f6d1b0d6ef162b0e0a1f9bf10c7a7
+----response----
+{ transaction_id:
+   '8608a7b373d1f796c81114d19cf95083f85cc3727f47514902daf2e5e4e68664',
+  processed:
+   { id:
+      '8608a7b373d1f796c81114d19cf95083f85cc3727f47514902daf2e5e4e68664',
+     block_num: 31652,
+     block_time: '2022-10-19T08:31:51.500',
+     producer_block_id: null,
+     receipt:
+      { status: 'executed', cpu_usage_us: 1036, net_usage_words: 31 },
+     elapsed: 1036,
+     net_usage: 248,
+     scheduled: false,
+     action_traces: [ [Object] ],
+     account_ram_delta: null,
+     except: null,
+     error_code: null } }
+```
+
+Verify from Antelope blockchain to ensure nonce & balance were updated:
+```
+./cleos get table evmevmevmevm evmevmevmevm account
+{
+  "rows": [{
+      "id": 0,
+      "eth_address": "2787b98fc4e731d0456b3941f0b3fe2e01439961",
+      "nonce": 3,
+      "balance": "00000000000000000000000000000000ffffffffffffffffffff54bdc1c8be00",
+      "eos_account": "",
+      "code": "",
+      "code_hash": "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470"
+    },{
+      "id": 1,
+      "eth_address": "0000000000000000000000000000000000000000",
+      "nonce": 0,
+      "balance": "0000000000000000000000000000000000000000000000000000ab423e374200",
+      "eos_account": "",
+      "code": "",
+      "code_hash": "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470"
+    },{
+      "id": 2,
+      "eth_address": "51a97d86ae7c83f050056f03ebbe451001046764",
+      "nonce": 1,
+      "balance": "0000000000000000000000000000000000000000000000000000000000000000",
+      "eos_account": "",
+      "code": "608060405234801561001057600080fd5b50600436106100365760003560e01c80632e64cec11461003b5780636057361d14610059575b600080fd5b610043610075565b60405161005091906100d9565b60405180910390f35b610073600480360381019061006e919061009d565b61007e565b005b60008054905090565b8060008190555050565b60008135905061009781610103565b92915050565b6000602082840312156100b3576100b26100fe565b5b60006100c184828501610088565b91505092915050565b6100d3816100f4565b82525050565b60006020820190506100ee60008301846100ca565b92915050565b6000819050919050565b600080fd5b61010c816100f4565b811461011757600080fd5b5056fea26469706673582212209a159a4f3847890f10bfb87871a61eba91c5dbf5ee3cf6398207e292eee22a1664736f6c63430008070033",
+      "code_hash": "72cdff13f49c75af3a3628ec4a6e51b6ec756a9c5bece913018e1bbf539ece2e"
+    }
+  ],
+  "more": false,
+  "next_key": ""
+}
+```
+
+### [Debug only] Investigate the current EVM storage state from Antelope
+Since we don't support running View actions directly from Antelope node (read requests will go to TrustEVM-RPC), it is quite complicated to investigate the storage of EVM directly from Antelope. However, If you really want to do that. These are the steps:
+
+#### Identify the "id" field of the contract address
+in the above example, contract address is 51a97d86ae7c83f050056f03ebbe451001046764), we use
+```
+./cleos get table evmevmevmevm evmevmevmevm account --index 2 -L 51a97d86ae7c83f050056f03ebbe451001046764 --key-type sha256
+```
+to get the response:
+```
+  "rows": [{
+      "id": 2,
+      "eth_address": "51a97d86ae7c83f050056f03ebbe451001046764",
+...
+```
+From the response, contract address 51a97d86ae7c83f050056f03ebbe451001046764 will use table id 2. So we get the storage table data of evmevmevmevm (with scope = 2, table name = ```storage```)
+```
+./cleos get table evmevmevmevm 2 storage
+```
+example output:
+```
+{
+  "rows": [{
+      "id": 0,
+      "key": "0000000000000000000000000000000000000000000000000000000000000000",
+      "value": "000000000000000000000000000000000000000000000000000000000000007b"
+    }
+  ],
+  "more": false,
+  "next_key": ""
+}
+```
+
 
 
 ## 5. Start up TrustEVM-node (silkworm node) 
 
-A TrustEVM-node is a node process of the virtual ethereum blockchain that validates virtual ethereum blocks and serves the requests coming from TrustEVM-RPC. It will not produce blocks. However, it will consume blocks from Antelope node and convert Antelope blocks into Virutal Ethereum blocks in a deterministic way. 
+A TrustEVM-node is a node process of the virtual ethereum blockchain that validates virtual ethereum blocks and serves the read requests coming from TrustEVM-RPC. It will not produce blocks. However, it will consume blocks from Antelope node and convert Antelope blocks into Virutal Ethereum blocks in a deterministic way. 
 
 To set it up, we need to first make up a genesis of the virtual ethereum blockchain that maps to the same EVM state of the evm account of the Antelope chain that just initialized in the previous steps.
 
