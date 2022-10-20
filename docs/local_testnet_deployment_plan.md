@@ -868,7 +868,9 @@ Response:
 
 ## 7. Setup proxy to separate read requests and write requests
 
-The proxy program will separate Ethereum's write requests (such as eth_sendRawTransaction,eth_gasPrice) from other requests (treated as read requests). In order to get it working, docker is required. 
+The proxy program will separate Ethereum's write requests (such as eth_sendRawTransaction,eth_gasPrice) from other requests (treated as read requests). The write requests should go to Transaction Wrapper (which wrap the ETH transaction into Antelope transaction and sign it and push to the Antelope blockchain). The read requests should go to TrustEVM-RPC.
+
+In order to get it working, docker is required. 
 
 To install docker in Linux, see https://docs.docker.com/engine/install/ubuntu/
 
@@ -886,7 +888,9 @@ Edit the file ```nginx.conf```, find the follow settings:
     server 192.168.56.101:8881;
   }
 ```
+
 change the IP & port of the write session to your Transaction Wrapper server endpoint
+
 change the IP & port of the read session to your TrustEVM-RPC server endpoint
 
 build the docker image for the proxy program
