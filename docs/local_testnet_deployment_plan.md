@@ -50,20 +50,14 @@ Compiled binaries from this repo
   In order to run a Trust EVM service, we need to have the follow items inside one physical server / VM:
   
   We need the following steps to setup the Antelope blockchain with capabilities to push EVM transactions:
+  
   1. run a local Antelope node (nodeos process) with SHIP plugin enabled, which is a single block producer
   2. blockchain bootstrapping and initialization
   3. deploy evm contract and initilize evm
   4. setup the transaction wrapper for to wrap ETH write requests into Antelope transactions
-  
-  And we need the following steps to support ETH API compatible read transactions (View transaction) via the virtual ETH chain in TrustEVM node
-  
-  6. run a TrustEVM-node(silkworm node) process connecting to the local Antelope node
-  7. run a TrustEVM-RPC(silkworm RPC) process locally to serve the eth RPC requests
-  
-  And we need a proxy to separate read requests and write requests
-  
-  8. setup a trustEVM proxy to route read requests to TrustEVM-RPC and write requests to Antelope public network
-
+  5. run a TrustEVM-node(silkworm node) process connecting to the local Antelope node
+  6. run a TrustEVM-RPC(silkworm RPC) process locally to serve the eth RPC requests
+  7. setup a trustEVM proxy to route read requests to TrustEVM-RPC and write requests to transaction wrapper
 
 ## Step by Step in details:
 
@@ -874,6 +868,53 @@ Response:
 
 ## 7. Setup proxy to separate read requests and write requests
 
+The proxy program will separate Ethereum's write requests (such as eth_sendRawTransaction,eth_gasPrice) from other requests (treated as read requests). In order to get it working, docker is required. 
 
+To install docker in Linux, see https://docs.docker.com/engine/install/ubuntu/
 
+You can find the proxy tool from TrustEVM/perfipherals/proxy
+```
+cd TrustEVM/peripherals/proxy/
+```
+Edit the file ```nginx.conf```, find the follow settings:
+```
+  upstream write {
+    server 192.168.56.101:18888;
+  }
+  
+  upstream read {
+    server 192.168.56.101:8881;
+  }
+```
+change the IP & port of the write session to your Transaction Wrapper server endpoint
+change the IP & port of the read session to your TrustEVM-RPC server endpoint
 
+build the docker image for the proxy program
+```
+sudo docker build .
+```
+check the image ID after building the image
+```
+sudo docker image ls
+```
+Example output:
+```
+REPOSITORY   TAG       IMAGE ID       CREATED         SIZE
+<none>       <none>    49564d312df7   2 hours ago     393MB
+debian       jessie    3aaeab7a4777   19 months ago   129MB
+```
+
+Run the proxy in docker:
+```
+sudo docker run -p 81:80 -v ${PWD}/nginx.conf:/etc/nginx.conf 49564d312df7
+```
+Here we map the host port 81 to the port 80 inside the docker.
+
+Check if the proxy is responding:
+```
+curl http://127.0.0.1:81 -X POST -H "Accept: application/json" -H "Content-Type: application/json" --data '{"method":"eth_gasPrice","params":[],"id":1,"jsonrpc":"2.0"}'
+```
+Example response:
+```
+{"jsonrpc":"2.0","id":1,"result":"0x22ecb25c00"}
+```
