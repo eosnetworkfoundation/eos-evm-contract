@@ -21,7 +21,7 @@
 	url = https://github.com/microsoft/GSL
 [submodule "external/appbase"]
 	path = external/appbase
-	url = https://github.com/antelopeio/appbase
+	url = https://github.com/AntelopeIO/appbase
 [submodule "external/abieos"]
 	path = external/abieos
-	url = https://github.com/antelopeio/abieos
+	url = https://github.com/AntelopeIO/abieos

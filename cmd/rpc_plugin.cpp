@@ -5,6 +5,7 @@
 #include <iostream>
 #include <string>
 
+#include <agrpc/grpc_context.hpp>
 #include <grpcpp/grpcpp.h>
 
 #include <silkrpc/common/log.hpp>
@@ -54,8 +55,10 @@ void rpc_plugin::plugin_initialize( const appbase::variables_map& options ) {
 
    auto verbosity         = appbase::app().get_plugin<sys_plugin>().get_verbosity();
 
+   using evmc::operator""_bytes32;
    silkworm::ChainConfig config{
       0,  // chain_id
+      0_bytes32,
       silkworm::SealEngineType::kNoProof,
       {
          0,          // Homestead
@@ -72,7 +75,16 @@ void rpc_plugin::plugin_initialize( const appbase::variables_map& options ) {
    node_settings.data_directory = std::make_unique<silkworm::DataDirectory>(data_dir, false);
    node_settings.network_id = config.chain_id;
    node_settings.etherbase  = silkworm::to_evmc_address(silkworm::from_hex("").value()); // TODO determine etherbase name
-   node_settings.chaindata_env_config = {node_settings.data_directory->chaindata().path().string(), false, false};
+   node_settings.chaindata_env_config = {node_settings.data_directory->chaindata().path().string(), false, true, false, false, true};
+
+   //  bool create{false};          // Whether db file must be created
+   //  bool readonly{false};        // Whether db should be opened in RO mode
+   //  bool exclusive{false};       // Whether this process has exclusive access
+   //  bool inmemory{false};        // Whether this db is in memory
+   //  bool shared{false};          // Whether this process opens a db already opened by another process
+   //  bool read_ahead{false};      // Whether to enable mdbx read ahead
+   //  bool write_map{false};       // Whether to enable mdbx write map
+
    node_settings.chaindata_env_config.max_readers = max_readers;
    node_settings.chain_config = config;
 

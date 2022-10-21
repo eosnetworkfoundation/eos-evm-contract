@@ -21,6 +21,7 @@ class engine_plugin : public appbase::plugin<engine_plugin> {
       std::string get_address() const;
       uint32_t    get_threads() const;
       std::string get_chain_data_dir() const;
+      std::optional<silkworm::BlockHeader> get_head_canonical_header();
 
    private:
       std::unique_ptr<class engine_plugin_impl> my;

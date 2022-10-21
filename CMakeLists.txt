@@ -16,6 +16,9 @@
 
 cmake_minimum_required(VERSION 3.16)
 
+# Add support for MacOS architectures
+set(CMAKE_OSX_ARCHITECTURES ${ARCHS_STANDARD} CACHE INTERNAL "" FORCE)
+
 # Check that submodules initialization has been done
 if(NOT EXISTS ${CMAKE_SOURCE_DIR}/silkworm/.git)
   message(FATAL_ERROR "Git submodules not initialized, execute:\n  git submodule update --init --recursive")
@@ -26,12 +29,15 @@ if(NOT CMAKE_TOOLCHAIN_FILE)
   set(CMAKE_TOOLCHAIN_FILE ${CMAKE_SOURCE_DIR}/silkworm/cmake/toolchain/cxx20.cmake CACHE FILEPATH "" FORCE)
 endif()
 
+# Enable language *before* indirectly including GNUInstallDirs (see CableBuildInfo)
+enable_language(CXX)
+
 include(silkworm/third_party/evmone/cmake/cable/bootstrap.cmake)
 include(CableBuildInfo)
 include(silkworm/third_party/evmone/cmake/cable/HunterGate.cmake)
 HunterGate(
-  URL "https://github.com/cpp-pm/hunter/archive/v0.24.1.tar.gz"
-  SHA1 "4942227a6e6f5e64414c55b97ef98609de199d18"
+  URL "https://github.com/cpp-pm/hunter/archive/v0.24.3.tar.gz"
+  SHA1 "10738b59e539818a01090e64c2d09896247530c7"
   FILEPATH "${CMAKE_SOURCE_DIR}/cmake/Hunter/config.cmake"
 )
 
@@ -45,6 +51,7 @@ set(PROJECT_VERSION_PATCH ${CMAKE_MATCH_3})
 
 cable_add_buildinfo_library(PROJECT_NAME ${PROJECT_NAME})
 
+# Enforce minimum compiler versions
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   if(CMAKE_C_COMPILER_VERSION VERSION_LESS 10.3.0)
     message(FATAL_ERROR "required gcc version >= 10.3.0")
@@ -62,6 +69,10 @@ elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL 
 endif()
 
 include(cmake/Hunter/packages.cmake)
+
+# Silence CMake policy warnings in submodules
+set(CMAKE_POLICY_DEFAULT_CMP0048 NEW)
+set(CMAKE_POLICY_DEFAULT_CMP0063 NEW)
 
 # Silkworm
 find_package(ethash CONFIG REQUIRED)

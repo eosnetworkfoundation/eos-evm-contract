@@ -8,7 +8,7 @@
 
 class blockchain_plugin : public appbase::plugin<blockchain_plugin> {
    public:
-      APPBASE_PLUGIN_REQUIRES((sys_plugin)(engine_plugin)(ship_receiver_plugin)(block_conversion_plugin));
+      APPBASE_PLUGIN_REQUIRES((sys_plugin)(engine_plugin)(block_conversion_plugin));
       blockchain_plugin();
       virtual ~blockchain_plugin();
       virtual void set_program_options(appbase::options_description& cli, appbase::options_description& cfg) override;

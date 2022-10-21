@@ -1,10 +1,18 @@
 #pragma once
+#include <silkworm/consensus/engine.hpp>
+#include <silkworm/chain/protocol_param.hpp>
 
 namespace evm_runtime {
 
+using namespace silkworm;
+
 struct engine : silkworm::consensus::IEngine {
     
-    ValidationResult pre_validate_block(const Block& block, const BlockState& state) override {
+    ValidationResult pre_validate_block_body(const Block& block, const BlockState& state) override {
+        return ValidationResult::kOk;
+    }
+
+    ValidationResult validate_ommers(const Block& block, const BlockState& state) override {
         return ValidationResult::kOk;
     }
 

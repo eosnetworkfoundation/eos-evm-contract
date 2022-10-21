@@ -14,7 +14,7 @@ struct pushtx {
 EOSIO_REFLECT(pushtx, ram_payer, rlpx)
 class block_conversion_plugin : public appbase::plugin<block_conversion_plugin> {
    public:
-      APPBASE_PLUGIN_REQUIRES((sys_plugin)(ship_receiver_plugin));
+      APPBASE_PLUGIN_REQUIRES((sys_plugin)(ship_receiver_plugin)(engine_plugin));
       block_conversion_plugin();
       virtual ~block_conversion_plugin();
       virtual void set_program_options(appbase::options_description& cli, appbase::options_description& cfg) override;

@@ -34,25 +34,41 @@ elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     add_compile_options(-stdlib=libc++)
 endif()
 
-# Silkrpc daemon
-set(NODE_LIBRARIES
-    trustevm_node-buildinfo
-    silkrpc
-    absl::flags_parse)
-    #silkinterfaces)
+# Silkrpc toolbox
+add_executable(silkrpc_toolbox
+    silkrpc_toolbox.cpp
+    ethbackend_async.cpp ethbackend_coroutines.cpp ethbackend.cpp
+    kv_seek_async_callback.cpp kv_seek_async_coroutines.cpp kv_seek_async.cpp kv_seek.cpp
+    kv_seek_both.cpp
+)
+target_include_directories(silkrpc_toolbox PRIVATE ${CMAKE_SOURCE_DIR})
+target_link_libraries(silkrpc_toolbox absl::flags_parse gRPC::grpc++_unsecure protobuf::libprotobuf silkrpc)
 
+# Silkrpc daemon
+set(SILKRPC_DAEMON_LIBRARIES
+    #silkrpc-buildinfo
+    silkrpc
+    absl::flags_parse
+    silkinterfaces)
+if(SILKRPC_USE_MIMALLOC)
+    list(APPEND SILKRPC_DAEMON_LIBRARIES mimalloc)
+endif()
+
+add_executable(silkrpcdaemon silkrpc_daemon.cpp)
+target_include_directories(silkrpcdaemon PUBLIC ${CMAKE_SOURCE_DIR})
+target_link_libraries(silkrpcdaemon PRIVATE ${SILKRPC_DAEMON_LIBRARIES})
 
 add_library(blockconversion_plugin block_conversion_plugin.cpp)
 target_include_directories(blockconversion_plugin PUBLIC ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/external/abieos/src)
-target_link_libraries(blockconversion_plugin PUBLIC ${NODE_LIBRARIES} silkworm_core silkworm_node appbase abieos ${Boost_PROGRAM_OPTIONS_LIBRARY})
+target_link_libraries(blockconversion_plugin PUBLIC ${SILKRPC_LIBRARIES} silkworm_core silkworm_node appbase abieos ${Boost_PROGRAM_OPTIONS_LIBRARY})
 
-add_library(engine_plugin engine_plugin.cpp)
+add_library(engine_plugin engine_plugin.cpp genesis.cpp)
 target_include_directories(engine_plugin PUBLIC ${CMAKE_SOURCE_DIR})
-target_link_libraries(engine_plugin PUBLIC ${NODE_LIBRARIES} silkworm_core silkworm_node appbase abieos ${Boost_PROGRAM_OPTIONS_LIBRARY})
+target_link_libraries(engine_plugin PUBLIC ${SILKRPC_LIBRARIES} silkworm_core silkworm_node appbase abieos ${Boost_PROGRAM_OPTIONS_LIBRARY})
 
 add_library(shipreceiver_plugin ship_receiver_plugin.cpp)
 target_include_directories(shipreceiver_plugin PUBLIC ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/external/abieos/src)
-target_link_libraries(shipreceiver_plugin PUBLIC ${NODE_LIBRARIES} silkworm_core silkworm_node appbase abieos ${Boost_PROGRAM_OPTIONS_LIBRARY})
+target_link_libraries(shipreceiver_plugin PUBLIC ${SILKRPC_LIBRARIES} silkworm_core silkworm_node appbase abieos ${Boost_PROGRAM_OPTIONS_LIBRARY})
 
 add_library(blockchain_plugin blockchain_plugin.cpp)
 target_include_directories(blockchain_plugin PUBLIC ${CMAKE_SOURCE_DIR})
@@ -64,11 +80,11 @@ target_link_libraries(sys_plugin PUBLIC silkworm_core silkworm_node appbase ${Bo
 
 add_library(rpc_plugin rpc_plugin.cpp)
 target_include_directories(rpc_plugin PUBLIC ${CMAKE_SOURCE_DIR})
-target_link_libraries(rpc_plugin PUBLIC ${NODE_LIBRARIES} sys_plugin appbase ${Boost_PROGRAM_OPTIONS_LIBRARY})
+target_link_libraries(rpc_plugin PUBLIC ${SILKRPC_LIBRARIES} ${SILKRPC_DAEMON_LIBRARIES} sys_plugin appbase ${Boost_PROGRAM_OPTIONS_LIBRARY})
 
 add_executable(trustevm-node node.cpp)
 target_include_directories(trustevm-node PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR})
-target_link_libraries(trustevm-node PRIVATE engine_plugin shipreceiver_plugin sys_plugin blockchain_plugin)
+target_link_libraries(trustevm-node PRIVATE engine_plugin shipreceiver_plugin sys_plugin blockchain_plugin rpc_plugin trustevm_node-buildinfo)
 
 add_executable(trustevm-rpc rpc.cpp)
 target_include_directories(trustevm-rpc PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR})
@@ -79,10 +95,11 @@ enable_testing()
 
 find_package(Catch2 CONFIG REQUIRED)
 find_package(GTest CONFIG REQUIRED)
+find_package(asio-grpc CONFIG REQUIRED)
 
 file(GLOB_RECURSE SILKRPC_TESTS CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/silkrpc/*_test.cpp")
 add_executable(unit_test unit_test.cpp ${SILKRPC_TESTS})
-target_link_libraries(unit_test silkrpc Catch2::Catch2 GTest::gmock)
+target_link_libraries(unit_test silkrpc Catch2::Catch2 GTest::gmock asio-grpc::asio-grpc)
 
 include(CTest)
 include(Catch)

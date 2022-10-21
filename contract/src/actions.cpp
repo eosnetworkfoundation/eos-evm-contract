@@ -63,7 +63,7 @@ ACTION evm_contract::testtx( const bytes& rlptx, const evm_runtime::test::block_
 
     Transaction tx;
     ByteView bv{(const uint8_t *)rlptx.data(), rlptx.size()};
-    eosio::check(rlp::decode(bv,tx) == rlp::DecodingResult::kOk && bv.empty(), "unable to decode transaction");
+    eosio::check(rlp::decode(bv,tx) == DecodingResult::kOk && bv.empty(), "unable to decode transaction");
 
     tx.from.reset();
     tx.recover_sender();
@@ -194,8 +194,8 @@ ACTION evm_contract::updateaccnt(const bytes& address, const bytes& initial, con
         if(data.size()) {
             Account tmp;
             ByteView bv{(const uint8_t *)data.data(), data.size()};
-            auto dec_res = decode_account_from_storage(bv);
-            eosio::check(dec_res.second == rlp::DecodingResult::kOk, "unable to decode account");
+            auto dec_res = Account::from_encoded_storage(bv);
+            eosio::check(dec_res.second == DecodingResult::kOk, "unable to decode account");
             res = dec_res.first;
         }
         return res;
