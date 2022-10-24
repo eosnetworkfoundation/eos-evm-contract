@@ -112,7 +112,7 @@ class block_conversion_plugin_impl : std::enable_shared_from_this<block_conversi
 
                // Keep the last block before genesis timestamp
                if (b->timestamp <= block_mapping::genesis_timestamp) {
-                  SILK_DEBUG << "Before genesis: Block #" << b->block_num;
+                  SILK_DEBUG << "Before genesis: Block #" << b->block_num << " timestamp: " << b->timestamp;
                   native_blocks.clear();
                   native_blocks.push_back(*b);
                   return;
@@ -148,6 +148,7 @@ class block_conversion_plugin_impl : std::enable_shared_from_this<block_conversi
                // Process the last native block received.
                // We extend the evm chain if necessary up until the block where the received block belongs
                auto evm_num = block_mapping::timestamp_to_evm_block(b->timestamp);
+               SILK_INFO << "Expecting evm number: " << evm_num;
 
                while(evm_blocks.back().header.number < evm_num) {
                   auto& last_evm_block = evm_blocks.back();
@@ -167,7 +168,7 @@ class block_conversion_plugin_impl : std::enable_shared_from_this<block_conversi
                      silkworm::ByteView bv = {(const uint8_t*)dtx.rlpx.data(), dtx.rlpx.size()};
                      silkworm::Transaction evm_tx;
                      if (silkworm::rlp::decode<silkworm::Transaction>(bv, evm_tx) != silkworm::DecodingResult::kOk) {
-                        SILK_CRIT << "Failed to decode transaction";
+                        SILK_CRIT << "Failed to decode transaction in block: " << curr.header.number;
                         throw std::runtime_error("Failed to decode transaction");
                      }
                      curr.transactions.emplace_back(std::move(evm_tx));
