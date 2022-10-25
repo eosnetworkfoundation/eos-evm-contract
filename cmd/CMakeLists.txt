@@ -88,7 +88,7 @@ target_link_libraries(trustevm-node PRIVATE engine_plugin shipreceiver_plugin sy
 
 add_executable(trustevm-rpc rpc.cpp)
 target_include_directories(trustevm-rpc PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR})
-target_link_libraries(trustevm-rpc PRIVATE rpc_plugin)
+target_link_libraries(trustevm-rpc PRIVATE rpc_plugin trustevm_node-buildinfo)
 
 # Unit tests
 enable_testing()
