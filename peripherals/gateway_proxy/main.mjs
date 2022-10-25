@@ -21,20 +21,8 @@ const proxyContract = new web3.eth.Contract(proxy, argv.address);
 
 //an array of objects, {address: string, url: string, weight: string}
 let currentStakers = [];
-let nginxProcess = null;
+let nginxProcess;
 const configFilePath = `${os.tmpdir}/evmnginx-${process.pid}.conf`;
-
-function createConfig(stakers) {
-   let configTemplate = fs.readFileSync(argv.config, { encoding: 'utf8' });
-   let serversString = "";
-   if (stakers.length === 0)
-      serversString = `server ${argv.fallback};   # (fallback)\n`;
-   else
-      stakers.forEach(staker => serversString += `server ${staker.url} weight=${staker.weight};   # ${staker.address}\n`);
-   configTemplate = configTemplate.replaceAll('$STAKERS', serversString);
-   configTemplate += '\ndaemon off;\n';
-   fs.writeFileSync(configFilePath, configTemplate);
-}
 
 async function getStakers() {
    const bnum = await web3.eth.getBlockNumber();
@@ -45,31 +33,29 @@ async function getStakers() {
    let queryPromises = [];
    for (let i = 0; i < allowCount; i++) {
       const addr = await proxyContract.methods.getRoleMember(STAKER_ROLE, i).call({}, bnum);
-      if (addr === zeroAddress)
-         continue;
-      queryPromises.push(Promise.all([addr,
-                                      proxyContract.methods.getUpstreamUrl(addr).call({}, bnum),
-                                      proxyContract.methods.getAmount(addr).call({}, bnum)]));
+      if (addr !== zeroAddress)
+         queryPromises.push(Promise.all([addr,
+                                         proxyContract.methods.getUpstreamUrl(addr).call({}, bnum),
+                                         proxyContract.methods.getAmount(addr).call({}, bnum)]));
    }
 
    for (const queryResult of await Promise.allSettled(queryPromises)) {
-      let entryAddr = "unknown";
       try {
          assert(queryResult.status === 'fulfilled', "Query promise failed");
          let [entryAddr, entryUrl, entryStaked] = queryResult.value;
 
-         const parsedUrl = entryUrl.match(/https:\/\/(?<url>[0-9a-zA-Z.-]+):?(?<port>[0-9]+)?\//);
-         assert(parsedUrl, `unable to parse URL`);
-         const resolvedAddress = await dns.promises.lookup(parsedUrl.groups.url, { family: 4 });
+         const parsedUrl = entryUrl.match(/https:\/\/(?<hostname>[0-9a-zA-Z.-]+):?(?<port>[0-9]+)?\//);
+         assert(parsedUrl, `unable to parse URL from ${entryAddr}`);
+         const resolvedAddress = await dns.promises.lookup(parsedUrl.groups.hostname, { family: 4 });
 
          const stakedBN = web3.utils.toBN(entryStaked);
          const stakedUnitsBN = stakedBN.div(web3.utils.toBN(minimumStakeUnit));
-         assert(!stakedUnitsBN.isZero(), "less than minimum stake amount staked");
+         assert(!stakedUnitsBN.isZero(), `less than minimum stake amount staked from ${entryAddr}`);
 
          newConfig.push({ "address": entryAddr, "url": `${resolvedAddress.address}:${parsedUrl.groups.port ?? '443'}`, "weight": stakedUnitsBN.toString() });
       }
       catch (e) {
-         console.error(`skipping ${entryAddr} due to error ${e}`);
+         console.error(`skipping due to error ${e}`);
       }
    }
 
@@ -77,7 +63,18 @@ async function getStakers() {
 }
 
 function populateNginxConfig(stakers) {
-   createConfig(stakers);
+   let configTemplate = fs.readFileSync(argv.config, { encoding: 'utf8' });
+
+   let serversString = "";
+   if (stakers.length === 0)
+      serversString = `server ${argv.fallback};   # (fallback)\n`;
+   else
+      stakers.forEach(staker => serversString += `server ${staker.url} weight=${staker.weight};   # ${staker.address}\n`);
+
+   configTemplate = configTemplate.replaceAll('$STAKERS', serversString);
+   configTemplate += '\ndaemon off;\n';
+   fs.writeFileSync(configFilePath, configTemplate);
+
    //test config first...
    assert(spawnSync(argv.nginx, ['-t', '-c', configFilePath], { stdio: "inherit" }).status === 0, "testing new config failed");
    if (nginxProcess?.pid)
