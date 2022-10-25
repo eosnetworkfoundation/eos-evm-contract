@@ -17,7 +17,7 @@ namespace channels {
       eosio::name         receiver;
       eosio::name         account;
       eosio::name         name;
-      eosio::input_stream data;
+      std::vector<char>   data;
    };
    
    struct native_trx {

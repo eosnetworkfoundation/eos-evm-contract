@@ -221,7 +221,7 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
                act.receiver,
                act.act.account,
                act.act.name,
-               std::move(act.act.data)
+               std::vector<char>(act.act.data.pos, act.act.data.end)
             };
             native_trx.actions.emplace_back(std::move(action));
             //SILK_DEBUG << "Appending action " << native_trx.actions.back().name.to_string();

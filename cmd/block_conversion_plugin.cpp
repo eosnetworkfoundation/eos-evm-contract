@@ -13,7 +13,10 @@ struct block_mapping {
    static constexpr uint64_t block_interval    = 1000000;          //us
 
    inline static uint32_t timestamp_to_evm_block(uint64_t timestamp) {
-      assert(timestamp >= genesis_timestamp);
+      if( timestamp < genesis_timestamp ) {
+         SILK_CRIT << "Invalid timestamp: " << timestamp << ", genesis: " << genesis_timestamp;
+         assert(timestamp >= genesis_timestamp);
+      }
       return 1 + (timestamp - genesis_timestamp)/block_interval;
    }
 
@@ -112,7 +115,7 @@ class block_conversion_plugin_impl : std::enable_shared_from_this<block_conversi
 
                // Keep the last block before genesis timestamp
                if (b->timestamp <= block_mapping::genesis_timestamp) {
-                  SILK_DEBUG << "Before genesis: Block #" << b->block_num << " timestamp: " << b->timestamp;
+                  SILK_DEBUG << "Before genesis: " << block_mapping::genesis_timestamp <<  " Block #" << b->block_num << " timestamp: " << b->timestamp;
                   native_blocks.clear();
                   native_blocks.push_back(*b);
                   return;
@@ -155,7 +158,7 @@ class block_conversion_plugin_impl : std::enable_shared_from_this<block_conversi
                   //if( last_evm_block.header.number != 0 ) {
                      last_evm_block.header.transactions_root = compute_transaction_root(last_evm_block);
                      if (!(last_evm_block.header.number % 1000))
-                        SILK_DEBUG << "Generating EVM #" << last_evm_block.header.number;
+                        SILK_INFO << "Generating EVM #" << last_evm_block.header.number;
                      evm_blocks_channel.publish(80, std::make_shared<silkworm::Block>(last_evm_block));
                   //}
                   evm_blocks.push_back(new_block(last_evm_block.header.number+1, last_evm_block.header.hash()));
@@ -164,7 +167,7 @@ class block_conversion_plugin_impl : std::enable_shared_from_this<block_conversi
                // Add transactions to the evm block
                auto& curr = evm_blocks.back();
                for_each_action(*b, [this, &curr](const auto& act){
-                     auto dtx = deserialize_tx(eosio::input_stream(act.data.pos, act.data.remaining()));
+                     auto dtx = deserialize_tx(act.data);
                      silkworm::ByteView bv = {(const uint8_t*)dtx.rlpx.data(), dtx.rlpx.size()};
                      silkworm::Transaction evm_tx;
                      if (silkworm::rlp::decode<silkworm::Transaction>(bv, evm_tx) != silkworm::DecodingResult::kOk) {
@@ -205,10 +208,9 @@ class block_conversion_plugin_impl : std::enable_shared_from_this<block_conversi
          );
       }
 
-      template <typename Stream>
-      inline pushtx deserialize_tx(Stream&& s) const {
+      inline pushtx deserialize_tx(const std::vector<char>& d) const {
          pushtx tx;
-         eosio::from_bin(tx, s);
+         eosio::convert_from_bin(tx, d);
          return tx;
       }
 
