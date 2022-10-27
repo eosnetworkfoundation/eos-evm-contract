@@ -339,8 +339,9 @@ These protocol features are required to support EVM in Antelope:
 ]
 ```
 
+## For TrustEVM team
 
-### 2. create the EVM account
+### 1. create the EVM account
 Prepare an Antelope test account (Creator account)
 Generate a temporary Antelope key pair:
 Choose an EVM account name (such as evmevmevmevm in this document).
@@ -349,7 +350,7 @@ Run the following transaction:
 ./cleos create account CREATOR_ACCOUNT evmevmevmevm TEMP_PUBLIC_KEY TEMP_PUBLIC_KEY
 ```
 
-### 3. deploy EVM contract to the EVM account
+### 2. Deploy the debug version of EVM contract to the EVM account
 Ensure the EVM smart contract is well compiled. 
 (for how to compile, please refer to https://github.com/eosnetworkfoundation/TrustEVM/blob/main/docs/compilation_and_testing_guide.md)
 
@@ -358,35 +359,24 @@ Ensure the EVM smart contract is well compiled.
 ./cleos set abi evmevmevmevm ../TrustEVM/contract/build/evm_runtime/evm_runtime.abi
 ```
 
-### 4. setup initial Eth genesis balances
-In order to send ETH transaction, the sending account must have a positive balance for paying gas. Because of that we need to setup initial EVM balances for Eth genesis accounts.
+### 3. Setup initial EVM token balance
+We need to setup the EVM token balance for the initial Eth account, which is specially managed by TrustEVM team.
 for example:
 ```
 ./cleos push action evmevmevmevm setbal '{"addy":"2787b98fc4e731d0456b3941f0b3fe2e01439961", "bal":"0000000000000000000000000000000100000000000000000000000000000000"}' -p evmevmevmevm
 ```
-Repeat this for every different genesis ETH address. 
 <b>Be careful: the balance string value must be in the form of exactly 64 hex-digits (meaning a 256-bit integer)</b>
 
-
-### 5. change "active" & "owner" permission to "eosio.prods":
-After everything is setup, we need to give control of account "evmevmevmevm" to eosio.prods, which means we need more than 2/3 of block producers to co-sign every transaction authorized by evmevmevmevm.
-
+### 4. Deploy the release version of EVM contract to the EVM account
+"setbal" is the debug action which will be only used for setting up the balance of the inital account. 
 ```
-./cleos set account permission evmevmevmevm active '{"threshold":1,"keys":[],"accounts":[{"permission":{"actor":"eosio.prods","permission":"active"},"weight":1}],"waits":[]}'
-
-./cleos set account permission evmevmevmevm owner '{"threshold":1,"keys":[],"accounts":[{"permission":{"actor":"eosio.prods","permission":"active"},"weight":1}],"waits":[]}' -p evmevmevmevm@owner
+./cleos set code evmevmevmevm ../TrustEVM/contract/build/evm_runtime/evm_runtime.wasm
+./cleos set abi evmevmevmevm ../TrustEVM/contract/build/evm_runtime/evm_runtime.abi
 ```
 
-Get the account again to ensure the permission is set correctly:
-```
-./cleos get account evmevmevmevm
-```
-example output:
-```
-permissions: 
-     owner     1:    1 eosio.prods@active
-        active     1:    1 eosio.prods@active
-```
+### 5. send EVM tokens from the initial account to participant accounts
+
+
 
 
 ## For EVM service providers
