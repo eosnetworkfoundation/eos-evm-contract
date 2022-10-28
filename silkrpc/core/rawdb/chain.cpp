@@ -88,6 +88,8 @@ boost::asio::awaitable<evmc::bytes32> read_canonical_block_hash(const DatabaseRe
 }
 
 boost::asio::awaitable<intx::uint256> read_total_difficulty(const DatabaseReader& reader, const evmc::bytes32& block_hash, uint64_t block_number) {
+    co_return intx::uint256{0};
+#if 0
     const auto block_key = silkworm::db::block_key(block_number, block_hash.bytes);
     SILKRPC_TRACE << "rawdb::read_total_difficulty block_key: " << silkworm::to_hex(block_key) << "\n";
     const auto kv_pair{co_await reader.get(db::table::kDifficulty, block_key)};
@@ -102,6 +104,7 @@ boost::asio::awaitable<intx::uint256> read_total_difficulty(const DatabaseReader
     }
     SILKRPC_DEBUG << "rawdb::read_total_difficulty canonical total difficulty: " << total_difficulty << "\n";
     co_return total_difficulty;
+#endif
 }
 
 boost::asio::awaitable<silkworm::BlockWithHash> read_block_by_hash(const DatabaseReader& reader, const evmc::bytes32& block_hash) {

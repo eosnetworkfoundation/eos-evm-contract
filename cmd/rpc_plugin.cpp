@@ -30,7 +30,9 @@ rpc_plugin::~rpc_plugin() {}
 void rpc_plugin::set_program_options( appbase::options_description& cli, appbase::options_description& cfg ) {
    cfg.add_options()
       ("http-port", boost::program_options::value<std::string>()->default_value("127.0.0.1:8881"),
-        "http port for JSON RPC of the form <address>:<port>")
+        "http port for JSON RPC of the form <address>:<port>")    
+      ("engine-port", boost::program_options::value<std::string>()->default_value("127.0.0.1:8882"),
+        "engine port for JSON RPC of the form <address>:<port>")
       ("trust-evm-node", boost::program_options::value<std::string>()->default_value("127.0.0.1:8001"),
         "address to trust-evm-node of the form <address>:<port>")
       ("rpc-threads", boost::program_options::value<uint32_t>()->default_value(16),
@@ -39,11 +41,15 @@ void rpc_plugin::set_program_options( appbase::options_description& cli, appbase
         "directory of chaindata")
       ("rpc-max-readers", boost::program_options::value<uint32_t>()->default_value(16),
         "maximum number of rpc readers")
+      ("api-spec", boost::program_options::value<std::string>()->default_value("eth"),
+        "comma separated api spec, possible values: debug,engine,eth,net,parity,erigon,txpool,trace,web3")
    ;
 }
 
-void rpc_plugin::plugin_initialize( const appbase::variables_map& options ) {
-   const auto& http_port   = options.at("rpc-endpoint").as<std::string>();
+void rpc_plugin::plugin_initialize( const appbase::variables_map& options ) try {
+
+   const auto& http_port   = options.at("http-port").as<std::string>();
+   const auto& engine_port   = options.at("engine-port").as<std::string>();
    const auto  threads     = options.at("rpc-threads").as<uint32_t>();
    const auto  max_readers = options.at("rpc-max-readers").as<uint32_t>();
 
@@ -58,7 +64,7 @@ void rpc_plugin::plugin_initialize( const appbase::variables_map& options ) {
    using evmc::operator""_bytes32;
    silkworm::ChainConfig config{
       0,  // chain_id
-      0_bytes32,
+      00_bytes32, // genesis-hash
       silkworm::SealEngineType::kNoProof,
       {
          0,          // Homestead
@@ -91,8 +97,8 @@ void rpc_plugin::plugin_initialize( const appbase::variables_map& options ) {
    silkrpc::DaemonSettings settings {
       node_settings.data_directory->chaindata().path().string(),
       http_port,
-      "", 
-      0 /* determine proper abi spec */,
+      engine_port, 
+      options.at("api-spec").as<std::string>() /* determine proper abi spec */,
       node_port,
       std::thread::hardware_concurrency() / 3,
       threads,
@@ -103,6 +109,12 @@ void rpc_plugin::plugin_initialize( const appbase::variables_map& options ) {
    my.reset(new rpc_plugin_impl(settings));
 
    SILK_INFO << "Initialized RPC Plugin";
+} catch (const std::exception &ex) {
+   SILK_ERROR << "Failed to initialize RPC Plugin, " << ex.what();
+   throw;
+} catch (...) {
+   SILK_ERROR << "Failed to initialize RPC Plugin with unknown reason";
+   throw;
 }
 
 void rpc_plugin::plugin_startup() {
