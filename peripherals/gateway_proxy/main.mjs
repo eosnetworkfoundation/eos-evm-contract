@@ -6,6 +6,7 @@ import os from 'node:os';
 import fs from 'node:fs';
 import process from 'node:process';
 import dns from 'node:dns';
+import http from 'http';
 
 import proxy from './TrustEVMStaking.json' assert {type: 'json'};
 
@@ -21,6 +22,7 @@ const proxyContract = new web3.eth.Contract(proxy, argv.address);
 
 //an array of objects, {address: string, url: string, weight: string}
 let currentStakers = [];
+let lastBlock = 0;
 let nginxProcess;
 const configFilePath = `${os.tmpdir}/evmnginx-${process.pid}.conf`;
 
@@ -59,7 +61,7 @@ async function getStakers() {
       }
    }
 
-   return newConfig;
+   return [newConfig, bnum];
 }
 
 function populateNginxConfig(stakers) {
@@ -83,11 +85,12 @@ function populateNginxConfig(stakers) {
 
 async function tick() {
    try {
-      const newStakers = await getStakers();
+      const [newStakers, bnum] = await getStakers();
       if (JSON.stringify(currentStakers) !== JSON.stringify(newStakers)) {
          populateNginxConfig(newStakers);
          currentStakers = newStakers;
       }
+      lastBlock = bnum;
    }
    catch (e) {
       console.error(`Something failed during tick update ${e}`);
@@ -95,8 +98,16 @@ async function tick() {
    setTimeout(tick, pollMS);
 }
 
-currentStakers = await getStakers();
+([currentStakers, lastBlock] = await getStakers());
 populateNginxConfig(currentStakers);
+
+let stateServer = http.createServer((req, res) => {
+   res.setHeader('Content-Type', 'application/json');
+   res.writeHead(200);
+   res.end(JSON.stringify({lastBlock, currentStakers}));
+});
+if(argv.state)
+   stateServer = stateServer.listen(argv.state, '127.0.0.1');
 
 let nginxProcessPromise = new Promise(resolve => {
    let nginxArgs = ['-c', configFilePath];

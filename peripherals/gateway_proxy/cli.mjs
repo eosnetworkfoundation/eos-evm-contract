@@ -37,6 +37,12 @@ export function args() {
          nargs: 1,
          demandOption: true
       })
+      .option('state', {
+         alias: 's',
+         description: 'port number for a localhost HTTP server that responds with state',
+         type: 'number',
+         nargs: 1,
+      })
       .option('e', {
          description: 'passed through to nginx -e argument',
          type: 'string',

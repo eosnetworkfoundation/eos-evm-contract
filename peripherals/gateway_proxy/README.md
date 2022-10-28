@@ -18,6 +18,8 @@ Options:
   -a, --address   address of staking contract to query       [string] [required]
   -r, --rpc       RPC endpoint for queries                   [string] [required]
   -f, --fallback  upstream to use when no stakers            [string] [required]
+  -s, --state     port number for a localhost HTTP server that responds with sta
+                  te                                                    [number]
   -e              passed through to nginx -e argument                   [string]
   -g              passed through to nginx -g argument                   [string]
   -p              passed through to nginx -p argument                   [string]
@@ -30,11 +32,12 @@ node main.mjs -a 0xaB9873C4c74469B0f724Cc4157D8F36EF32037aF \
               -c /home/user/nginx.conf                      \
               -n /usr/bin/nginx                             \
               -f 127.0.0.1:6000                             \
-              -r http://127.0.0.1:7000
+              -r http://127.0.0.1:7000                      \
+              -s 2222
 ```
 Note the unfortunate difference in now the fallback & RPC endpoint are defined.
 
-In the above example, `/home/user/nginx.conf` will be used as the "templated" config (more on this later) handed to the nginx at `/usr/bin/nginx`. The address `0xaB9873C4c74469B0f724Cc4157D8F36EF32037aF` will be polled for stakers via the RPC endpoint at `http://127.0.0.1:7000`. Should there be no stakers, `127.0.0.1:6000` will be used as the upstream for all requests (be aware this could be treated as http or https based on your configuration, more on this later)
+In the above example, `/home/user/nginx.conf` will be used as the "templated" config (more on this later) handed to the nginx at `/usr/bin/nginx`. The address `0xaB9873C4c74469B0f724Cc4157D8F36EF32037aF` will be polled for stakers via the RPC endpoint at `http://127.0.0.1:7000`. Should there be no stakers, `127.0.0.1:6000` will be used as the upstream for all requests (be aware this could be treated as http or https based on your configuration, more on this later). An HTTP server will be run on `127.0.0.1:2222` that returns the current state of the gateway proxy.
 
 At startup, querying the RPC endpoint must succeed and nginx must confirm that the config file is valid. Otherwise, startup fails. Post startup, should the RPC endpoint go offline or the config file not be accepted, the gateway proxy will continue to attempt communication with the RPC endpoint and continue to attempt loading the config while leaving the prior configuration online.
 
@@ -92,6 +95,28 @@ http {
 daemon off;
 ```
 
+### State HTTP Server
+If run with the `-s` option, an HTTP server will be running on localhost with the given port number. It returns the (simple) state of the gateway proxy's operation as a way to ping and query the health of the service. An example reply could be
+```json
+{
+  "lastBlock": 1666972229,
+  "currentStakers": [
+    {
+      "address": "0x1431226E230D7e46DCc78b0ad8C1c8FdeC6AA5C0",
+      "url": "172.253.122.99:443",
+      "weight": "300000000"
+    },
+    {
+      "address": "0x3E15134f6413ef974cF050764A011CD8e4b6a8A7",
+      "url": "142.251.163.104:443",
+      "weight": "150000000"
+    }
+  ]
+}
+```
+
+`lastBlock` will be the last block that was successfully queried. Keep in mind that `weight` would be the staked amount in `minimumStakeUnit` units (currently szabos).
+
 ### Caveats & Limitations
 The URLs found in the staking contract _must_ have a form of either `https://host.name.invalid/` or `https://host.name.invalid:8000/`. Anything after the trailing slash is ignored. These hostnames will be resolved to only a single IPv4 address before populating the config template. This has the side effect of eliminating SNI from being sent upstream.
 
@@ -100,3 +125,5 @@ All nginx upstreams must all be either http or https. Practically speaking this 
 If a staker has an invalid URL (either because the form is not as defined above, or because the DNS lookup fails), the staker is ignored.
 
 If the staker has less than `minimumStakeUnit` as defined in `main.mjs`, the staker is ignored. This is currently set to 1 Szabo.
+
+Should the javascript process crash or exit via an uncaught exception the `nginx` process will continue to run with whatever its last configuration was. There are good and bad aspects of this; but it's worth noting. Restarting the javascript process will require momentarily stopping the "orphaned" `nginx`
