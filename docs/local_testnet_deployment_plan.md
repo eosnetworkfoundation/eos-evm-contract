@@ -756,12 +756,55 @@ A TrustEVM-node is a node process of the virtual ethereum blockchain that valida
 
 To set it up, we need to first make up a genesis of the virtual ethereum blockchain that maps to the same EVM state of the evm account of the Antelope chain that just initialized in the previous steps.
 
+### Antelope to EVM Block mapping
+We need choose a block x in Antelope as the starting point to build up the Virtual EVM blockchain. This block x need to be equal or eariler than the first EVM related transaction happened in Antelope. 
+
+For example:
+
+x = 3
+
+Then the block mapping would be:
+
+Antelope block 4 -> EVM virtual block 1
+
+Antelope block 5 -> EVM virtual block 2
+
+Antelope block 6 -> EVM virtual block 2
+
+Antelope block 7 -> EVM virtual block 3
+
+Antelope block 8 -> EVM virtual block 3
+
+Antelope block 9 -> EVM virtual block 4
+
+...
+
+Antelope block 3 is
+```
+./cleos get block 3
+{
+  "timestamp": "2022-10-31T10:08:19.500",
+  "producer": "eosio",
+  "confirmed": 0,
+  "previous": "00000002f38dcf0536565aabdd5a7deac4405619c136f338d850213aeb3de9d4",
+  "transaction_mroot": "0000000000000000000000000000000000000000000000000000000000000000",
+  "action_mroot": "823207bb72f1f98e3a27ffd69d183e9122e22c322c16027b6a62bd6ca9c45b04",
+  "schedule_version": 0,
+  "new_producers": null,
+  "producer_signature": "SIG_K1_KYBceuuWxANn2Jwh1UbpT4UrW6TW2xq9XS9SUMHDa5ti3JktuoqQmDkrCuRQyZRp9sABRtfxT6RcoAtkNtg8SUGbmCFPud",
+  "transactions": [],
+  "id": "00000003548b7f7c1b914df458910723b3c52b9d3ba5f337b15c673e998560c3",
+  "block_num": 3,
+  "ref_block_prefix": 4098724123
+}
+```
+
 This is a EVM genesis example:
 ```
     {
         "alloc": {
-            "0xe7cc2b40ae8f58a7b28cc6e9b47bcadeb4985c42": {
-                "balance": "0x33b2e3c9fd0803ce8000000"
+            "0x2787b98fc4e731d0456b3941f0b3fe2e01439961": { // <--- initial balance
+                "balance": "0x0000000000000000000000000000000100000000000000000000000000000000" 
             }
         },
         "coinbase": "0x0000000000000000000000000000000000000000",
@@ -779,7 +822,7 @@ This is a EVM genesis example:
         "difficulty": "0x01",
         "extraData": "TrustEVM",
         "gasLimit": "0x7ffffffffff",
-        "mixHash": "0x005e23106263ebed6c85a238ff1f553fb2990f8b780d8cdc4042b2e48d64d542",
+        "mixHash": "0x00000003548b7f7c1b914df458910723b3c52b9d3ba5f337b15c673e998560c3", // <--- change it to match your Antelop block id of x
         "nonce": "0x0",
         "timestamp": "0x62546fd7"
     }
@@ -792,7 +835,7 @@ Fields that you may need to consider to change:
 ### calculate the correct timestamp value:
 The following code (ref TrustEVM/cmd/block_conversion_plugin.cpp) shows the conversion between Antelop block timestamp (where is the offset of micro seconds since 1970-01-01) and the virtual EVM chain timestamp.
 ```
-   static constexpr uint64_t genesis_timestamp = 1648673684000000; //us
+   static constexpr uint64_t genesis_timestamp = 1667210899500000; //us <---- here we set it equal to the timestamp of Antelope block 3
    static constexpr uint64_t block_interval    = 1000000;          //us
 
    inline static uint32_t timestamp_to_evm_block(uint64_t antelope_timestamp) {
@@ -804,7 +847,29 @@ The following code (ref TrustEVM/cmd/block_conversion_plugin.cpp) shows the conv
       return genesis_timestamp + block_num * block_interval;
    }
 ```
+You probably need to change the "genesis_timestamp" to match the one in the genesis Antelop block
+the following piece of code is an example to convert timestamp to integer:
+```
+from datetime import datetime
+import sys
 
+#datetime_string = "2022-10-27T06:02:35.500"
+format = "%Y-%m-%dT%H:%M:%S.%f"
+ 
+# converting datetime string to datetime 
+# object with milliseconds..
+date_object = datetime.strptime(sys.argv[1], format)
+print("date_object =", date_object)
+epoch_time = datetime(1970,1,1)
+delta = date_object - epoch_time
+print('microsec since epoch:', (int)(delta.total_seconds() * 1000000))
+```
+Using the above code to find out the corrent timestamp:
+```
+python3 time_convert.py 2022-10-31T10:08:19.500
+date_object = 2022-10-31 10:08:19.500000
+microsec since epoch: 166721089950000
+```
 
 Starting the TrustEVM process:
 ```
