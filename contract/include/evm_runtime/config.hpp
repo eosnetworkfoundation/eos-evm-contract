@@ -5,7 +5,7 @@ using evmc::operator""_bytes32;
 
 inline silkworm::ChainConfig kJungle4{
     15555,  // chain_id
-    0_bytes32,
+    00_bytes32,
     silkworm::SealEngineType::kNoProof,
     {
         0,          // Homestead
