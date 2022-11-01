@@ -23,7 +23,7 @@ struct contracts {
    static std::vector<char>    evm_runtime_abi() { return read_abi("${CMAKE_CURRENT_SOURCE_DIR}/../build/evm_runtime/evm_runtime.abi"); }
 
    static std::string eth_test_folder() {
-      return "${CMAKE_CURRENT_SOURCE_DIR}/ethereum-tests";
+      return "${CMAKE_CURRENT_SOURCE_DIR}/../../silkworm/third_party/tests";
    }
 
    static std::string skip_list() {
