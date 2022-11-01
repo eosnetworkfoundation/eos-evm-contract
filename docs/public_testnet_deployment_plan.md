@@ -382,9 +382,45 @@ for example:
 ## For EVM service providers
 Service providers will need to provide ETH compatiable EVM services as follows:
 ### 1. Run at least one Antelope node to sync with the public testnet, running in irreversiable mode, with state history plugin enabled
+
+example command:
+```
+./build/programs/nodeos/nodeos --data-dir=./data-dir  --config-dir=./data-dir --genesis-json=./data-dir/genesis.json --disable-replay-opts --read-mode=irreversible
+```
+
 ### 2. Run at least one TrustEVM-node (silkworm node) to sync with the Antelope node
+
+```
+./build/cmd/trustevm-node --chain-data ./chain-data  --plugin block_conversion_plugin --plugin blockchain_plugin --nocolor 1 --verbosity=5
+```
+
 ### 3. Run at least one TrustEVM-RPC (silkworm rpc) process to sync with the TrustEVM-node
+The TrustEVM-RPC need to be stay in the same machine with TrustEVM-node, as it needs to access the same chain-data folder
+```
+./build/cmd/trustevm-rpc --trust-evm-node=127.0.0.1:8080 --chaindata=./chain-data 
+```
+
 ### 4. Have at least one Antelope account (sender account) with enough CPU/NET/RAM resource 
+Service providers can create one or more testnet accounts with some CPU, NET, and RAM resource.
+
 ### 5. Run at least one Transaction Wrapper service to wrap ETH transaction into Antelope transaction and push to public testnet
+prepare the .env file to configure Antelope RPC endpoint, listening port, EVM contract account, sender account, ... etc
+
+For example
+```
+EOS_RPC="http://127.0.0.1:8888"
+EOS_KEY="5JURSKS1BrJ1TagNBw1uVSzTQL2m9eHGkjknWeZkjSt33Awtior"
+HOST="127.0.0.1"
+PORT="18888"
+EOS_EVM_ACCOUNT="evmevmevmevm"
+EOS_SENDER="a123"
+```
+In this environment settings, Tx Wrapper will listen to 127.0.0.1:18888, use 5JURSKS1BrJ1TagNBw1uVSzTQL2m9eHGkjknWeZkjSt33Awtior to wrap and sign the in-coming eth trasnactions into Antelope transactions, and then push them into the Antelope RPC endpoint http://127.0.0.1:8888
+
+use index.js from https://github.com/eosnetworkfoundation/TrustEVM/tree/main/peripherals/tx_wrapper
+```
+node index.js
+```
+
 ### 6. Run at least one Proxy service to separate read service to TrustEVM-RPC node and write service to Transaction Wrapper.
 
