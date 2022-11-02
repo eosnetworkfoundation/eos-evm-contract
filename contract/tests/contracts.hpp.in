@@ -1,29 +1,44 @@
 #pragma once
 #include <eosio/testing/tester.hpp>
 
+#define CORE_SYM_NAME "SYS"
+#define CORE_SYM_PRECISION 4
+
+#define _STRINGIZE1(x) #x
+#define _STRINGIZE2(x) _STRINGIZE1(x)
+
+#define CORE_SYM_STR ( _STRINGIZE2(CORE_SYM_PRECISION) "," CORE_SYM_NAME )
+#define CORE_SYM  ( ::eosio::chain::string_to_symbol_c( CORE_SYM_PRECISION, CORE_SYM_NAME ) )
+
+struct core_sym {
+   static inline eosio::chain::asset from_string(const std::string& s) {
+      return eosio::chain::asset::from_string(s + " " CORE_SYM_NAME);
+   }
+};
+
 namespace eosio { namespace testing {
 
 struct contracts {
-   static std::vector<uint8_t> system_wasm() { return read_wasm("${CMAKE_CURRENT_SOURCE_DIR}/contracts/eosio.system/eosio.system.wasm"); }
-   static std::vector<char>    system_abi() { return read_abi("${CMAKE_CURRENT_SOURCE_DIR}/contracts/eosio.system/eosio.system.abi"); }
+   static std::vector<uint8_t> eosio_system_wasm() { return read_wasm("${CMAKE_CURRENT_SOURCE_DIR}/contracts/eosio.system/eosio.system.wasm"); }
+   static std::vector<char>    eosio_system_abi() { return read_abi("${CMAKE_CURRENT_SOURCE_DIR}/contracts/eosio.system/eosio.system.abi"); }
 
-   static std::vector<uint8_t> token_wasm() { return read_wasm("${CMAKE_CURRENT_SOURCE_DIR}/contracts/eosio.token/eosio.token.wasm"); }
-   static std::vector<char>    token_abi() { return read_abi("${CMAKE_CURRENT_SOURCE_DIR}/contracts/eosio.token/eosio.token.abi"); }
+   static std::vector<uint8_t> eosio_token_wasm() { return read_wasm("${CMAKE_CURRENT_SOURCE_DIR}/contracts/eosio.token/eosio.token.wasm"); }
+   static std::vector<char>    eosio_token_abi() { return read_abi("${CMAKE_CURRENT_SOURCE_DIR}/contracts/eosio.token/eosio.token.abi"); }
 
-   static std::vector<uint8_t> msig_wasm() { return read_wasm("${CMAKE_CURRENT_SOURCE_DIR}/contracts/eosio.msig/eosio.msig.wasm"); }
-   static std::vector<char>    msig_abi() { return read_abi("${CMAKE_CURRENT_SOURCE_DIR}/contracts/eosio.msig/eosio.msig.abi"); }
+   static std::vector<uint8_t> eosio_msig_wasm() { return read_wasm("${CMAKE_CURRENT_SOURCE_DIR}/contracts/eosio.msig/eosio.msig.wasm"); }
+   static std::vector<char>    eosio_msig_abi() { return read_abi("${CMAKE_CURRENT_SOURCE_DIR}/contracts/eosio.msig/eosio.msig.abi"); }
 
-   static std::vector<uint8_t> wrap_wasm() { return read_wasm("${CMAKE_CURRENT_SOURCE_DIR}/contracts/eosio.wrap/eosio.wrap.wasm"); }
-   static std::vector<char>    wrap_abi() { return read_abi("${CMAKE_CURRENT_SOURCE_DIR}/contracts/eosio.wrap/eosio.wrap.abi"); }
+   static std::vector<uint8_t> eosio_wrap_wasm() { return read_wasm("${CMAKE_CURRENT_SOURCE_DIR}/contracts/eosio.wrap/eosio.wrap.wasm"); }
+   static std::vector<char>    eosio_wrap_abi() { return read_abi("${CMAKE_CURRENT_SOURCE_DIR}/contracts/eosio.wrap/eosio.wrap.abi"); }
 
-   static std::vector<uint8_t> bios_wasm() { return read_wasm("${CMAKE_CURRENT_SOURCE_DIR}/contracts/eosio.bios/eosio.bios.wasm"); }
-   static std::vector<char>    bios_abi() { return read_abi("${CMAKE_CURRENT_SOURCE_DIR}/contracts/eosio.bios/eosio.bios.abi"); }
+   static std::vector<uint8_t> eosio_bios_wasm() { return read_wasm("${CMAKE_CURRENT_SOURCE_DIR}/contracts/eosio.bios/eosio.bios.wasm"); }
+   static std::vector<char>    eosio_bios_abi() { return read_abi("${CMAKE_CURRENT_SOURCE_DIR}/contracts/eosio.bios/eosio.bios.abi"); }
 
    static std::vector<uint8_t> evm_runtime_wasm() { return read_wasm("${CMAKE_CURRENT_SOURCE_DIR}/../build/evm_runtime/evm_runtime.wasm"); }
    static std::vector<char>    evm_runtime_abi() { return read_abi("${CMAKE_CURRENT_SOURCE_DIR}/../build/evm_runtime/evm_runtime.abi"); }
 
    static std::string eth_test_folder() {
-      return "${CMAKE_CURRENT_SOURCE_DIR}/ethereum-tests";
+      return "${CMAKE_CURRENT_SOURCE_DIR}/../../silkworm/third_party/tests";
    }
 
    static std::string skip_list() {

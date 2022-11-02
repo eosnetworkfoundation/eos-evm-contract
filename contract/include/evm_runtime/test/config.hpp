@@ -8,7 +8,7 @@ using evmc::operator""_bytes32;
 
 inline ChainConfig kTestNetwork{
     1,  // chain_id
-    0_bytes32,
+    00_bytes32,
     silkworm::SealEngineType::kNoProof,
     {
         0,          // Homestead

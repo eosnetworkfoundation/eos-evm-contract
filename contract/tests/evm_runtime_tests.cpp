@@ -381,6 +381,7 @@ struct evm_runtime_tester : eosio_system_tester, silkworm::State {
    abi_serializer evm_runtime_abi;
    std::map< name, private_key> key_map;
    bool is_verbose = false;
+   bool slow_tests = false;
 
    size_t total_passed{0};
    size_t total_failed{0};
@@ -388,24 +389,21 @@ struct evm_runtime_tester : eosio_system_tester, silkworm::State {
 
    evm_runtime_tester() {
       std::string verbose_arg = "--verbose";
+      std::string slowtests_arg = "--slow-tests";
       auto argc = boost::unit_test::framework::master_test_suite().argc;
       auto argv = boost::unit_test::framework::master_test_suite().argv;
       for (int i = 0; i < argc; i++) {
          if (verbose_arg == argv[i]) {
             is_verbose = true;
-            break;
+         }
+         if (slowtests_arg == argv[i]) {
+            slow_tests = true;
          }
       }
 
       BOOST_REQUIRE_EQUAL( success(), push_action(eosio::chain::config::system_account_name, "wasmcfg"_n, mvo()("settings", "high")) );
-
       create_account_with_resources(ME, system_account_name, 5000000);
       set_authority( ME, "active"_n, {1, {{get_public_key(ME,"active"),1}}, {{{ME,"eosio.code"_n},1}}} );
-
-      // const auto& am = validating_node->get_authorization_manager();
-      // const auto& p = am.get_permission({ME, "active"_n});
-      // auto s = fc::json::to_string(p, fc::time_point(abi_serializer_max_time));
-      // BOOST_TEST_MESSAGE( "active perm: " << s );
 
       set_code(ME, contracts::evm_runtime_wasm());
       set_abi(ME, contracts::evm_runtime_abi().data());
@@ -414,18 +412,6 @@ struct evm_runtime_tester : eosio_system_tester, silkworm::State {
       abi_def abi;
       BOOST_REQUIRE_EQUAL(abi_serializer::to_abi(accnt.abi, abi), true);
       evm_runtime_abi.set_abi(abi, abi_serializer_max_time);
-   }
-
-   void create_token(const account_name& account, const asset& max_supply) {
-
-      create_account_with_resources(account, system_account_name, 200e3);
-      set_code( account, contracts::token_wasm());
-      set_abi( account, contracts::token_abi().data() );
-
-      create_currency( account, account, max_supply);
-      issue(account, max_supply, account);
-
-      BOOST_REQUIRE_EQUAL( max_supply, get_balance( account, account, max_supply.get_symbol() ) );
    }
 
    std::string to_str(const fc::variant& o) {
@@ -443,14 +429,11 @@ struct evm_runtime_tester : eosio_system_tester, silkworm::State {
       act.account       = ME;
       act.name          = name;
       
-      // dlog("action_type_name: ${a}", ("a",action_type_name));
-      // dlog("data: ${d}", ("d",data));
-
-      act.data = evm_runtime_abi.variant_to_binary( action_type_name, data, abi_serializer_max_time );
+      if( evm_runtime_abi.get_action_type(name) != type_name())
+         act.data = evm_runtime_abi.variant_to_binary( action_type_name, data, abi_serializer_max_time );
 
       acts.emplace_back(std::move(act));
       return my_push_action(std::move(acts));
-      // return eosio::testing::base_tester::push_action(std::move(act), signer.to_uint64_t());
    }
 
    static inline void print_debug(const action_trace& ar) {
@@ -715,7 +698,7 @@ struct evm_runtime_tester : eosio_system_tester, silkworm::State {
 
       fc::mutable_variant_object mr;
       mr("a",to_bytes(address));
-      std::cout << "state_storage_size: " << fc::format_string("${a}",mr,true) << std::endl;
+      //std::cout << "state_storage_size: " << fc::format_string("${a}",mr,true) << std::endl;
 
       const auto& idx = db.get_index<key_value_index, by_scope_primary>();
       auto itr = idx.lower_bound( boost::make_tuple(tid->id) );
@@ -727,16 +710,16 @@ struct evm_runtime_tester : eosio_system_tester, silkworm::State {
             itr->value.size()
          );
 
-         fc::mutable_variant_object mu;
-         mu( "a", r.key );
-         mu( "b", r.value );
-         std::cout << fc::format_string("   ${a}=${b}", mu, true) << std::endl;
+         // fc::mutable_variant_object mu;
+         // mu( "a", r.key );
+         // mu( "b", r.value );
+         // std::cout << fc::format_string("   ${a}=${b}", mu, true) << std::endl;
          
          ++itr;
          ++count;
       }
-      dlog("${a} => ${c}",("a",to_bytes(address))("c",count));
-      std::cout << "   total: " << count << std::endl;
+      //dlog("${a} => ${c}",("a",to_bytes(address))("c",count));
+      //std::cout << "   total: " << count << std::endl;
       return count;
    }
 
@@ -838,18 +821,9 @@ struct evm_runtime_tester : eosio_system_tester, silkworm::State {
 
    // https://ethereum-tests.readthedocs.io/en/latest/test_types/blockchain_tests.html#pre-prestate-section
    void init_pre_state(const std::string& test_name, const nlohmann::json& pre) {
-      // auto& db = const_cast<chainbase::database&>(control->db());
-      // auto session = db.start_undo_session(true);
-      bool verbose = false;
-      if(test_name == "CALLBlake2f_MaxRounds_d0g0v0_Istanbul") {
-         verbose = true;
-      }
-
       for (const auto& entry : pre.items()) {
          const evmc::address address{to_evmc_address(from_hex(entry.key()).value())};
          const nlohmann::json& j{entry.value()};
-
-         if(verbose) dlog("UPDATING ACCOUNT!!! ${a}", ("a", to_bytes(address)));
 
          Account account;
          const auto balance{intx::from_string<intx::uint256>(j["balance"].get<std::string>())};
@@ -864,26 +838,16 @@ struct evm_runtime_tester : eosio_system_tester, silkworm::State {
                account.code_hash = bit_cast<evmc_bytes32>(ethash::keccak256(code.data(), code.size()));
                auto ch = fc::to_hex((const char*)account.code_hash.bytes, 32);
                
-               if(verbose) dlog("UPDATING CODE!!! ${a}", ("a", to_bytes(address)));
                update_account_code(address, account.incarnation, account.code_hash, code);
          }
 
          update_account(address, /*initial=*/std::nullopt, account);
 
          for (const auto& storage : j["storage"].items()) {
-               
-               if(verbose) {
-                  auto k = storage.key();
-                  auto v = storage.value().get<std::string>();
-                  dlog("UPDATING STORAGE!!! ${a} ${k} ${v}", ("a", to_bytes(address))("k",k)("v",v));
-               }
-               
                Bytes key{from_hex(storage.key()).value()};
                Bytes value{from_hex(storage.value().get<std::string>()).value()};
                update_storage(address, account.incarnation, to_bytes32(key), /*initial=*/{}, to_bytes32(value));
          }
-         
-         // session.squash();
       }
    }
 
@@ -956,31 +920,13 @@ struct evm_runtime_tester : eosio_system_tester, silkworm::State {
    RunResults blockchain_test(const std::string& test_name, const nlohmann::json& json_test) {
 
       std::string network{json_test["network"].get<std::string>()};
-      //const ChainConfig& config{kNetworkConfig.at(network)};
-
-      if(test_name == "CALLBlake2f_MaxRounds_d0g0v0_Istanbul") {
-         dlog("PRE CALLBlake2f_MaxRounds_d0g0v0_Istanbul DUMP ALL (pre)");
-         dumpall();
-      }
-
       init_pre_state(test_name, json_test["pre"]);
-
-      if(test_name == "CALLBlake2f_MaxRounds_d0g0v0_Istanbul") {
-         dlog("PRE CALLBlake2f_MaxRounds_d0g0v0_Istanbul DUMP ALL (post)");
-         dumpall();
-      }
 
       for (const auto& json_block : json_test["blocks"]) {
          Status status{run_block(json_block)};
          if (status != Status::kPassed) {
                return status;
          }
-      }
-
-      
-      if(test_name == "CALLBlake2f_MaxRounds_d0g0v0_Istanbul") {
-         dlog("POST CALLBlake2f_MaxRounds_d0g0v0_Istanbul DUMP ALL");
-         dumpall();
       }
 
       if (json_test.contains("postStateHash")) {
@@ -1016,7 +962,7 @@ struct evm_runtime_tester : eosio_system_tester, silkworm::State {
          //Only Istanbul
          if(network != "Istanbul") continue;
          //if(test.key() != "opcAEDiffPlaces_d34g0v0_London") continue;
-         std::cout << test.key() << std::endl;
+         //std::cout << test.key() << std::endl;
          //if(test.key() == "CALLBlake2f_MaxRounds_d0g0v0_Istanbul") {
          //  
          //}
@@ -1028,10 +974,6 @@ struct evm_runtime_tester : eosio_system_tester, silkworm::State {
          }
          
          clearall();
-         produce_block();
-         dlog("STORAGE AFTER CLEAR ALL?? START");
-         dumpall();
-         dlog("STORAGE AFTER CLEAR ALL?? END");
       }
 
       total_passed += total.passed;
@@ -1075,7 +1017,7 @@ BOOST_FIXTURE_TEST_CASE( GeneralStateTests, evm_runtime_tester ) try {
       const RunnerFunc runner{entry.second};
 
       for (auto i = fs::recursive_directory_iterator(root_dir / dir); i != fs::recursive_directory_iterator{}; ++i) {
-         if (exclude_test(*i, root_dir, true)) {
+         if (exclude_test(*i, root_dir, slow_tests)) {
                ++total_skipped;
                i.disable_recursion_pending();
          } else if (fs::is_regular_file(i->path())) {

@@ -16,7 +16,7 @@ CONTRACT evm_contract : public contract {
       using contract::contract;
 
       [[eosio::action]]
-      db_stats pushtx(eosio::name ram_payer, const bytes& rlptx);
+      void pushtx(eosio::name ram_payer, const bytes& rlptx);
 
 #ifdef WITH_TEST_ACTIONS
       ACTION testtx( const bytes& rlptx, const evm_runtime::test::block_info& bi );

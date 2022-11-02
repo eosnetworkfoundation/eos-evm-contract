@@ -80,7 +80,7 @@ target_include_directories( evm_runtime PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/../../silkworm/third_party/evmone/evmc/include
 )
 
-target_link_options(evm_runtime PUBLIC -stack-size=20000)
+target_link_options(evm_runtime PUBLIC -stack-size=25552)
 
 add_custom_command(TARGET evm_runtime
    # make wasm data segments 8k long max
