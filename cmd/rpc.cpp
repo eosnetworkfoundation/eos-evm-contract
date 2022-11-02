@@ -45,7 +45,7 @@ int main(int argc, char* argv[]) {
         appbase::app().exec();
     } catch( const std::runtime_error& err) {
         SILK_CRIT << err.what();
-    } catch( std::exception err ) {
+    } catch( const std::exception &err ) {
         SILK_CRIT << err.what();
     }
 }
