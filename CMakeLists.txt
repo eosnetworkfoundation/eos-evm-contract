@@ -78,6 +78,7 @@ set(CMAKE_POLICY_DEFAULT_CMP0063 NEW)
 find_package(ethash CONFIG REQUIRED)
 find_package(intx CONFIG REQUIRED)
 
+set(SHARED_DIR ${CMAKE_CURRENT_SOURCE_DIR}/shared)
 add_subdirectory(silkworm)
 
 # Silkrpc itself

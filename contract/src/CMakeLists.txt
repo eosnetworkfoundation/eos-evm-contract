@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.19)
+cmake_minimum_required(VERSION 3.18)
 project(evm_runtime)
 
 set(EOSIO_WASM_OLD_BEHAVIOR "Off")
@@ -78,6 +78,7 @@ target_include_directories( evm_runtime PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/../../silkworm/third_party/evmone/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../silkworm/third_party/evmone/lib
     ${CMAKE_CURRENT_SOURCE_DIR}/../../silkworm/third_party/evmone/evmc/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../shared/include
 )
 
 target_link_options(evm_runtime PUBLIC -stack-size=20000)

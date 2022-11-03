@@ -54,32 +54,32 @@ if(SILKRPC_USE_MIMALLOC)
     list(APPEND SILKRPC_DAEMON_LIBRARIES mimalloc)
 endif()
 
-add_executable(silkrpcdaemon silkrpc_daemon.cpp)
-target_include_directories(silkrpcdaemon PUBLIC ${CMAKE_SOURCE_DIR})
-target_link_libraries(silkrpcdaemon PRIVATE ${SILKRPC_DAEMON_LIBRARIES})
+#add_executable(silkrpcdaemon silkrpc_daemon.cpp)
+#target_include_directories(silkrpcdaemon PUBLIC ${CMAKE_SOURCE_DIR})
+#target_link_libraries(silkrpcdaemon PRIVATE ${SILKRPC_DAEMON_LIBRARIES})
 
 add_library(blockconversion_plugin block_conversion_plugin.cpp)
-target_include_directories(blockconversion_plugin PUBLIC ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/external/abieos/src)
+target_include_directories(blockconversion_plugin PUBLIC ${SHARED_DIR}/include ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/external/abieos/src)
 target_link_libraries(blockconversion_plugin PUBLIC ${SILKRPC_LIBRARIES} silkworm_core silkworm_node appbase abieos ${Boost_PROGRAM_OPTIONS_LIBRARY})
 
 add_library(engine_plugin engine_plugin.cpp genesis.cpp)
-target_include_directories(engine_plugin PUBLIC ${CMAKE_SOURCE_DIR})
+target_include_directories(engine_plugin PUBLIC ${SHARED_DIR}/include ${CMAKE_SOURCE_DIR})
 target_link_libraries(engine_plugin PUBLIC ${SILKRPC_LIBRARIES} silkworm_core silkworm_node appbase abieos ${Boost_PROGRAM_OPTIONS_LIBRARY})
 
 add_library(shipreceiver_plugin ship_receiver_plugin.cpp)
-target_include_directories(shipreceiver_plugin PUBLIC ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/external/abieos/src)
+target_include_directories(shipreceiver_plugin PUBLIC ${SHARED_DIR}/include ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/external/abieos/src)
 target_link_libraries(shipreceiver_plugin PUBLIC ${SILKRPC_LIBRARIES} silkworm_core silkworm_node appbase abieos ${Boost_PROGRAM_OPTIONS_LIBRARY})
 
 add_library(blockchain_plugin blockchain_plugin.cpp)
-target_include_directories(blockchain_plugin PUBLIC ${CMAKE_SOURCE_DIR})
+target_include_directories(blockchain_plugin PUBLIC ${SHARED_DIR}/include ${CMAKE_SOURCE_DIR})
 target_link_libraries(blockchain_plugin PUBLIC engine_plugin shipreceiver_plugin blockconversion_plugin)
 
 add_library(sys_plugin sys_plugin.cpp)
-target_include_directories(sys_plugin PUBLIC ${CMAKE_SOURCE_DIR})
+target_include_directories(sys_plugin PUBLIC ${SHARED_DIR}/include ${CMAKE_SOURCE_DIR})
 target_link_libraries(sys_plugin PUBLIC silkworm_core silkworm_node appbase ${Boost_PROGRAM_OPTIONS_LIBRARY})
 
 add_library(rpc_plugin rpc_plugin.cpp)
-target_include_directories(rpc_plugin PUBLIC ${CMAKE_SOURCE_DIR})
+target_include_directories(rpc_plugin PUBLIC ${SHARED_DIR}/include ${CMAKE_SOURCE_DIR})
 target_link_libraries(rpc_plugin PUBLIC ${SILKRPC_LIBRARIES} ${SILKRPC_DAEMON_LIBRARIES} sys_plugin appbase ${Boost_PROGRAM_OPTIONS_LIBRARY})
 
 add_executable(trustevm-node node.cpp)

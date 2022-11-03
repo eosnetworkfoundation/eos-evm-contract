@@ -16,6 +16,7 @@
 
 #include <eosio/eosio.hpp>
 #include <evm_runtime/processor.hpp>
+#include <reserved_address.hpp>
 #include <silkpre/secp256k1n.hpp>
 
 #include <cassert>
@@ -111,17 +112,20 @@ ValidationResult ExecutionProcessor::validate_transaction(const Transaction& txn
     const intx::uint512 max_gas_cost{intx::umul(intx::uint256{txn.gas_limit}, txn.max_fee_per_gas)};
     // See YP, Eq (57) in Section 6.2 "Execution"
     const intx::uint512 v0{max_gas_cost + txn.value};
-    if (state_.get_balance(*txn.from) < v0) {
-        eosio::print("state_.get_balance");
-        return ValidationResult::kInsufficientFunds;
-    }
+    bool is_from_reserved = trust::evm::is_reserved_address(*(txn.from));
+    if (!is_from_reserved) {
+        if (state_.get_balance(*txn.from) < v0) {
+            eosio::print("state_.get_balance");
+            return ValidationResult::kInsufficientFunds;
+        }
 
-    if (available_gas() < txn.gas_limit) {
-        // Corresponds to the final condition of Eq (58) in Yellow Paper Section 6.2 "Execution".
-        // The sum of the transaction’s gas limit and the gas utilized in this block prior
-        // must be no greater than the block’s gas limit.
-        eosio::print("available_gas");
-        return ValidationResult::kBlockGasLimitExceeded;
+        if (available_gas() < txn.gas_limit) {
+            // Corresponds to the final condition of Eq (58) in Yellow Paper Section 6.2 "Execution".
+            // The sum of the transaction’s gas limit and the gas utilized in this block prior
+            // must be no greater than the block’s gas limit.
+            eosio::print("available_gas");
+            return ValidationResult::kBlockGasLimitExceeded;
+        }
     }
 
     return ValidationResult::kOk;
@@ -142,11 +146,16 @@ void ExecutionProcessor::execute_transaction(const Transaction& txn, Receipt& re
     state_.clear_journal_and_substate();
 
     eosio::check(txn.from.has_value(), "no from");
+    
+    bool is_from_reserved = trust::evm::is_reserved_address(*(txn.from));
     state_.access_account(*txn.from);
 
     const intx::uint256 base_fee_per_gas{evm_.block().header.base_fee_per_gas.value_or(0)};
     const intx::uint256 effective_gas_price{txn.effective_gas_price(base_fee_per_gas)};
-    state_.subtract_from_balance(*txn.from, txn.gas_limit * effective_gas_price);
+
+    if (!is_from_reserved) {
+        state_.subtract_from_balance(*txn.from, txn.gas_limit * effective_gas_price);
+    }
 
     if (txn.to.has_value()) {
         state_.access_account(*txn.to);
