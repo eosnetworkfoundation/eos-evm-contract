@@ -53,6 +53,10 @@ See user stories
 ## Open questions
 - Need decision on the detailed mechanism for payment:
   - What is the frequency should the contract receive tokens
+    - As frequent as possible/reasonable
   - Whether this token is for next payment cycle or previous one.
+    - Next
   - How should payment be calculated.(The general idea would be by share of payment, but how in detail, whether it should be similar to a Farm or something else)
+    - like sushiswap farm
   - What if some operator join/quit in the middle of a payment cycle
+    - like sushiswap farm
