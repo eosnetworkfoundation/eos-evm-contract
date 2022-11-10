@@ -1042,29 +1042,11 @@ boost::asio::awaitable<void> EthereumRpcApi::handle_eth_call(const nlohmann::jso
     try {
         ethdb::kv::CachedDatabase tx_database{BlockNumberOrHash{block_id}, *tx, *state_cache_};
 
-        // FIXME: configurable chain config?
-        using evmc::operator""_bytes32;
-        silkworm::ChainConfig config{
-            0, // chain_id
-            00_bytes32, // genesis-hash
-            silkworm::SealEngineType::kNoProof,
-            {
-               0,          // Homestead
-               0,          // Tangerine Whistle
-               0,          // Spurious Dragon
-               0,          // Byzantium
-               0,          // Constantinople
-               0,          // Petersburg
-               0,          // Istanbul
-               // 0,          // Berlin
-               // 0,          // London
-            },
-        };
-
+        const auto chain_id = co_await core::rawdb::read_chain_id(tx_database);
+        const auto chain_config_ptr = lookup_chain_config(chain_id);
         const auto block_number = co_await core::get_block_number(block_id, tx_database);
 
-        EVMExecutor executor{*context_.io_context(), tx_database, config, workers_, block_number};
-
+        EVMExecutor executor{*context_.io_context(), tx_database, *chain_config_ptr, workers_, block_number};
         const auto block_with_hash = co_await core::read_block_by_number(*block_cache_, tx_database, block_number);
         silkworm::Transaction txn{call.to_transaction()};
         const auto execution_result = co_await executor.call(block_with_hash.block, txn);
