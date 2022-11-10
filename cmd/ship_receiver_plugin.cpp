@@ -46,6 +46,7 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
 
       using block_result_t = eosio::ship_protocol::get_blocks_result_v0;
       using native_block_t = channels::native_block;
+      static constexpr eosio::name pushtx = eosio::name("pushtx");
 
       void init(std::string h, std::string p, eosio::name ca) {
          SILK_DEBUG << "ship_receiver_plugin_impl INIT";
@@ -181,11 +182,15 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
                auto tt = eosio::from_bin<eosio::ship_protocol::transaction_trace>(*block.traces);
                const auto& trace = std::get<eosio::ship_protocol::transaction_trace_v0>(tt);
                const auto& actions = trace.action_traces;
+               bool found = false;
                for (std::size_t j=0; j < actions.size(); j++) {
-                  const auto& act = std::get<eosio::ship_protocol::action_trace_v1>(actions[j]);
-                  if (act.act.name == eosio::name("pushtx") && core_account == act.receiver) {
-                     append_to_block(current_block, trace);
-                  } 
+                  std::visit([&](auto& act){
+                     if (act.act.name == pushtx && core_account == act.receiver) {
+                        append_to_block(current_block, trace, j);
+                        found = true;
+                     }
+                  }, actions[j]);
+                  if (found) break;
                }
             }
          }
@@ -209,25 +214,27 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
          return block;
       }
 
-      template <typename Trx>
-      inline native_block_t& append_to_block(native_block_t& block, Trx&& trx) {
-         channels::native_trx native_trx = {trx.id, trx.cpu_usage_us, trx.elapsed};
-         const auto& actions = trx.action_traces;
+      template <typename Trace>
+      inline void append_to_block(native_block_t& block, Trace& trace, std::size_t idx) {
+         channels::native_trx native_trx = {trace.id, trace.cpu_usage_us, trace.elapsed};
+         const auto& actions = trace.action_traces;
          //SILK_DEBUG << "Appending transaction ";
-         for (std::size_t j=0; j < actions.size(); j++) {
-            const auto& act = std::get<eosio::ship_protocol::action_trace_v1>(actions[j]);
-            channels::native_action action = {
-               act.action_ordinal,
-               act.receiver,
-               act.act.account,
-               act.act.name,
-               std::vector<char>(act.act.data.pos, act.act.data.end)
-            };
-            native_trx.actions.emplace_back(std::move(action));
+         for (std::size_t j=idx; j < actions.size(); j++) {
+            std::visit([&](auto& act){
+               if (act.act.name == pushtx && core_account == act.receiver) {
+                   channels::native_action action = {
+                       act.action_ordinal,
+                       act.receiver,
+                       act.act.account,
+                       act.act.name,
+                       std::vector<char>(act.act.data.pos, act.act.data.end)
+                   };
+                   native_trx.actions.emplace_back(std::move(action));
+               }
+            }, actions[j]);
             //SILK_DEBUG << "Appending action " << native_trx.actions.back().name.to_string();
          }
          block.transactions.emplace_back(std::move(native_trx));
-         return block;
       }
 
      
