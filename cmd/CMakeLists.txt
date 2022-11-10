@@ -62,7 +62,7 @@ add_library(blockconversion_plugin block_conversion_plugin.cpp)
 target_include_directories(blockconversion_plugin PUBLIC ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/external/abieos/src)
 target_link_libraries(blockconversion_plugin PUBLIC ${SILKRPC_LIBRARIES} silkworm_core silkworm_node appbase abieos ${Boost_PROGRAM_OPTIONS_LIBRARY})
 
-add_library(engine_plugin engine_plugin.cpp genesis.cpp)
+add_library(engine_plugin engine_plugin.cpp)
 target_include_directories(engine_plugin PUBLIC ${CMAKE_SOURCE_DIR})
 target_link_libraries(engine_plugin PUBLIC ${SILKRPC_LIBRARIES} silkworm_core silkworm_node appbase abieos ${Boost_PROGRAM_OPTIONS_LIBRARY})
 
