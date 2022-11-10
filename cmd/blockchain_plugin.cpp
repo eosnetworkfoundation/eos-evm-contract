@@ -26,9 +26,8 @@ class blockchain_plugin_impl : std::enable_shared_from_this<blockchain_plugin_im
 
          evm_blocks_subscription = appbase::app().get_channel<channels::evm_blocks>().subscribe(
             [this](auto b) {
-               
                try {
-                   SILK_INFO << "EVM Block " << b->header.number;
+                   //SILK_INFO << "EVM Block " << b->header.number;
                    block_queue.push(b);
                } catch (const mdbx::exception& ex) {
                   SILK_CRIT << "CALLBACK ERR1" << std::string(ex.what());
