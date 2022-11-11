@@ -367,6 +367,7 @@ for example:
 ```
 <b>Be careful: the balance string value must be in the form of exactly 64 hex-digits (meaning a 256-bit integer)</b>
 
+
 ### 4. Deploy the release version of EVM contract to the EVM account
 "setbal" is the debug action which will be only used for setting up the balance of the inital account. 
 ```
@@ -376,10 +377,106 @@ for example:
 
 ### 5. send EVM tokens from the initial account to participant accounts
 
+The token distribution script https://github.com/eosnetworkfoundation/TrustEVM/blob/main/peripherals/token_distribution/distribute_to_accounts.py can be used to distribute tokens to initial EVM accounts:
+
+#### prepare the account balance csv file
+you need to list all the account balances in a csv file (without the header row), with the 1st column represents the account name and the 2nd column respresent the balance number in decimal, such as:
+```
+0x00000000219ab540356cbb839cbe05303d7705fa,14708999007718564869804029
+0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2,3930560351933256293096325
+0xf977814e90da44bfa03b6295a0616a897441acec,2604596263728749700480557
+0xda9dfa130df4de4673b89022ee50ff26f6ea73cf,2113030086367224616200000
+0x0716a17fbaee714f1e6ab0f9d59edbc5f09815c0,1998606574289842563751000
+0xbe0eb53f46cd790cd13851d5eff43d12404d33e8,1996008352588563830743490
+0x742d35cc6634c0532925a3b844bc454e4438f44e,1383424850937541446672785
+```
+
+#### prepare Enviroment variables
+Have your EVM private key of the EVM sender account, and the nodeos's RPC endpoint defined in the enviroment variables as the following example:
+```
+export EVM_SENDER_KEY=a3f1b69da92a0233ce29485d3049a4ace39e8d384bbc2557e3fc60940ce4e954
+export NODEOS_ENDPOINT=http://127.0.0.1:8888
+```
+
+#### Find out the starting nonce number & the current balance of the sender account
+Using the following command you can find out the starting nonce number of any existing EVM account:
+```
+./cleos get table evmevmevmevm evmevmevmevm account --index 2 --key-type sha256 --limit 1 -L EVM_ACCOUNT_NAME
+```
+for example:
+```
+./cleos get table evmevmevmevm evmevmevmevm account --index 2 --key-type sha256 --limit 1 -L 2787b98fc4e731d0456b3941f0b3fe2e01439961
+{
+  "rows": [{
+      "id": 0,
+      "eth_address": "2787b98fc4e731d0456b3941f0b3fe2e01439961",
+      "nonce": 1005,
+      "balance": "00000000000000000000000000000000ffffffffffbee2eeb107b6ea020924bd",
+      "eos_account": "",
+      "code": "",
+      "code_hash": "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470"
+    }
+  ],
+  "more": true,
+  "next_key": "27ca5d05bb99a31c1cb793c8679f605ea58c1dd3000000000000000000000000"
+}
+```
+Ensure the sender account have enough balance to distribute all the accounts in the distribution list.
+
+<b>locate the starting_nonce variable in the script ( https://github.com/eosnetworkfoundation/TrustEVM/blob/main/peripherals/token_distribution/distribute_to_accounts.py):</b>
+```
+# staring_nonce is the nonce number that maps to the transfer of the first account in the list
+# it is used to ensure each transfer is idempotent
+# be careful when you change it
+starting_nonce = 3
+```
+<b>change the starting_nonce variable in the script in your local environment to match your current sender account's nonce number. The nonce number is to mark the progress of distribution. You should not change the starting_nonce once it is correctly set. </b>
+
+### prepare your Antelope wrapping account (such as evmevmevmevm) and import your private key in your local Antelope wallet (keosd):
+for example:
+```
+./cleos wallet create -n w123 --to-console
+./cleos wallet import -n w123 --private-key 5JURSKS1BrJ1TagNBw1uVSzTQL2m9eHGkjknWeZkjSt33Awtior
+```
+
+### double check other parameters in the script:
+```
+EVM_CONTRACT    = os.getenv("EVM_CONTRACT", "evmevmevmevm")
+NODEOS_ENDPOINT = os.getenv("NODEOS_ENDPOINT", "http://127.0.0.1:8888")
+EOS_SENDER      = os.getenv("EOS_SENDER", "evmevmevmevm")
+EVM_SENDER_KEY  = os.getenv("EVM_SENDER_KEY", None)
+EOS_SENDER_KEY  = os.getenv("EOS_SENDER_KEY", None)
+EVM_CHAINID     = int(os.getenv("EVM_CHAINID", "15555"))
+```
+
+### run the distribution script:
+command syntax:
+```
+python3 ./distribute_to_accounts.py FROM_ACCOUNT DISTRIBUTION_CSV
+```
+for example:
+```
+export EVM_SENDER_KEY=a3f1b69da92a0233ce29485d3049a4ace39e8d384bbc2557e3fc60940ce4e954
+export NODEOS_ENDPOINT=http://127.0.0.1:8888
+python3 ./distribute_to_accounts.py 2787b98fc4e731d0456b3941f0b3fe2e01439961 ~/Downloads/eth_acc_bals_100k.csv
+```
+The script will call sign transactions and call "./cleos" to push them to the NODEOS_ENDPOINT.
+You can stop and restart the script from time to time and it can continue from the last point of distribution. But keep it in mind that the "account" & "starting_nonce" in your script must not be changed.
+
+
+### check the nonce number again after the whole script is finished. 
+```
+./cleos get table evmevmevmevm evmevmevmevm account --index 2 --key-type sha256 --limit 1 -L EVM_ACCOUNT_NAME
+```
+ensure the current nonce number has been increased by x, where x is the number of accounts in the distribution list.
 
 
 
+
+##
 ## For EVM service providers
+
+This part is mainly the same with the local testnet deployment plan (https://github.com/eosnetworkfoundation/TrustEVM/blob/main/docs/local_testnet_deployment_plan.md).
 Service providers will need to provide ETH compatiable EVM services as follows:
 ### 1. Run at least one Antelope node to sync with the public testnet, running in irreversiable mode, with state history plugin enabled
 
@@ -389,7 +486,7 @@ example command:
 ```
 
 ### 2. Run at least one TrustEVM-node (silkworm node) to sync with the Antelope node
-
+Refer to https://github.com/eosnetworkfoundation/TrustEVM/blob/main/docs/local_testnet_deployment_plan.md#5-start-up-trustevm-node-silkworm-node
 ```
 ./build/cmd/trustevm-node --chain-data ./chain-data  --plugin block_conversion_plugin --plugin blockchain_plugin --nocolor 1 --verbosity=5
 ```
@@ -399,6 +496,7 @@ The TrustEVM-RPC need to be stay in the same machine with TrustEVM-node, as it n
 ```
 ./build/cmd/trustevm-rpc --trust-evm-node=127.0.0.1:8080 --chaindata=./chain-data 
 ```
+refer to https://github.com/eosnetworkfoundation/TrustEVM/blob/main/docs/local_testnet_deployment_plan.md#6-start-up-trustevm-rpc-silkworm-rpc for more RPC setup details.
 
 ### 4. Have at least one Antelope account (sender account) with enough CPU/NET/RAM resource 
 Service providers can create one or more testnet accounts with some CPU, NET, and RAM resource.
@@ -423,6 +521,8 @@ node index.js
 ```
 
 ### 6. Run at least one Proxy service to separate read service to TrustEVM-RPC node and write service to Transaction Wrapper.
+Plese refer to https://github.com/eosnetworkfoundation/TrustEVM/blob/main/docs/local_testnet_deployment_plan.md#7-setup-proxy-to-separate-read-requests-and-write-requests
+
 
 ## RPC Provider Architecture
 
