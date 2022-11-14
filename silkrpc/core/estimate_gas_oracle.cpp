@@ -121,11 +121,11 @@ boost::asio::awaitable<bool> EstimateGasOracle::try_execution(const silkworm::Tr
     } else {
         const auto error_message = EVMExecutor<>::get_error_message(result.error_code, result.data);
         SILKRPC_DEBUG << "result message " << error_message << ", code " << result.error_code << "\n";
-        if (result.data.empty()) {
-            throw EstimateGasException{-32000, error_message};
-        } else {
-            throw EstimateGasException{3, error_message, result.data};
-        }
+        // if (result.data.empty()) {
+        //     throw EstimateGasException{-32000, error_message};
+        // } else {
+        //     throw EstimateGasException{3, error_message, result.data};
+        // }
     }
 
     co_return failed;

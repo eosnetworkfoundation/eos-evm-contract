@@ -63,7 +63,7 @@ void rpc_plugin::plugin_initialize( const appbase::variables_map& options ) try 
 
    using evmc::operator""_bytes32;
    silkworm::ChainConfig config{
-      0,  // chain_id
+      15555,  // chain_id
       00_bytes32, // genesis-hash
       silkworm::SealEngineType::kNoProof,
       {

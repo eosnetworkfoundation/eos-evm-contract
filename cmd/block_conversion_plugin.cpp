@@ -6,21 +6,30 @@
 
 #include <silkworm/types/transaction.hpp>
 #include <silkworm/trie/vector_root.hpp>
+#include <silkworm/common/endian.hpp>
 
 struct block_mapping {
    
-   static constexpr uint64_t genesis_timestamp = 1648673684000000; //us 
-   static constexpr uint64_t block_interval    = 1000000;          //us
+   uint64_t genesis_timestamp = 1667688089000000; //us
+   uint64_t block_interval    = 1000000;          //us
 
-   inline static uint32_t timestamp_to_evm_block(uint64_t timestamp) {
+   void set_genesis_timestamp(uint64_t timestamp){
+      genesis_timestamp = timestamp;
+   }
+
+   void set_block_interval(uint64_t interval) {
+      block_interval = interval;
+   }
+
+   inline uint32_t timestamp_to_evm_block(uint64_t timestamp) {
       if( timestamp < genesis_timestamp ) {
-         SILK_CRIT << "Invalid timestamp: " << timestamp << ", genesis: " << genesis_timestamp;
+         SILK_CRIT << "Invalid timestamp [" << timestamp << ", genesis: " << genesis_timestamp;
          assert(timestamp >= genesis_timestamp);
       }
       return 1 + (timestamp - genesis_timestamp)/block_interval;
    }
 
-   inline static uint64_t evm_block_to_timestamp(uint32_t block_num) {
+   inline uint64_t evm_block_to_timestamp(uint32_t block_num) {
       return genesis_timestamp + block_num * block_interval;
    }
 
@@ -47,11 +56,25 @@ class block_conversion_plugin_impl : std::enable_shared_from_this<block_conversi
             return;
          }
          evm_blocks.push_back(silkworm::Block{.header=*head_header});
-         
+
          channels::native_block nb;
          nb.id = eosio::checksum256(head_header->mix_hash.bytes);
          nb.block_num = endian_reverse_u32(*reinterpret_cast<uint32_t*>(head_header->mix_hash.bytes));
+         nb.timestamp = head_header->timestamp*1e6;
+         SILK_DEBUG << "Loaded native block: [" << head_header->number << "][" << nb.block_num << "],[" << nb.timestamp << "]";
          native_blocks.push_back(nb);
+
+         auto genesis_header = appbase::app().get_plugin<engine_plugin>().get_genesis_header();
+         if (!genesis_header) {
+            sys::error("Unable to read genesis header");
+            return;
+         }
+
+         bm.set_block_interval(silkworm::endian::load_big_u64(genesis_header->nonce.data())*1e3);
+         bm.set_genesis_timestamp(genesis_header->timestamp*1e6);
+
+         SILK_INFO << "Block interval: " << bm.block_interval;
+         SILK_INFO << "Genesis timestamp: " << bm.genesis_timestamp;
       }
 
       evmc::bytes32 compute_transaction_root(const silkworm::BlockBody& body) {
@@ -74,7 +97,7 @@ class block_conversion_plugin_impl : std::enable_shared_from_this<block_conversi
          new_block.header.difficulty        = 1;
          new_block.header.number            = num;
          new_block.header.gas_limit         = 0x7ffffffffff;
-         new_block.header.timestamp         = block_mapping::evm_block_to_timestamp(num)/1e6;
+         new_block.header.timestamp         = bm.evm_block_to_timestamp(num)/1e6;
          new_block.header.transactions_root = silkworm::kEmptyRoot;
          //new_block.header.mix_hash
          //new_block.header.nonce           
@@ -93,6 +116,7 @@ class block_conversion_plugin_impl : std::enable_shared_from_this<block_conversi
          auto id = native_block.id.extract_as_byte_array();
          static_assert(sizeof(decltype(id)) == sizeof(decltype(evm_block.header.mix_hash.bytes)));
          std::copy(id.begin(), id.end(), evm_block.header.mix_hash.bytes);
+         evm_block.irreversible = native_block.block_num <= native_block.lib;
       }
 
       template <typename F>
@@ -110,12 +134,13 @@ class block_conversion_plugin_impl : std::enable_shared_from_this<block_conversi
          
          native_blocks_subscription = appbase::app().get_channel<channels::native_blocks>().subscribe(
             [this](auto b) {
-               
+               static size_t count = 0;
+
                //SILK_INFO << "--Enter Block #" << b->block_num;
 
                // Keep the last block before genesis timestamp
-               if (b->timestamp <= block_mapping::genesis_timestamp) {
-                  SILK_DEBUG << "Before genesis: " << block_mapping::genesis_timestamp <<  " Block #" << b->block_num << " timestamp: " << b->timestamp;
+               if (b->timestamp <= bm.genesis_timestamp) {
+                  SILK_DEBUG << "Before genesis: " << bm.genesis_timestamp <<  " Block #" << b->block_num << " timestamp: " << b->timestamp;
                   native_blocks.clear();
                   native_blocks.push_back(*b);
                   return;
@@ -129,7 +154,7 @@ class block_conversion_plugin_impl : std::enable_shared_from_this<block_conversi
                   //SILK_DEBUG << "Fork at Block #" << b->block_num;
                   const auto& forked_block = native_blocks.back();
 
-                  while( block_mapping::timestamp_to_evm_block(forked_block.timestamp) < evm_blocks.back().header.number )
+                  while( bm.timestamp_to_evm_block(forked_block.timestamp) < evm_blocks.back().header.number )
                      evm_blocks.pop_back();
 
                   auto& last_evm_block = evm_blocks.back();
@@ -138,7 +163,7 @@ class block_conversion_plugin_impl : std::enable_shared_from_this<block_conversi
                   });
 
                   native_blocks.pop_back();
-                  if( native_blocks.size() && block_mapping::timestamp_to_evm_block(native_blocks.back().timestamp) == last_evm_block.header.number )
+                  if( native_blocks.size() && bm.timestamp_to_evm_block(native_blocks.back().timestamp) == last_evm_block.header.number )
                      set_upper_bound(last_evm_block, native_blocks.back());
                }
 
@@ -150,8 +175,8 @@ class block_conversion_plugin_impl : std::enable_shared_from_this<block_conversi
 
                // Process the last native block received.
                // We extend the evm chain if necessary up until the block where the received block belongs
-               auto evm_num = block_mapping::timestamp_to_evm_block(b->timestamp);
-               SILK_INFO << "Expecting evm number: " << evm_num;
+               auto evm_num = bm.timestamp_to_evm_block(b->timestamp);
+               //SILK_INFO << "Expecting evm number: " << evm_num;
 
                while(evm_blocks.back().header.number < evm_num) {
                   auto& last_evm_block = evm_blocks.back();
@@ -180,29 +205,31 @@ class block_conversion_plugin_impl : std::enable_shared_from_this<block_conversi
                set_upper_bound(curr, *b);
 
                // Calculate last irreversible EVM block
-               auto lib_timestamp = b->timestamp;
+               std::optional<uint64_t> lib_timestamp;
                if(b->lib < native_blocks.back().block_num) {
                   auto it = std::find_if(native_blocks.begin(), native_blocks.end(), [&b](const auto& nb){ return nb.block_num == b->lib; });
-                  if(it == native_blocks.end()) {
-                     SILK_CRIT << "Unable to find LIB in temp chain (Block #" << b->lib << ")";
-                     throw std::runtime_error("Unable to find LIB in temp chain");
+                  if(it != native_blocks.end()) {
+                     lib_timestamp = it->timestamp;
                   }
-                  lib_timestamp = it->timestamp;
+               } else {
+                   lib_timestamp = b->timestamp;
                }
 
-               auto evm_lib = block_mapping::timestamp_to_evm_block(lib_timestamp) - 1;
-               //SILK_DEBUG << "EVM LIB: #" << evm_lib;
+               if( lib_timestamp ) {
+                  auto evm_lib = bm.timestamp_to_evm_block(*lib_timestamp) - 1;
+                  //SILK_DEBUG << "EVM LIB: #" << evm_lib;
 
-               // Remove irreversible native blocks
-               while(block_mapping::timestamp_to_evm_block(native_blocks.front().timestamp) < evm_lib) {
-                  //SILK_DEBUG << "Remove IRR native: #" << native_blocks.front().block_num;
-                  native_blocks.pop_front();
-               }
+                  // Remove irreversible native blocks
+                  while(bm.timestamp_to_evm_block(native_blocks.front().timestamp) < evm_lib) {
+                     //SILK_DEBUG << "Remove IRR native: #" << native_blocks.front().block_num;
+                     native_blocks.pop_front();
+                  }
 
-               // Remove irreversible evm blocks
-               while(evm_blocks.front().header.number < evm_lib) {
-                  //SILK_DEBUG << "Remove IRR EVM: #" << evm_blocks.front().header.number;
-                  evm_blocks.pop_front();
+                  // Remove irreversible evm blocks
+                  while(evm_blocks.front().header.number < evm_lib) {
+                     //SILK_DEBUG << "Remove IRR EVM: #" << evm_blocks.front().header.number;
+                     evm_blocks.pop_front();
+                  }
                }
             }
          );
@@ -220,24 +247,17 @@ class block_conversion_plugin_impl : std::enable_shared_from_this<block_conversi
       std::list<silkworm::Block>                    evm_blocks;
       channels::evm_blocks::channel_type&           evm_blocks_channel;
       channels::native_blocks::channel_type::handle native_blocks_subscription;
+      block_mapping                                 bm;
 };
 
 block_conversion_plugin::block_conversion_plugin() : my(new block_conversion_plugin_impl()) {}
 block_conversion_plugin::~block_conversion_plugin() {}
 
 void block_conversion_plugin::set_program_options( appbase::options_description& cli, appbase::options_description& cfg ) {
-   cfg.add_options()
-      // ("genesis-time", boost::program_options::value<std::string>()->default_value("2022-01-01T00:00:00"),
-      //   "Start time for Trust EVM chain")
-      // ("evm-abi", boost::program_options::value<std::string>()->default_value("./evm.abi"),
-      //   "ABI for TrustEVM runtime")
-   ;
+
 }
 
 void block_conversion_plugin::plugin_initialize( const appbase::variables_map& options ) {
-   //auto genesis_eos_block  = options.at("genesis-eos-block").as<uint32_t>();
-   //auto abi_dir = options.at("evm-abi").as<std::string>();
-
    my->init();
    SILK_INFO << "Initialized block_conversion Plugin";
 }
