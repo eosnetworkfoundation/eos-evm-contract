@@ -148,16 +148,17 @@ boost::asio::awaitable<void> EthereumRpcApi::handle_eth_gas_price(const nlohmann
     auto tx = co_await database_->begin();
 
     try {
-        ethdb::TransactionDatabase tx_database{*tx};
-        const auto block_number = co_await core::get_block_number(core::kLatestBlockId, tx_database);
-        SILKRPC_INFO << "block_number " << block_number << "\n";
+        //ethdb::TransactionDatabase tx_database{*tx};
+        //const auto block_number = co_await core::get_block_number(core::kLatestBlockId, tx_database);
+        //SILKRPC_INFO << "block_number " << block_number << "\n";
 
-        BlockProvider block_provider = [this, &tx_database](uint64_t block_number) {
-            return core::read_block_by_number(*block_cache_, tx_database, block_number);
-        };
+        //BlockProvider block_provider = [this, &tx_database](uint64_t block_number) {
+        //    return core::read_block_by_number(*block_cache_, tx_database, block_number);
+        //};
 
-        GasPriceOracle gas_price_oracle{ block_provider};
-        const auto gas_price = co_await gas_price_oracle.suggested_price(block_number);
+        //GasPriceOracle gas_price_oracle{ block_provider};
+        //const auto gas_price = co_await gas_price_oracle.suggested_price(block_number);
+        uint64_t gas_price = 10'000'000'000; // 10 Gwei, FIXME: need proper implementation 
         reply = make_json_content(request["id"], to_quantity(gas_price));
     } catch (const std::exception& e) {
         SILKRPC_ERROR << "exception: " << e.what() << " processing request: " << request.dump() << "\n";
@@ -892,7 +893,7 @@ boost::asio::awaitable<void> EthereumRpcApi::handle_eth_get_balance(const nlohma
         const auto block_number = co_await core::get_block_number(block_id, tx_database);
         std::optional<silkworm::Account> account{co_await state_reader.read_account(address, block_number + 1)};
 
-        reply = make_json_content(request["id"], "0x" + (account ? intx::to_string(account->balance) : "0"));
+        reply = make_json_content(request["id"], "0x" + (account ? intx::hex(account->balance) : "0"));
     } catch (const std::exception& e) {
         SILKRPC_ERROR << "exception: " << e.what() << " processing request: " << request.dump() << "\n";
         reply = make_json_error(request["id"], 100, e.what());
