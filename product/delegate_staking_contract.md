@@ -32,7 +32,7 @@ Depends on the token mechanism, we have different potential plans:
 ##### 1 if we want to support delegate staking from public:
 
 There are two potential easy designs:
-1 siimilar to a aggragator: when user stake here, he got a share of the pool. The fund in the pool will be staked in the origin staking contract and some script will collect rewards and add them to the pool (and invest again) periodically. There will be no concept of reward from a user's point of view. The value of the share of pool will grow and this is what user gain.
+1 similar to a aggregator: when user stake here, he got a share of the pool. The fund in the pool will be staked in the origin staking contract and some script will collect rewards and add them to the pool (and invest again) periodically. There will be no concept of reward from a user's point of view. The value of the share of pool will grow and this is what user gain.
 2 serve kind of like a proxy. The user will be as if he is directly staking to the origin contract. Rewards are calculated use the same formula as the origin contract.
 
 The first design is quite common for yield aggregators. 
@@ -50,12 +50,12 @@ See user stories
 - A Contract in solidity (deliverable)
   - User API 
     - Methods for user to stake and withdraw EVM
-      - if there are no enough fund, the contract should withdraw from the orgin contract.
+      - if there are no enough fund, the contract should withdraw from the origin contract.
     - Methods for Operator to claim rewards (only if we pick the second design)
     - Methods for Operator to view related data
   - Admin API
     - Methods for admin to blacklist users
-    - Methods for admin to view related data in an aggragate way
+    - Methods for admin to view related data in an aggregate way
     - Methods for re-invest (only if we pick the first design)
     - Methods for admin to set the return rate for the users.
   - Extra functionality
