@@ -214,7 +214,11 @@ RequestParser::ResultType RequestParser::consume(Request& req, char input) {
                         return h.name == "Content-Length";
                     });
                     if (it == req.headers.end()) {
-                        return bad;
+                        if (req.method != "OPTIONS") {
+                            return bad;
+                        } else {
+                            return good;
+                        }
                     }
                     req.content_length = std::atoi((*it).value.c_str());
                 }

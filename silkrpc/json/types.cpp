@@ -634,20 +634,20 @@ void to_json(nlohmann::json& json, const std::set<evmc::address>& addresses) {
     }
 }
 
-nlohmann::json make_json_content(uint32_t id) {
+nlohmann::json make_json_content(const nlohmann::json& id) {
     return {{"jsonrpc", "2.0"}, {"id", id}, {"result", nullptr}};
 }
 
-nlohmann::json make_json_content(uint32_t id, const nlohmann::json& result) {
+nlohmann::json make_json_content(const nlohmann::json& id, const nlohmann::json& result) {
     return {{"jsonrpc", "2.0"}, {"id", id}, {"result", result}};
 }
 
-nlohmann::json make_json_error(uint32_t id, int32_t code, const std::string& message) {
+nlohmann::json make_json_error(const nlohmann::json& id, int32_t code, const std::string& message) {
     const Error error{code, message};
     return {{"jsonrpc", "2.0"}, {"id", id}, {"error", error}};
 }
 
-nlohmann::json make_json_error(uint32_t id, const RevertError& error) {
+nlohmann::json make_json_error(const nlohmann::json& id, const RevertError& error) {
     return {{"jsonrpc", "2.0"}, {"id", id}, {"error", error}};
 }
 
