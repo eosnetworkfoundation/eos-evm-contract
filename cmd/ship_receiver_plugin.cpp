@@ -120,15 +120,15 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
       template <typename F>
       inline void async_read(F&& func) const {
          auto buff = std::make_shared<flat_buffer>();
-         boost::system::error_code ec;
 
          stream->async_read(*buff, appbase::app().get_priority_queue().wrap(80,
-            [this, buff, func](const auto ec, auto) {
+            [buff, func](const auto ec, auto) {
                if (ec) {
                   SILK_CRIT << "SHiP read failed : " << ec.message();
                   sys::error();
+               } else {
+                  func(buff);
                }
-               func(buff);
             })
          );
       }
