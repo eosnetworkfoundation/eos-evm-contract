@@ -37,20 +37,25 @@ boost::asio::awaitable<void> RequestHandler::handle_request(const http::Request&
     SILKRPC_DEBUG << "handle_request content: " << request.content << "\n";
     auto start = clock_time::now();
 
-    auto request_id{0};
+    nlohmann::json request_id{};
+
     try {
         if (request.content.empty()) {
             reply.content = "";
             reply.status = http::Reply::no_content;
-            reply.headers.reserve(2);
-            reply.headers.emplace_back(http::Header{"Content-Length", std::to_string(reply.content.size())});
-            reply.headers.emplace_back(http::Header{"Content-Type", "application/json"});
+            if (request.method == "OPTIONS") {
+                reply.headers.emplace_back(http::Header{"Allow", "POST, GET, OPTIONS"});
+            } else {
+                reply.headers.reserve(2);
+                reply.headers.emplace_back(http::Header{"Content-Length", std::to_string(reply.content.size())});
+                reply.headers.emplace_back(http::Header{"Content-Type", "application/json"});
+            }
             SILKRPC_INFO << "handle_request t=" << clock_time::since(start) << "ns\n";
             co_return;
         }
 
         const auto request_json = nlohmann::json::parse(request.content);
-        request_id = request_json["id"].get<uint32_t>();
+        request_id = request_json["id"];
         if (!request_json.contains("method")) {
             reply.content = make_json_error(request_id, -32600, "method missing").dump() + "\n";
             reply.status = http::Reply::bad_request;
