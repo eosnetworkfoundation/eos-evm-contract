@@ -153,6 +153,11 @@ void state::update_storage(const evmc::address& address, uint64_t incarnation, c
     auto itr = inx.find(make_key(address));
     ++stats.account.read;
 
+    eosio::print("storage update: ");
+    eosio::printhex(address.bytes, 20);eosio::print("\n");
+    eosio::printhex(location.bytes, 32);eosio::print("\n");
+    eosio::printhex(current.bytes, 32);eosio::print("\n");
+
     if (is_zero(current)) {
         if(itr == inx.end()) return;
         storage_table db(_self, itr->id);

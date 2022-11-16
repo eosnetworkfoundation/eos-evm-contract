@@ -169,6 +169,7 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
 
          if (!block.this_block) {
            //TODO: throw here?
+           SILK_CRIT << "to_native: block.this_block";
            return std::nullopt;
          }
 

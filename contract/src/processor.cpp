@@ -111,7 +111,15 @@ ValidationResult ExecutionProcessor::validate_transaction(const Transaction& txn
     const intx::uint512 max_gas_cost{intx::umul(intx::uint256{txn.gas_limit}, txn.max_fee_per_gas)};
     // See YP, Eq (57) in Section 6.2 "Execution"
     const intx::uint512 v0{max_gas_cost + txn.value};
-    if (state_.get_balance(*txn.from) < v0) {
+    auto xxx = state_.get_balance(*txn.from);
+
+    uint8_t tmp[32];
+    intx::be::store(tmp, xxx);
+
+    eosio::print("get_balance: ");
+    eosio::printhex(tmp, 32);
+    eosio::print("\n");
+    if (xxx < v0) {
         eosio::print("state_.get_balance");
         return ValidationResult::kInsufficientFunds;
     }
@@ -166,7 +174,14 @@ void ExecutionProcessor::execute_transaction(const Transaction& txn, Receipt& re
     const intx::uint128 g0{intrinsic_gas(txn, rev >= EVMC_HOMESTEAD, rev >= EVMC_ISTANBUL)};
     eosio::check(g0 <= UINT64_MAX, "g0 <= UINT64_MAX");  // true due to the precondition (transaction must be valid)
 
-    const CallResult vm_res{evm_.execute(txn, txn.gas_limit - static_cast<uint64_t>(g0))};
+    auto yyy = txn.gas_limit - static_cast<uint64_t>(g0);
+    eosio::print("txn.gas_limit: ", txn.gas_limit, "\n");
+    const CallResult vm_res{evm_.execute(txn, yyy)};
+    eosio::print("\nvr.s: ", uint64_t(vm_res.status));
+    eosio::print("\nvr.gl: ", uint64_t(vm_res.gas_left));
+    eosio::print("\nvr.gr: ", uint64_t(vm_res.gas_refund));
+    //vm_res.status
+
 
     const uint64_t gas_used{txn.gas_limit - refund_gas(txn, vm_res.gas_left, vm_res.gas_refund)};
 

@@ -25,6 +25,7 @@ using namespace silkworm;
 
 void evm_contract::pushtx( eosio::name ram_payer, const bytes& rlptx ) {
     LOGTIME("EVM START");
+    eosio::print("evm_contract::pushtx\n");
     eosio::require_auth(ram_payer);
 
     Block block;
@@ -38,6 +39,10 @@ void evm_contract::pushtx( eosio::name ram_payer, const bytes& rlptx ) {
     eosio::check(rlp::decode(bv,tx) == DecodingResult::kOk && bv.empty(), "unable to decode transaction");
     LOGTIME("EVM TX DECODE");
 
+    eosio::print("TX.data\n");
+    eosio::printhex(tx.data.data(), tx.data.size());
+    eosio::print("\n");
+
     tx.from.reset();
     tx.recover_sender();
     eosio::check(tx.from.has_value(), "unable to recover sender");
@@ -50,6 +55,9 @@ void evm_contract::pushtx( eosio::name ram_payer, const bytes& rlptx ) {
     Receipt receipt;
     ep.execute_transaction(tx, receipt);
     
+    eosio::print("RESULT: ", uint64_t(receipt.success), ",", receipt.cumulative_gas_used);
+    eosio::print("\n");
+
     LOGTIME("EVM EXECUTE");
 }
 
