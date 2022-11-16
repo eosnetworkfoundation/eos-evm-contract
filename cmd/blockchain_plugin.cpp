@@ -29,6 +29,10 @@ class blockchain_plugin_impl : std::enable_shared_from_this<blockchain_plugin_im
                try {
                    //SILK_INFO << "EVM Block " << b->header.number;
                    block_queue.push(b);
+
+                   if( sync_loop->get_state() == silkworm::Worker::State::kStopped ) {
+                       appbase::app().quit();
+                   }
                } catch (const mdbx::exception& ex) {
                   SILK_CRIT << "CALLBACK ERR1" << std::string(ex.what());
                } catch (const std::exception& ex) {
