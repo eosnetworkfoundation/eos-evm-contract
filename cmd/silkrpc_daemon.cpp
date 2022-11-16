@@ -27,7 +27,7 @@
 #include <boost/asio/version.hpp>
 #include <grpcpp/grpcpp.h>
 
-#include <silkrpc/buildinfo.h>
+//#include <silkrpc/buildinfo.h>
 #include <silkrpc/common/log.hpp>
 #include <silkrpc/daemon.hpp>
 
@@ -44,30 +44,31 @@ ABSL_FLAG(silkrpc::WaitMode, wait_mode, silkrpc::WaitMode::blocking, "scheduler 
 
 //! Assemble the application version using the Cable build information
 std::string get_version_from_build_info() {
-    const auto build_info{silkrpc_get_buildinfo()};
+    //const auto build_info{silkrpc_get_buildinfo()};
 
     std::string application_version{"silkrpcdaemon version: "};
-    application_version.append(build_info->project_version);
+    application_version.append("hacked");//build_info->project_version);
     return application_version;
 }
 
 //! Assemble the application fully-qualified name using the Cable build information
 std::string get_name_from_build_info() {
-    const auto build_info{silkrpc_get_buildinfo()};
+//    const auto build_info{silkrpc_get_buildinfo()};
 
     std::string application_name{"silkrpc/"};
-    application_name.append(build_info->git_branch);
-    application_name.append(build_info->project_version);
-    application_name.append("/");
-    application_name.append(build_info->system_name);
-    application_name.append("-");
-    application_name.append(build_info->system_processor);
-    application_name.append("_");
-    application_name.append(build_info->build_type);
-    application_name.append("/");
-    application_name.append(build_info->compiler_id);
-    application_name.append("-");
-    application_name.append(build_info->compiler_version);
+    application_name.append("trustevm-rpc");
+//    application_name.append(build_info->git_branch);
+//    application_name.append(build_info->project_version);
+//    application_name.append("/");
+//    application_name.append(build_info->system_name);
+//    application_name.append("-");
+//    application_name.append(build_info->system_processor);
+//    application_name.append("_");
+//    application_name.append(build_info->build_type);
+//    application_name.append("/");
+//    application_name.append(build_info->compiler_id);
+//    application_name.append("-");
+//    application_name.append(build_info->compiler_version);
     return application_name;
 }
 

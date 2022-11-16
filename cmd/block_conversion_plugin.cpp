@@ -136,6 +136,7 @@ class block_conversion_plugin_impl : std::enable_shared_from_this<block_conversi
             [this](auto b) {
                static size_t count = 0;
 
+               try { // channel exceptions are swallowed
                //SILK_INFO << "--Enter Block #" << b->block_num;
 
                // Keep the last block before genesis timestamp
@@ -145,7 +146,7 @@ class block_conversion_plugin_impl : std::enable_shared_from_this<block_conversi
                   native_blocks.push_back(*b);
                   return;
                }
-               
+
                // Add received native block to our local reversible chain.
                // If the received native block can't be linked we remove the forked blocks until the fork point.
                // Also we remove the forked block transactions from the corresponding evm block as they where previously included
@@ -230,6 +231,14 @@ class block_conversion_plugin_impl : std::enable_shared_from_this<block_conversi
                      //SILK_DEBUG << "Remove IRR EVM: #" << evm_blocks.front().header.number;
                      evm_blocks.pop_front();
                   }
+               }
+               
+               } catch (const mdbx::exception& ex) {
+                  SILK_CRIT << "CALLBACK mdbx ERR: " << std::string(ex.what());
+               } catch (const std::exception& ex) {
+                  SILK_CRIT << "CALLBACK ex ERR: " << std::string(ex.what());
+               } catch (...) {
+                  SILK_CRIT << "CALLBACK unknown ERR";
                }
             }
          );
