@@ -1,37 +1,17 @@
 #include "ship_receiver_plugin.hpp"
 #include "abi_utils.hpp"
 
-#include <atomic>
-#include <filesystem>
-#include <iostream>
 #include <string>
-#include <unordered_set>
 #include <utility>
 
 #include <boost/asio/connect.hpp>
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/beast/core.hpp>
 #include <boost/beast/websocket.hpp>
-#include <boost/iostreams/device/back_inserter.hpp>
-#include <boost/iostreams/filtering_stream.hpp>
 #include <boost/program_options.hpp>
-#include <boost/asio/signal_set.hpp>
-#include <boost/asio/deadline_timer.hpp>
-#include <boost/filesystem.hpp>
-#include <boost/interprocess/shared_memory_object.hpp>
-#include <boost/interprocess/mapped_region.hpp>
-#include <boost/interprocess/sync/interprocess_mutex.hpp>
-#include <boost/interprocess/sync/scoped_lock.hpp>
-#include <boost/algorithm/string.hpp> 
-#include <silkworm/db/stages.hpp>
-#include <silkworm/db/access_layer.hpp>
 
 namespace asio      = boost::asio;
-namespace bio       = boost::iostreams;
-namespace bpo       = boost::program_options;
 namespace websocket = boost::beast::websocket;
-namespace bip       = boost::interprocess;
-namespace bfs       = boost::filesystem;
 
 using asio::ip::tcp;
 using boost::beast::flat_buffer;
@@ -48,11 +28,12 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
       using native_block_t = channels::native_block;
       static constexpr eosio::name pushtx = eosio::name("pushtx");
 
-      void init(std::string h, std::string p, eosio::name ca) {
+      void init(std::string h, std::string p, eosio::name ca, std::optional<uint32_t> start_block_num) {
          SILK_DEBUG << "ship_receiver_plugin_impl INIT";
-         host = h;
-         port = p;
+         host = std::move(h);
+         port = std::move(p);
          core_account = ca;
+         start_from_block_num = start_block_num;
          resolver = std::make_shared<tcp::resolver>(appbase::app().get_io_service());
          stream   = std::make_shared<websocket::stream<tcp::socket>>(appbase::app().get_io_service());
          stream->binary(true);
@@ -285,6 +266,12 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
             return;
          }
          auto start_from = endian_reverse_u32(*reinterpret_cast<uint32_t*>(head_header->mix_hash.bytes)) + 1;
+         SILK_INFO << "Canonical header start from block: " << start_from;
+
+         if( start_from_block_num ) {
+            SILK_INFO << "Using specified start block number:" << *start_from_block_num;
+            start_from = *start_from_block_num;
+         }
 
          if( res.trace_begin_block > start_from ) {
             SILK_ERROR << "Block #" << start_from << " not available in SHiP";
@@ -306,10 +293,11 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
       abieos::abi                                     abi;
       channels::native_blocks::channel_type&          native_blocks_channel;
       eosio::name                                     core_account;
+      std::optional<uint32_t>                         start_from_block_num;
 };
 
 ship_receiver_plugin::ship_receiver_plugin() : my(new ship_receiver_plugin_impl) {}
-ship_receiver_plugin::~ship_receiver_plugin() {}
+ship_receiver_plugin::~ship_receiver_plugin() = default;
 
 void ship_receiver_plugin::set_program_options( appbase::options_description& cli, appbase::options_description& cfg ) {
    cfg.add_options()
@@ -317,6 +305,8 @@ void ship_receiver_plugin::set_program_options( appbase::options_description& cl
         "SHiP host address")
       ("ship-core-account", boost::program_options::value<std::string>()->default_value("evmevmevmevm"),
         "Account on the core blockchain that hosts the Trust EVM runtime")
+      ("ship-start-from-block-num", boost::program_options::value<uint32_t>(),
+        "Override Antelope block number to start syncing from"  )
    ;
 }
 
@@ -324,8 +314,12 @@ void ship_receiver_plugin::plugin_initialize( const appbase::variables_map& opti
    auto endpoint = options.at("ship-endpoint").as<std::string>();
    const auto& i = endpoint.find(":");
    auto core     = options.at("ship-core-account").as<std::string>();
+   std::optional<uint32_t> start_block_num;
+   if (options.contains("ship-start-from-block-num")) {
+      start_block_num = options.at("ship-start-from-block-num").as<uint32_t>();
+   }
 
-   my->init(endpoint.substr(0, i), endpoint.substr(i+1), eosio::name(core));
+   my->init(endpoint.substr(0, i), endpoint.substr(i+1), eosio::name(core), start_block_num);
    SILK_INFO << "Initialized SHiP Receiver Plugin";
 }
 
