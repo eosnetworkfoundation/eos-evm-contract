@@ -22,6 +22,8 @@ class ship_receiver_plugin : public appbase::plugin<ship_receiver_plugin> {
       void plugin_startup();
       void plugin_shutdown();
 
+      std::optional<channels::native_block> get_start_from_block();
+
    private:
       std::unique_ptr<class ship_receiver_plugin_impl> my;
 };

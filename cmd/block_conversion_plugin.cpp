@@ -1,6 +1,7 @@
 #include "block_conversion_plugin.hpp"
 #include "channels.hpp"
 #include "abi_utils.hpp"
+#include "utils.hpp"
 
 #include <fstream>
 
@@ -40,15 +41,6 @@ class block_conversion_plugin_impl : std::enable_shared_from_this<block_conversi
       block_conversion_plugin_impl()
         : evm_blocks_channel(appbase::app().get_channel<channels::evm_blocks>()){}
 
-      inline uint32_t endian_reverse_u32( uint32_t x )
-      {
-         return (((x >> 0x18) & 0xFF)        )
-            | (((x >> 0x10) & 0xFF) << 0x08)
-            | (((x >> 0x08) & 0xFF) << 0x10)
-            | (((x        ) & 0xFF) << 0x18)
-            ;
-      }
-
       void load_head() {
          auto head_header = appbase::app().get_plugin<engine_plugin>().get_head_canonical_header();
          if (!head_header) {
@@ -58,9 +50,14 @@ class block_conversion_plugin_impl : std::enable_shared_from_this<block_conversi
          evm_blocks.push_back(silkworm::Block{.header=*head_header});
 
          channels::native_block nb;
-         nb.id = eosio::checksum256(head_header->mix_hash.bytes);
-         nb.block_num = endian_reverse_u32(*reinterpret_cast<uint32_t*>(head_header->mix_hash.bytes));
-         nb.timestamp = head_header->timestamp*1e6;
+         std::optional<channels::native_block> start_from_block = appbase::app().get_plugin<ship_receiver_plugin>().get_start_from_block();
+         if( start_from_block ) {
+            nb = *start_from_block;
+         } else {
+            nb.id = eosio::checksum256(head_header->mix_hash.bytes);
+            nb.block_num = utils::to_block_num(head_header->mix_hash.bytes);
+            nb.timestamp = head_header->timestamp*1e6;
+         }
          SILK_DEBUG << "Loaded native block: [" << head_header->number << "][" << nb.block_num << "],[" << nb.timestamp << "]";
          native_blocks.push_back(nb);
 
