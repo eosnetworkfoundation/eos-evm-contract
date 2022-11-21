@@ -37,6 +37,14 @@ int main(int argc, char* argv[]) {
 
         if (!appbase::app().initialize<sys_plugin>(argc, argv))
            return -1;
+
+        // if rpc_plugin enabled then enable engine_plugin
+        if (appbase::app().get_plugin<rpc_plugin>().get_state() == appbase::abstract_plugin::initialized) {
+           if (appbase::app().get_plugin<engine_plugin>().get_state() == appbase::abstract_plugin::registered) {
+               appbase::app().get_plugin<engine_plugin>().initialize(appbase::app().get_options());
+           }
+        }
+
         appbase::app().startup();
         appbase::app().set_thread_priority_max();
         appbase::app().exec();
