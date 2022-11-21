@@ -25,7 +25,7 @@ class sys_plugin : public appbase::plugin<sys_plugin> {
          //raise(SIGINT);
       }
 
-      uint32_t get_verbosity();
+      silkworm::log::Level get_verbosity();
 
       private:
          silkworm::log::Settings settings;
