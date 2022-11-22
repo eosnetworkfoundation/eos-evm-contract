@@ -212,21 +212,29 @@ std::optional<std::string> EVMExecutor<WorldState, VM>::pre_check(const VM& evm,
 template<typename WorldState, typename VM>
 boost::asio::awaitable<ExecutionResult> EVMExecutor<WorldState, VM>::call(
     const silkworm::Block& block,
-    const silkworm::Transaction& txn,
+    const silkworm::Transaction& txn_,
     bool refund,
     bool gas_bailout,
     const Tracers& tracers) {
-    SILKRPC_DEBUG << "EVMExecutor::call: " << block.header.number << " gasLimit: " << txn.gas_limit << " refund: " << refund << " gasBailout: " << gas_bailout << "\n";
-    SILKRPC_DEBUG << "EVMExecutor::call:Transaction: " << &txn << "Txn: " << txn << "\n";
+    SILKRPC_DEBUG << "EVMExecutor::call: " << block.header.number << " gasLimit: " << txn_.gas_limit << " refund: " << refund << " gasBailout: " << gas_bailout << "\n";
+    SILKRPC_DEBUG << "EVMExecutor::call:Transaction: " << &txn_ << "txn: " << txn_ << "\n";
+    SILKRPC_DEBUG << "EVMExecutor::call:Tracers: " << tracers.size() << "\n";
 
     const auto exec_result = co_await boost::asio::async_compose<decltype(boost::asio::use_awaitable), void(ExecutionResult)>(
-        [this, &block, &txn, &tracers, &refund, &gas_bailout](auto&& self) {
-            SILKRPC_TRACE << "EVMExecutor::call post block: " << block.header.number << " txn: " << &txn << "\n";
-            boost::asio::post(workers_, [this, &block, &txn, &tracers, &refund, &gas_bailout, self = std::move(self)]() mutable {
+        [this, &block, &txn_, &tracers, &refund, &gas_bailout](auto&& self) {
+            SILKRPC_TRACE << "EVMExecutor::call post block: " << block.header.number << " txn: " << &txn_ << "\n";
+            boost::asio::post(workers_, [this, &block, &txn_, &tracers, &refund, &gas_bailout, self = std::move(self)]() mutable {
                 VM evm{block, state_, config_};
+                SILKRPC_DEBUG << "EVMExecutor::call:Tracers2: " << tracers.size() << "\n";
+
+                //--- HACK begin
                 // for (auto& tracer : tracers) {
                 //     evm.add_tracer(*tracer);
                 // }
+                auto txn = const_cast<silkworm::Transaction&>(txn_);
+                txn.from = evm.beneficiary;
+                gas_bailout = true;
+                //--- HACK end
 
                 assert(txn.from.has_value());
                 state_.access_account(*txn.from);

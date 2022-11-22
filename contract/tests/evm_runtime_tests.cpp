@@ -40,7 +40,6 @@ using namespace std;
 using namespace fc::crypto;
 using namespace silkworm;
 using namespace silkworm::rlp;
-using namespace evmc;
 
 namespace fs = std::filesystem;
 typedef intx::uint<256> u256;
@@ -264,14 +263,14 @@ struct account {
       }
    };
 
-   uint256be get_balance()const {
-      uint256be res;
+   evmc::uint256be get_balance()const {
+      evmc::uint256be res;
       std::copy(balance.begin(), balance.end(), res.bytes);
       return res;
    }
 
-   bytes32 get_code_hash()const {
-      bytes32 res;
+   evmc::bytes32 get_code_hash()const {
+      evmc::bytes32 res;
       std::copy(code_hash.begin(), code_hash.end(), res.bytes);
       return res;
    }
