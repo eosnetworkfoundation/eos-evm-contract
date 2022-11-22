@@ -1,37 +1,18 @@
 #include "ship_receiver_plugin.hpp"
 #include "abi_utils.hpp"
+#include "utils.hpp"
 
-#include <atomic>
-#include <filesystem>
-#include <iostream>
 #include <string>
-#include <unordered_set>
 #include <utility>
 
 #include <boost/asio/connect.hpp>
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/beast/core.hpp>
 #include <boost/beast/websocket.hpp>
-#include <boost/iostreams/device/back_inserter.hpp>
-#include <boost/iostreams/filtering_stream.hpp>
 #include <boost/program_options.hpp>
-#include <boost/asio/signal_set.hpp>
-#include <boost/asio/deadline_timer.hpp>
-#include <boost/filesystem.hpp>
-#include <boost/interprocess/shared_memory_object.hpp>
-#include <boost/interprocess/mapped_region.hpp>
-#include <boost/interprocess/sync/interprocess_mutex.hpp>
-#include <boost/interprocess/sync/scoped_lock.hpp>
-#include <boost/algorithm/string.hpp> 
-#include <silkworm/db/stages.hpp>
-#include <silkworm/db/access_layer.hpp>
 
 namespace asio      = boost::asio;
-namespace bio       = boost::iostreams;
-namespace bpo       = boost::program_options;
 namespace websocket = boost::beast::websocket;
-namespace bip       = boost::interprocess;
-namespace bfs       = boost::filesystem;
 
 using asio::ip::tcp;
 using boost::beast::flat_buffer;
@@ -48,11 +29,14 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
       using native_block_t = channels::native_block;
       static constexpr eosio::name pushtx = eosio::name("pushtx");
 
-      void init(std::string h, std::string p, eosio::name ca) {
+      void init(std::string h, std::string p, eosio::name ca,
+                std::optional<eosio::checksum256> start_block_id, int64_t start_block_timestamp) {
          SILK_DEBUG << "ship_receiver_plugin_impl INIT";
-         host = h;
-         port = p;
+         host = std::move(h);
+         port = std::move(p);
          core_account = ca;
+         start_from_block_id = start_block_id;
+         start_from_block_timestamp = start_block_timestamp;
          resolver = std::make_shared<tcp::resolver>(appbase::app().get_io_service());
          stream   = std::make_shared<websocket::stream<tcp::socket>>(appbase::app().get_io_service());
          stream->binary(true);
@@ -266,15 +250,6 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
          });
       }
 
-      inline uint32_t endian_reverse_u32( uint32_t x )
-      {
-         return (((x >> 0x18) & 0xFF)        )
-            | (((x >> 0x10) & 0xFF) << 0x08)
-            | (((x >> 0x08) & 0xFF) << 0x10)
-            | (((x        ) & 0xFF) << 0x18)
-            ;
-      }
-
       void sync() {
          // get available blocks range we can grab
          auto res = get_status();
@@ -284,7 +259,14 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
             sys::error("Unable to read canonical header");
             return;
          }
-         auto start_from = endian_reverse_u32(*reinterpret_cast<uint32_t*>(head_header->mix_hash.bytes)) + 1;
+         auto start_from = utils::to_block_num(head_header->mix_hash.bytes) + 1;
+         SILK_INFO << "Canonical header start from block: " << start_from;
+
+         if( start_from_block_id ) {
+            uint32_t block_num = utils::to_block_num(*start_from_block_id);
+            SILK_INFO << "Using specified start block number:" << block_num;
+            start_from = block_num;
+         }
 
          if( res.trace_begin_block > start_from ) {
             SILK_ERROR << "Block #" << start_from << " not available in SHiP";
@@ -297,6 +279,16 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
          start_read();
       }
 
+      std::optional<channels::native_block> get_start_from_block() {
+         if( !start_from_block_id ) return {};
+
+         channels::native_block nb{};
+         nb.id = *start_from_block_id;
+         nb.timestamp = start_from_block_timestamp;
+         nb.block_num = utils::to_block_num(*start_from_block_id);
+         return nb;
+      }
+
    private:
       std::shared_ptr<tcp::resolver>                  resolver;
       std::shared_ptr<websocket::stream<tcp::socket>> stream;
@@ -306,10 +298,12 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
       abieos::abi                                     abi;
       channels::native_blocks::channel_type&          native_blocks_channel;
       eosio::name                                     core_account;
+      std::optional<eosio::checksum256>               start_from_block_id;
+      int64_t                                         start_from_block_timestamp{};
 };
 
 ship_receiver_plugin::ship_receiver_plugin() : my(new ship_receiver_plugin_impl) {}
-ship_receiver_plugin::~ship_receiver_plugin() {}
+ship_receiver_plugin::~ship_receiver_plugin() = default;
 
 void ship_receiver_plugin::set_program_options( appbase::options_description& cli, appbase::options_description& cfg ) {
    cfg.add_options()
@@ -317,6 +311,10 @@ void ship_receiver_plugin::set_program_options( appbase::options_description& cl
         "SHiP host address")
       ("ship-core-account", boost::program_options::value<std::string>()->default_value("evmevmevmevm"),
         "Account on the core blockchain that hosts the Trust EVM runtime")
+      ("ship-start-from-block-id", boost::program_options::value<std::string>(),
+        "Override Antelope block id to start syncing from"  )
+      ("ship-start-from-block-timestamp", boost::program_options::value<int64_t>(),
+        "Timestamp for the provided ship-start-from-block-id, required if block-id provided"  )
    ;
 }
 
@@ -324,8 +322,20 @@ void ship_receiver_plugin::plugin_initialize( const appbase::variables_map& opti
    auto endpoint = options.at("ship-endpoint").as<std::string>();
    const auto& i = endpoint.find(":");
    auto core     = options.at("ship-core-account").as<std::string>();
+   std::optional<eosio::checksum256> start_block_id;
+   int64_t start_block_timestamp = 0;
+   if (options.contains("ship-start-from-block-id")) {
+      if (!options.contains("ship-start-from-block-timestamp")) {
+         throw std::runtime_error("ship-start-from-block-timestamp required if ship-start-from-block-id provided");
+      }
+      start_block_id = utils::checksum256_from_string( options.at("ship-start-from-block-id").as<std::string>() );
+      start_block_timestamp = options.at("ship-start-from-block-timestamp").as<int64_t>();
+      SILK_INFO << "String from block id: " << utils::to_string( *start_block_id ) << " block num: " << utils::to_block_num(*start_block_id);
+   } else if ( options.contains("ship-start-from-block-timestamp") ) {
+      throw std::runtime_error("ship-start-from-block-timestamp only valid if ship-start-from-block-id provided");
+   }
 
-   my->init(endpoint.substr(0, i), endpoint.substr(i+1), eosio::name(core));
+   my->init(endpoint.substr(0, i), endpoint.substr(i+1), eosio::name(core), start_block_id, start_block_timestamp);
    SILK_INFO << "Initialized SHiP Receiver Plugin";
 }
 
@@ -337,4 +347,8 @@ void ship_receiver_plugin::plugin_startup() {
 
 void ship_receiver_plugin::plugin_shutdown() {
    SILK_INFO << "Shutdown SHiP Receiver";
+}
+
+std::optional<channels::native_block> ship_receiver_plugin::get_start_from_block() {
+   return my->get_start_from_block();
 }
