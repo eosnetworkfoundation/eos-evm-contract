@@ -50,6 +50,7 @@ set(PROJECT_VERSION_MINOR ${CMAKE_MATCH_2})
 set(PROJECT_VERSION_PATCH ${CMAKE_MATCH_3})
 
 cable_add_buildinfo_library(PROJECT_NAME ${PROJECT_NAME})
+cable_add_buildinfo_library(PROJECT_NAME silkrpc)
 
 # Enforce minimum compiler versions
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
