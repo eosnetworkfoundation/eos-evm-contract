@@ -46,6 +46,31 @@ void rpc_plugin::set_program_options( appbase::options_description& cli, appbase
    ;
 }
 
+silkrpc::LogLevel to_silkrpc_log_level(silkworm::log::Level v) {
+   switch (v) {
+      case silkworm::log::Level::kNone:
+         return silkrpc::LogLevel::None;
+      case silkworm::log::Level::kCritical:
+         return silkrpc::LogLevel::Critical;
+      case silkworm::log::Level::kError:
+         return silkrpc::LogLevel::Error;
+      case silkworm::log::Level::kWarning:
+         return silkrpc::LogLevel::Warn;
+      case silkworm::log::Level::kInfo:
+         return silkrpc::LogLevel::Info;
+      case silkworm::log::Level::kDebug:
+         return silkrpc::LogLevel::Debug;
+      case silkworm::log::Level::kTrace:
+         return silkrpc::LogLevel::Trace;
+      default:
+         break;
+   }
+
+   std::string err = "Unknown silkworm log level: ";
+   err += std::to_string(static_cast<int64_t>(v));
+   throw std::runtime_error(err);
+}
+
 void rpc_plugin::plugin_initialize( const appbase::variables_map& options ) try {
 
    const auto& http_port   = options.at("http-port").as<std::string>();
@@ -60,6 +85,7 @@ void rpc_plugin::plugin_initialize( const appbase::variables_map& options ) try 
    const auto& data_dir   = options.at("chaindata").as<std::string>();
 
    auto verbosity         = appbase::app().get_plugin<sys_plugin>().get_verbosity();
+   silkrpc::LogLevel log_level = to_silkrpc_log_level(verbosity);
 
    using evmc::operator""_bytes32;
    silkworm::ChainConfig config{
@@ -102,7 +128,7 @@ void rpc_plugin::plugin_initialize( const appbase::variables_map& options ) try 
       node_port,
       std::thread::hardware_concurrency() / 3,
       threads,
-      static_cast<silkrpc::LogLevel>(verbosity), 
+      log_level,
       silkrpc::WaitMode::blocking
    };
 

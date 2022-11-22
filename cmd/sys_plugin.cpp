@@ -35,6 +35,6 @@ void sys_plugin::plugin_startup() {
 void sys_plugin::plugin_shutdown() {
 }
 
-uint32_t sys_plugin::get_verbosity() {
-   return static_cast<uint32_t>(settings.log_verbosity);
+silkworm::log::Level sys_plugin::get_verbosity() {
+   return settings.log_verbosity;
 }
