@@ -487,10 +487,11 @@ size_t EvmHost::copy_code(const evmc::address& address, size_t code_offset, uint
     return n;
 }
 
-void EvmHost::selfdestruct(const evmc::address& address, const evmc::address& beneficiary) noexcept {
-    evm_.state().record_suicide(address);
+bool EvmHost::selfdestruct(const evmc::address& address, const evmc::address& beneficiary) noexcept {
+    const bool recorded{evm_.state().record_suicide(address)};
     evm_.state().add_to_balance(beneficiary, evm_.state().get_balance(address));
     evm_.state().set_balance(address, 0);
+    return recorded;
 }
 
 evmc::result EvmHost::call(const evmc_message& message) noexcept {

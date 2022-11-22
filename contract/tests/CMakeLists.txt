@@ -11,12 +11,12 @@ include_directories(
     ${CMAKE_BINARY_DIR}
     ${CMAKE_SOURCE_DIR}/silkworm/node
     ${CMAKE_SOURCE_DIR}/silkworm/core
-    ${CMAKE_SOURCE_DIR}/external/evmone/lib
-    ${CMAKE_SOURCE_DIR}/external/evmone/evmc/include
+    ${CMAKE_SOURCE_DIR}/../../silkworm/third_party/evmone/lib
+    ${CMAKE_SOURCE_DIR}/../../silkworm/third_party/evmone/evmc/include
     ${CMAKE_SOURCE_DIR}/external/magic_enum/include
     ${CMAKE_SOURCE_DIR}/external/abseil
-    ${CMAKE_SOURCE_DIR}/external/intx/include
-    ${CMAKE_SOURCE_DIR}/external/ethash/include
+    ${CMAKE_SOURCE_DIR}/../external/intx/include
+    ${CMAKE_SOURCE_DIR}/../external/ethash/include
     ${CMAKE_SOURCE_DIR}/external
     ${eosio_DIR}/../../../../libraries/fc/secp256k1/secp256k1/include
 )
@@ -37,7 +37,7 @@ add_eosio_test( unit_test
     ${CMAKE_SOURCE_DIR}/silkworm/core/silkworm/common/util.cpp
     ${CMAKE_SOURCE_DIR}/silkworm/core/silkworm/common/endian.cpp
     ${CMAKE_SOURCE_DIR}/silkworm/core/silkworm/crypto/ecdsa.cpp
-    ${CMAKE_SOURCE_DIR}/external/ethash/lib/keccak/keccak.c
-    ${CMAKE_SOURCE_DIR}/external/ethash/lib/ethash/ethash.cpp
-    ${CMAKE_SOURCE_DIR}/external/ethash/lib/ethash/primes.c
+    ${CMAKE_SOURCE_DIR}/../external/ethash/lib/keccak/keccak.c
+    ${CMAKE_SOURCE_DIR}/../external/ethash/lib/ethash/ethash.cpp
+    ${CMAKE_SOURCE_DIR}/../external/ethash/lib/ethash/primes.c
 )
