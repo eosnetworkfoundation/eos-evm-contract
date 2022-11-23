@@ -66,7 +66,7 @@ public:
     EVMExecutor(const EVMExecutor&) = delete;
     EVMExecutor& operator=(const EVMExecutor&) = delete;
 
-    boost::asio::awaitable<ExecutionResult> call(const silkworm::Block& block, const silkworm::Transaction& txn, bool refund = true, bool gas_bailout = false, const Tracers& tracers = {});
+    boost::asio::awaitable<ExecutionResult> call(const silkworm::Block& block, const silkworm::Transaction& txn, bool refund = true, bool gas_bailout = false, Tracers tracers = {});
     void reset();
 
 private:

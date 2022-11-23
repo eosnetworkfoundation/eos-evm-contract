@@ -215,25 +215,27 @@ boost::asio::awaitable<ExecutionResult> EVMExecutor<WorldState, VM>::call(
     const silkworm::Transaction& txn_,
     bool refund,
     bool gas_bailout,
-    const Tracers& tracers) {
+    Tracers tracers) {
     SILKRPC_DEBUG << "EVMExecutor::call: " << block.header.number << " gasLimit: " << txn_.gas_limit << " refund: " << refund << " gasBailout: " << gas_bailout << "\n";
     SILKRPC_DEBUG << "EVMExecutor::call:Transaction: " << &txn_ << "txn: " << txn_ << "\n";
     SILKRPC_DEBUG << "EVMExecutor::call:Tracers: " << tracers.size() << "\n";
 
     const auto exec_result = co_await boost::asio::async_compose<decltype(boost::asio::use_awaitable), void(ExecutionResult)>(
-        [this, &block, &txn_, &tracers, &refund, &gas_bailout](auto&& self) {
+        [this, &block, &txn_, tracers{std::move(tracers)}, &refund, &gas_bailout](auto&& self) {
             SILKRPC_TRACE << "EVMExecutor::call post block: " << block.header.number << " txn: " << &txn_ << "\n";
-            boost::asio::post(workers_, [this, &block, &txn_, &tracers, &refund, &gas_bailout, self = std::move(self)]() mutable {
+            boost::asio::post(workers_, [this, &block, &txn_, tracers{std::move(tracers)}, refund, gas_bailout, self = std::move(self)]() mutable {
                 VM evm{block, state_, config_};
                 SILKRPC_DEBUG << "EVMExecutor::call:Tracers2: " << tracers.size() << "\n";
 
                 //--- HACK begin
-                // for (auto& tracer : tracers) {
-                //     evm.add_tracer(*tracer);
-                // }
+                for (auto& tracer : tracers) {
+                   evm.add_tracer(*tracer);
+                }
                 auto txn = const_cast<silkworm::Transaction&>(txn_);
-                txn.from = evm.beneficiary;
-                gas_bailout = true;
+                if(!txn.from) {
+                   txn.from = evm.beneficiary;
+                }
+                //gas_bailout = true;
                 //--- HACK end
 
                 assert(txn.from.has_value());
