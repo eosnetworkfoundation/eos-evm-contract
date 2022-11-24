@@ -67,17 +67,18 @@ make -j8
 ### compile EVM smart contract for Antelope blockchain:
 Prerequisites:
 - cmake 3.19 or later
-- Compile and install cdt project (https://github.com/AntelopeIO/cdt.git)
-- python3
-
-Steps:
-link cdt compiler & install wasm python module:
+- install cdt
 ```
-sudo ln <CDT_PROJECT>/build/bin/eosio-wasm2wast /usr/local/bin/eosio-wasm2wast
-sudo ln <CDT_PROJECT>/build/bin/eosio-wast2wasm /usr/local/bin/eosio-wast2wasm
+wget https://github.com/AntelopeIO/cdt/releases/download/v3.1.0-rc1/cdt_3.1.0-rc1_amd64.deb
+sudo apt install ./cdt_3.1.0-rc1_amd64.deb
+```
+or refer to the detail instructions from https://github.com/AntelopeIO/cdt
+- python3 with wasm module:
+```
 pip3 install wasm
 ```
 
+steps of building EVM smart contracts:
 ```
 cd contract
 mkdir build
@@ -92,9 +93,23 @@ TrustEVM/contract/build/evm_runtime/evm_runtime.abi
 ```
 
 ## Unittests
-in the build folder, run
+
+We need to compile the leap project in Antelope in order to compile unittests:
+following the instruction in https://github.com/AntelopeIO/leap to compile leap
+
+To compile unittests:
 ```
-./cmd/unit_test
+cd TrustEVM/contract/tests
+mkdir build
+cd build
+cmake -Deosio_DIR=/<PATH_TO_LEAP_SOURCE>/build/lib/cmake/eosio ..
+make -j4 unit_test
+```
+
+to run unittest:
+```
+cd contract/tests/build
+./unit_test
 ```
 
 ## Deployments
