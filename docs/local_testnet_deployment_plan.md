@@ -761,50 +761,64 @@ We need choose a block x in Antelope as the starting point to build up the Virtu
 
 For example:
 
-x = 3
+if we choose x = 2, it means that the virtual Ethereum blockchain will be built from the 2nd block of Antelope. As compared to Antelope, which have a 0.5 second block time, Ethereum protocol can only support block timestamp of up to second level precision. To make it compatible with Ethereum protocol, there is a block mapping mechanism between Antelope blocks and EVM virtual blocks, for example:
 
-Then the block mapping would be:
 
-Antelope block 4 -> EVM virtual block 1
+Antelope block 3 -> EVM virtual block 1
 
-Antelope block 5 -> EVM virtual block 2
+Antelope block 4 & 5 -> EVM virtual block 2
 
-Antelope block 6 -> EVM virtual block 2
+Antelope block 6 & 7 -> EVM virtual block 3
 
-Antelope block 7 -> EVM virtual block 3
-
-Antelope block 8 -> EVM virtual block 3
-
-Antelope block 9 -> EVM virtual block 4
+Antelope block 8 & 9 -> EVM virtual block 4
 
 ...
 
-Antelope block 3 is
+
+### Setting up the correct EVM genesis 
+Once we have decided the starting block number, the next step is to build up the correct genesis for the virtual Ethereum chain. Take this as example.
+
+Antelope block 2:
 ```
-./cleos get block 3
 {
-  "timestamp": "2022-10-31T10:08:19.500",
+  "timestamp": "2022-11-18T07:58:34.000",
   "producer": "eosio",
   "confirmed": 0,
-  "previous": "00000002f38dcf0536565aabdd5a7deac4405619c136f338d850213aeb3de9d4",
+  "previous": "0000000177f4004274497e5d085281578f907ebaa10f00d94b9aa3a9f39e3393",
   "transaction_mroot": "0000000000000000000000000000000000000000000000000000000000000000",
-  "action_mroot": "823207bb72f1f98e3a27ffd69d183e9122e22c322c16027b6a62bd6ca9c45b04",
+  "action_mroot": "e8fd9bd7b16564c9133c1da207a557554b0f74cb96034c3ed43af295d20d9d13",
   "schedule_version": 0,
   "new_producers": null,
-  "producer_signature": "SIG_K1_KYBceuuWxANn2Jwh1UbpT4UrW6TW2xq9XS9SUMHDa5ti3JktuoqQmDkrCuRQyZRp9sABRtfxT6RcoAtkNtg8SUGbmCFPud",
+  "producer_signature": "SIG_K1_K6MSRQA3aJ9nRWMGG9vLMJWgvDGPvUNq3QWKkNCPmvTCGMg6vsoHeyFL384t8dMDhSA46YS5vqtvTGF8hezcBRpypWk1eX",
   "transactions": [],
-  "id": "00000003548b7f7c1b914df458910723b3c52b9d3ba5f337b15c673e998560c3",
-  "block_num": 3,
-  "ref_block_prefix": 4098724123
+  "id": "000000026d392f1bfeddb000555bcb03ca6e31a54c0cf9edc23cede42bda17e6",
+  "block_num": 2,
+  "ref_block_prefix": 11591166
 }
 ```
 
-This is a EVM genesis example:
+Using the following python command to get the time difference in second between 1970-01-01 and 2022-11-18T07:58:34.000 in hex form:
+```
+python3 -c 'from datetime import datetime; print(hex(int((datetime.strptime("2022-11-18T07:58:34.000","%Y-%m-%dT%H:%M:%S.%f")-datetime(1970,1,1)).total_seconds())))'
+```
+result:
+```
+0x63773b2a
+```
+This determines the value of the "timestamp" field in EVM genesis
+
+set the "mixHash" field to be "0x + Antelope starting block id", e.g.  "0x000000026d392f1bfeddb000555bcb03ca6e31a54c0cf9edc23cede42bda17e6"
+
+set the "nonce" field with "0x3e8". This is re-purposed to be the block time (in mill-second) of the EVM chain.
+
+In the "alloc" part, setup the genesis EVM account balance.
+
+Final EVM genesis example:
 ```
     {
         "alloc": {
-            "0x2787b98fc4e731d0456b3941f0b3fe2e01439961": { // <--- initial balance
-                "balance": "0x0000000000000000000000000000000100000000000000000000000000000000" 
+            "2787b98fc4e731d0456b3941f0b3fe2e01439961": {
+                "balance": "0x100000000000000000000000000000000" 
             }
         },
         "coinbase": "0x0000000000000000000000000000000000000000",
@@ -822,59 +836,16 @@ This is a EVM genesis example:
         "difficulty": "0x01",
         "extraData": "TrustEVM",
         "gasLimit": "0x7ffffffffff",
-        "mixHash": "0x00000003548b7f7c1b914df458910723b3c52b9d3ba5f337b15c673e998560c3", // <--- change it to match your Antelop block id of x
-        "nonce": "0x0",
-        "timestamp": "0x62546fd7"
+        "mixHash": "0x000000026d392f1bfeddb000555bcb03ca6e31a54c0cf9edc23cede42bda17e6",
+        "nonce": "0x3e8",
+        "timestamp": "0x63773b2a"
     }
 ```
-Fields that you may need to consider to change:
-- alloc: all genesis EVM balances (should set to the same value retrieve from ```./cleos get table evmevmevmevm evmevmevmevm account```)
-- mixHash: the block hash of the Antelope block that represent the starting block (genesis EVM block) of the virtual EVM blockchain. You can set it to the block hash of the block containing the "setcode" action of the evmevmevmevm account.
-- timestamp: block timestamp of the genesis EVM block 
 
-### calculate the correct timestamp value:
-The following code (ref TrustEVM/cmd/block_conversion_plugin.cpp) shows the conversion between Antelop block timestamp (where is the offset of micro seconds since 1970-01-01) and the virtual EVM chain timestamp.
-```
-   static constexpr uint64_t genesis_timestamp = 1667210899500000; //us <---- here we set it equal to the timestamp of Antelope block 3
-   static constexpr uint64_t block_interval    = 1000000;          //us
-
-   inline static uint32_t timestamp_to_evm_block(uint64_t antelope_timestamp) {
-      assert(antelope_timestamp >= genesis_timestamp); // <--- this requires the antelope block timestamp must be at least some time after year 2022
-      return 1 + (antelope_timestamp - genesis_timestamp)/block_interval;
-   }
-   
-   inline static uint64_t evm_block_to_timestamp(uint32_t block_num) {
-      return genesis_timestamp + block_num * block_interval;
-   }
-```
-You probably need to change the "genesis_timestamp" to match the one in the genesis Antelop block
-the following piece of code is an example to convert timestamp to integer:
-```
-from datetime import datetime
-import sys
-
-#datetime_string = "2022-10-27T06:02:35.500"
-format = "%Y-%m-%dT%H:%M:%S.%f"
- 
-# converting datetime string to datetime 
-# object with milliseconds..
-date_object = datetime.strptime(sys.argv[1], format)
-print("date_object =", date_object)
-epoch_time = datetime(1970,1,1)
-delta = date_object - epoch_time
-print('microsec since epoch:', (int)(delta.total_seconds() * 1000000))
-```
-Using the above code to find out the corrent timestamp:
-```
-python3 time_convert.py 2022-10-31T10:08:19.500
-date_object = 2022-10-31 10:08:19.500000
-microsec since epoch: 166721089950000
-```
-
-Starting the TrustEVM process:
+### Starting the TrustEVM process:
 ```
 mkdir ./chain-data
-./build/cmd/trustevm-node --chain-data ./chain-data  --plugin block_conversion_plugin --plugin blockchain_plugin --nocolor 1 --verbosity=5
+./trustevm-node --chain-data ./chain-data --plugin block_conversion_plugin --plugin blockchain_plugin --nocolor 1 --verbosity=5 --genesis-json=./genesis.json
 ```
 
 ## 6. Start up TrustEVM-RPC (silkworm RPC)
@@ -883,10 +854,10 @@ The TrustEVM-RPC process provides ethereum compatible RPC service for clients. I
 
 ### To start the trustevm-rpc process:
 ```
-./build/cmd/trustevm-rpc --trust-evm-node=127.0.0.1:8080 --chaindata=./chain-data 
+./trustevm-rpc --api-spec=eth,net --http-port=0.0.0.0:8881 --trust-evm-node=127.0.0.1:8080 --chaindata=./chain-data
 ```
 here ```--chain-data``` must point to the same directory of the chain-data in TrustEVM-node
-by default TrustEVM-rpc will listen on port 8881 for RPC requests.
+In the above command, TrustEVM-rpc will listen on port 8881 for RPC requests.
 
 ### Make sure RPC response:
 Try 
