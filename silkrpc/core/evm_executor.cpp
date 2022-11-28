@@ -221,9 +221,9 @@ boost::asio::awaitable<ExecutionResult> EVMExecutor<WorldState, VM>::call(
     SILKRPC_DEBUG << "EVMExecutor::call:Tracers: " << tracers.size() << "\n";
 
     const auto exec_result = co_await boost::asio::async_compose<decltype(boost::asio::use_awaitable), void(ExecutionResult)>(
-        [this, &block, &txn_, tracers{std::move(tracers)}, &refund, &gas_bailout](auto&& self) {
+        [this, &block, &txn_, &tracers, &refund, &gas_bailout](auto& self) mutable {
             SILKRPC_TRACE << "EVMExecutor::call post block: " << block.header.number << " txn: " << &txn_ << "\n";
-            boost::asio::post(workers_, [this, &block, &txn_, tracers{std::move(tracers)}, refund, gas_bailout, self = std::move(self)]() mutable {
+            boost::asio::post(workers_, [this, &block, &txn_, &tracers, refund, gas_bailout, self = std::move(self)]() mutable {
                 VM evm{block, state_, config_};
                 SILKRPC_DEBUG << "EVMExecutor::call:Tracers2: " << tracers.size() << "\n";
 
