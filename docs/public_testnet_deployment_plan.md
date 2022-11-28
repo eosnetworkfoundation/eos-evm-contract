@@ -359,6 +359,12 @@ Ensure the EVM smart contract is well compiled.
 ./cleos set abi evmevmevmevm ../TrustEVM/contract/build/evm_runtime/evm_runtime.abi
 ```
 
+### 2a. Initialize EVM contract
+The EVM contract will not allow any actions except `init` until its chain id & native token is configured. Exact values to use here are TBD.
+```
+./cleos push action evmevmevmevm init '{"chainid": 15555, "native_token_symbol":"4,EVM"}'
+```
+
 ### 3. Setup initial EVM token balance
 We need to setup the EVM token balance for the initial Eth account, which is specially managed by TrustEVM team.
 for example:

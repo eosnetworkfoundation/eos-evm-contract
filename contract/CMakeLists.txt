@@ -21,7 +21,6 @@ ExternalProject_Add(
               -DCMAKE_TOOLCHAIN_FILE=${CDT_ROOT}/lib/cmake/cdt/CDTWasmToolchain.cmake
               -DWITH_TEST_ACTIONS=${WITH_TEST_ACTIONS}
               -DWITH_LOGTIME=${WITH_LOGTIME}
-              -DOVERRIDE_CHAIN_ID=${OVERRIDE_CHAIN_ID}
    UPDATE_COMMAND ""
    PATCH_COMMAND ""
    TEST_COMMAND ""

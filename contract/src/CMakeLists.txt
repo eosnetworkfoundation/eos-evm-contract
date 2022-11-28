@@ -16,10 +16,6 @@ if (WITH_TEST_ACTIONS)
     add_compile_definitions(WITH_TEST_ACTIONS)
 endif()
 
-if (OVERRIDE_CHAIN_ID)
-    add_compile_definitions(OVERRIDE_CHAIN_ID=${OVERRIDE_CHAIN_ID})
-endif()
-
 if (WITH_LOGTIME)
     add_compile_definitions(WITH_LOGTIME)
 endif()

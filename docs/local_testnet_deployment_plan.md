@@ -328,6 +328,11 @@ deploy evm_runtime contract (wasm & abi file) to account evmevmevmevm
 ./cleos set abi evmevmevmevm ../TrustEVM/contract/build/evm_runtime/evm_runtime.abi
 ```
 
+Set chain ID & native token configuration
+```
+./cleos push action evmevmevmevm init '{"chainid": 15555, "native_token_symbol":"4,EVM"}'
+```
+
 setting initial balance for genesis eth accounts.
 In this document we use ```0x2787b98fc4e731d0456b3941f0b3fe2e01439961```, (private key ```a3f1b69da92a0233ce29485d3049a4ace39e8d384bbc2557e3fc60940ce4e954```) as genesis. Developers can use one or more other genesis eth accounts.
 
