@@ -29,7 +29,7 @@ A 64-bit value is enough to hold all ranges of possible dust: if the contract is
 
 Upon a transfer from EVM to Antelope, the token value modulo configured precision will be accumulated in `dust`. If `dust` ever exceeds the minimal value represented via the Antelope token's precision, that excess value is transferred from `dust` to the Antelope token's standard balance.
 
-This dust balance is inaccessible to the user except for one action: transferring the token from Antelope to EVM (via an EVM transaction). This action has the possibility to bridge the dust back to EVM if the transfer specifies a value utilizing precision less than the Anteleope token precision. i.e. this is the only time the user's `balance`+`dust` is truly considered one balance.
+This dust balance is inaccessible to the user except for one action: transferring the token from Antelope to EVM (via an EVM transaction). This action has the possibility to bridge the dust back to EVM if the transfer specifies a value utilizing precision more than the Antelope token precision. i.e. this is the only time the user's `balance`+`dust` is truly considered one balance.
 
 ### Examples
 
@@ -52,28 +52,8 @@ The expectation is that no other contracts, block explorers, or wallets will car
 
 Nevertheless, it is worth empirically testing to ensure the token balance is properly displayed for users in typical use cases. A contract was deployed on Jungle4 lacking both a `create` action and including the extra `account` table row data. Eosq correctly displayed that a token holder had the expected `balance`, ignoring the `dust`. It may be worth trying on another explorers and/or wallets.
 
-### Other Thoughts
+### Reponsibliy Of Deployer & `init` Caller
 
-Another interesting table row layout I experimented with was
-```c++
- struct [[eosio::table]] account {
-    asset    balance;
-    asset    dust;
+The caller of the contract's `init` action will need to set the Antelope token's precision with consideration of the EVM native token's tokenomics (supply, inflation, etc). For example, while a setting of 0 will "only" allow the Antelope token to represent 4611686018427387904 EVM which is less than what the EVM native token could represent, realistically that may well exceed the maximum supply & inflation of the token in practice.
 
-    uint64_t primary_key()const { return balance.symbol.code().raw(); }
- };
-```
-What's interesting about this is that it makes querying the table a little more self describing by including a unit on the `dust`.
-```
-cleos get table token holder accounts
-{
-  "rows": [{
-      "balance": "2.4690 EVM",
-      "dust": "600000 WEI"
-    }
-  ],
-  "more": false,
-  "next_key": ""
-}
-```
-Not certain if this is a good idea or not.
+The bottom line is that the onus is on the caller of `init` to set this number appropriately. The contract will have to be prepared to assert on transactions that overflow the asset should the combination of `init`ed precision and native EVM supply be 'misconfigured'.
