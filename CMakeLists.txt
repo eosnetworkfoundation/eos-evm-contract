@@ -94,3 +94,11 @@ add_subdirectory(silkrpc)
 add_subdirectory(external)
 add_subdirectory(cmd)
 add_subdirectory(examples)
+
+if (OVERRIDE_CHAIN_ID)
+  message("overriding chain id to ${OVERRIDE_CHAIN_ID}")
+  target_compile_definitions(silkworm_core PUBLIC OVERRIDE_CHAIN_ID=${OVERRIDE_CHAIN_ID})
+  target_compile_definitions(silkworm_node PUBLIC OVERRIDE_CHAIN_ID=${OVERRIDE_CHAIN_ID})
+  target_compile_definitions(silkrpc PUBLIC OVERRIDE_CHAIN_ID=${OVERRIDE_CHAIN_ID})
+endif()
+
