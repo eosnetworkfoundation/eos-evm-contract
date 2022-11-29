@@ -43,6 +43,8 @@ void rpc_plugin::set_program_options( appbase::options_description& cli, appbase
         "maximum number of rpc readers")
       ("api-spec", boost::program_options::value<std::string>()->default_value("eth"),
         "comma separated api spec, possible values: debug,engine,eth,net,parity,erigon,txpool,trace,web3")
+      ("chain-id", boost::program_options::value<uint32_t>()->default_value(silkworm::kTrustConfig.chain_id),
+        "override chain-id")
    ;
 }
 
@@ -89,7 +91,7 @@ void rpc_plugin::plugin_initialize( const appbase::variables_map& options ) try 
 
    using evmc::operator""_bytes32;
    silkworm::ChainConfig config{
-      15555,  // chain_id
+      options.at("chain-id").as<uint32_t>(),  // chain_id
       00_bytes32, // genesis-hash
       silkworm::SealEngineType::kNoProof,
       {
