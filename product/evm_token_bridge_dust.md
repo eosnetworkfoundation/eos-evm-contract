@@ -52,7 +52,7 @@ The expectation is that no other contracts, block explorers, or wallets will car
 
 Nevertheless, it is worth empirically testing to ensure the token balance is properly displayed for users in typical use cases. A contract was deployed on Jungle4 lacking both a `create` action and including the extra `account` table row data. Eosq correctly displayed that a token holder had the expected `balance`, ignoring the `dust`. It may be worth trying on another explorers and/or wallets.
 
-### Reponsibliy Of Deployer & `init` Caller
+### Responsibility Of Deployer & `init` Caller
 
 The caller of the contract's `init` action will need to set the Antelope token's precision with consideration of the EVM native token's tokenomics (supply, inflation, etc). For example, while a setting of 0 will "only" allow the Antelope token to represent 4611686018427387904 EVM which is less than what the EVM native token could represent, realistically that may well exceed the maximum supply & inflation of the token in practice.
 
