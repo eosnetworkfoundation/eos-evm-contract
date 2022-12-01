@@ -11,6 +11,7 @@
 #include <silkrpc/common/log.hpp>
 #include <silkrpc/daemon.hpp>
 #include <silkworm/common/settings.hpp>
+#include <silkworm/common/log.hpp>
 
 class rpc_plugin_impl : std::enable_shared_from_this<rpc_plugin_impl> {
    public:
@@ -22,6 +23,7 @@ class rpc_plugin_impl : std::enable_shared_from_this<rpc_plugin_impl> {
       }
 
       silkrpc::DaemonSettings settings;
+      std::thread daemon_thread;
 };
 
 rpc_plugin::rpc_plugin() {}
@@ -31,7 +33,7 @@ void rpc_plugin::set_program_options( appbase::options_description& cli, appbase
    cfg.add_options()
       ("http-port", boost::program_options::value<std::string>()->default_value("127.0.0.1:8881"),
         "http port for JSON RPC of the form <address>:<port>")    
-      ("engine-port", boost::program_options::value<std::string>()->default_value("127.0.0.1:8882"),
+      ("rpc-engine-port", boost::program_options::value<std::string>()->default_value("127.0.0.1:8882"),
         "engine port for JSON RPC of the form <address>:<port>")
       ("trust-evm-node", boost::program_options::value<std::string>()->default_value("127.0.0.1:8001"),
         "address to trust-evm-node of the form <address>:<port>")
@@ -76,7 +78,7 @@ silkrpc::LogLevel to_silkrpc_log_level(silkworm::log::Level v) {
 void rpc_plugin::plugin_initialize( const appbase::variables_map& options ) try {
 
    const auto& http_port   = options.at("http-port").as<std::string>();
-   const auto& engine_port   = options.at("engine-port").as<std::string>();
+   const auto& engine_port   = options.at("rpc-engine-port").as<std::string>();
    const auto  threads     = options.at("rpc-threads").as<uint32_t>();
    const auto  max_readers = options.at("rpc-max-readers").as<uint32_t>();
 
@@ -146,8 +148,14 @@ void rpc_plugin::plugin_initialize( const appbase::variables_map& options ) try 
 }
 
 void rpc_plugin::plugin_startup() {
-   silkrpc::Daemon::run(my->settings, {"trust-evm-rpc", "version: "+appbase::app().full_version_string()});
+   my->daemon_thread = std::thread([this]() {
+      silkworm::log::set_thread_name("rpc-daemon");
+      silkrpc::Daemon::run(my->settings, {"trust-evm-rpc", "version: "+appbase::app().full_version_string()});
+   });
 }
 
 void rpc_plugin::plugin_shutdown() {
+   if (my->daemon_thread.joinable()) {
+      my->daemon_thread.join();
+   }
 }
