@@ -1040,5 +1040,7 @@ BOOST_FIXTURE_TEST_CASE( GeneralStateTests, evm_runtime_tester ) try {
    const auto [_, duration] = sw.lap();
    std::cout << " in " << StopWatch::format(duration) << std::endl;
 
+   BOOST_REQUIRE_EQUAL(total_failed, 0);
+
 } FC_LOG_AND_RETHROW()
 BOOST_AUTO_TEST_SUITE_END()
