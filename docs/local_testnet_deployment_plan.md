@@ -961,7 +961,27 @@ Example response:
 ```
 
 
-## 8. [Optional] Setup EVM block explorer 
+## 8. [Optional] Setup Metamask Chrome extension
+
+- Ensure TrustEVM-RPC is running with ```--api-spec=eth,debug,net,trace```
+- Install Metamask Plugin in Chrome
+- Click Account ICON on the top right, the Find Settings -> Networks -> Add Network
+
+![image](https://user-images.githubusercontent.com/37097018/202395747-7ee25460-7cab-4a14-af45-99835a69d86e.png)
+
+Fill in the following information:
+
+- Network Name: any name is OK
+- New RPC URL: YOUR PROXY LISTENING ENDPOINT
+- Chain ID: 15555 or other chainID that matches the EVM chain
+- Currency Symbol: EVM
+
+And then click "Save"
+
+After setting up Metamask, you should able to import or create accounts via this plugin, or go to https://metamask.github.io/test-dapp/ to test basic dapp integration.
+
+
+## 9. [Optional] Setup EVM block explorer 
 
 In this example, we will use the blockscout explorer (https://github.com/elmato/blockscout). Any other Ethereum compatible block explorer will also works.
 
