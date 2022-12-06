@@ -959,3 +959,91 @@ Example response:
 ```
 {"jsonrpc":"2.0","id":1,"result":"0x22ecb25c00"}
 ```
+
+
+## 8. [Optional] Setup EVM block explorer 
+
+In this example, we will use the blockscout explorer (https://github.com/elmato/blockscout). Any other Ethereum compatible block explorer will also works.
+
+Requirements:
+- TrustEVM-RPC is running with ```--api-spec=eth,debug,net,trace``` parameter. This is the source the block explore will retrieve data from.
+- docker in Linux
+- Python3
+
+### Setup the flask proxy to convert the bulk requests into single requests.
+- Since TrustEVM-RPC does not support bulk requests, we need a simple proxy script to convert those requests into multiple single requests:
+
+This is an example proxy script "flask_proxy.py" that convert requests and forward them to the TrustEVM-RPC endpoint (for example http://127.0.0.1:8881):
+```
+#!/usr/bin/env python3
+import random
+import os
+import json
+import time
+import calendar
+from datetime import datetime
+
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+from eth_hash.auto import keccak
+import requests
+import json
+
+from binascii import unhexlify
+
+readEndpoint="http://127.0.0.1:8881"
+
+try:
+    app = Flask(__name__)
+    CORS(app)
+
+    @app.route("/", methods=["POST"])
+    def default():
+        def forward_request(req):
+            return requests.post(readEndpoint, json.dumps(req), headers={"Content-Type":"application/json"}).json()
+
+        request_data = request.get_json()
+        if type(request_data) == dict:
+            return jsonify(forward_request(request_data))
+
+        res = []
+        for r in request_data:
+            res.append(forward_request(r))
+
+        return jsonify(res)
+
+    app.run(host='0.0.0.0', port=5000)
+finally:
+    exit(0)
+```
+
+Run the flask_proxy.py script in the background. 
+```
+python3 ./flask_proxy.py
+```
+
+
+### checkout and run blockscout in the same machine that the flask proxy is running
+```
+git clone https://github.com/elmato/blockscout
+cd blockscout
+git checkout trust
+cd docker
+make
+cd ../docker-compose
+docker-compose -f docker-compose.yml up  
+```
+
+Once the blockscout docker is up, access http://127.0.0.1:4000 from any web explorer. You will see the web interface of the explorer, such as:
+![image](https://user-images.githubusercontent.com/37097018/205851442-40a7efa5-bca6-4ef4-adfc-1be4cceeb707.png)
+
+### Cleanup the explorer database
+These are the steps to cleanup the explorer database in case you want to start from scratch:
+```
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # 
+# WARNING THIS WILL DELETE ALL DOCKER VOLUMES
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # 
+docker rm -f $(docker ps -a -q)
+docker volume rm $(docker volume ls -q)
+```
+
