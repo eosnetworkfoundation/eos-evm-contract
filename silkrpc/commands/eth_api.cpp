@@ -835,6 +835,7 @@ boost::asio::awaitable<void> EthereumRpcApi::handle_eth_estimate_gas(const nlohm
         EVMExecutor evm_executor{*context_.io_context(), tx_database, *chain_config_ptr, workers_, latest_block.header.number};
 
         ego::Executor executor = [&latest_block, &evm_executor](const silkworm::Transaction &transaction) {
+            evm_executor.reset();
             return evm_executor.call(latest_block, transaction);
         };
 
