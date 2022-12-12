@@ -15,8 +15,8 @@ This document describes how to set up a local Antelope test environment with EVM
 
 Make sure you have the following binaries built from https://github.com/AntelopeIO/leap:
 
-- Nodeos: the main process of an Antelope node
-- Cleos: the command line interface for queries and transaction
+- nodeos: the main process of an Antelope node
+- cleos: the command line interface for queries and transaction
 - keosd: the key and wallet manager
 
 Have the following binaries built from https://github.com/AntelopeIO/cdt:
@@ -361,7 +361,7 @@ Deploy evm_runtime contract, wasm and abi file, to account evmevmevmevm:
 
 #### Set Initial Balance For Genesis ETH Accounts
 
-In this document we use ```0x2787b98fc4e731d0456b3941f0b3fe2e01439961```, (private key ```a3f1b69da92a0233ce29485d3049a4ace39e8d384bbc2557e3fc60940ce4e954```) as genesis. Developers can use one or more other genesis eth accounts.
+In this document we use `0x2787b98fc4e731d0456b3941f0b3fe2e01439961` (private key `a3f1b69da92a0233ce29485d3049a4ace39e8d384bbc2557e3fc60940ce4e954` as genesis. Developers can use one or more other genesis eth accounts.
 
 <b>Notice that the balance string must be in hex and must be exactly 64 bytes long (representing a full 256-bit integer value). Failure to meet such criteria will result in incorrect balance calculation in transfers. </b>
 
@@ -399,7 +399,7 @@ Example output:
 }
 ```
 
-Notice that the value ```0000000000000000000000000000000100000000000000000000000000000000``` is in hexdecimal form and must be exactly 64 characters long (256-bit integer value).
+Notice that the value `0000000000000000000000000000000100000000000000000000000000000000` is in hexadecimal form and must be exactly 64 characters long (256-bit integer value).
 
 ### 4. Setup The Transaction Wrapper Service
 
@@ -416,9 +416,9 @@ npm install ethereumjs-util
 
 #### Create Sender Antelope Account
 
-Create an aditional Antelope account, a.k.a. the sender account, as the wrapper account for signing wrapped Antelope transactions.
+Create an additional Antelope account, a.k.a. the sender account, as the wrapper account for signing wrapped Antelope transactions.
 
-We use ```a123``` for example (public key EOS8kE63z4NcZatvVWY4jxYdtLg6UEA123raMGwS6QDKwpQ69eGcP, private key 5JURSKS1BrJ1TagNBw1uVSzTQL2m9eHGkjknWeZkjSt33Awtior). Note, you may need to unlock your Antelope wallet again if it was already timed out.
+We use `a123` for example (public key EOS8kE63z4NcZatvVWY4jxYdtLg6UEA123raMGwS6QDKwpQ69eGcP, private key 5JURSKS1BrJ1TagNBw1uVSzTQL2m9eHGkjknWeZkjSt33Awtior). Note, you may need to unlock your Antelope wallet again if it was already timed out.
 
 ```shell
 ./cleos create account eosio a123 EOS8kE63z4NcZatvVWY4jxYdtLg6UEA123raMGwS6QDKwpQ69eGcP EOS8kE63z4NcZatvVWY4jxYdtLg6UEA123raMGwS6QDKwpQ69eGcP
@@ -437,7 +437,7 @@ EOS_EVM_ACCOUNT="evmevmevmevm"
 EOS_SENDER="a123"
 ```
 
-In this environment settings, Tx Wrapper will listen to 127.0.0.1:18888, use ```5JURSKS1BrJ1TagNBw1uVSzTQL2m9eHGkjknWeZkjSt33Awtior``` to wrap and sign the in-coming ETH trasnactions into Antelope transactions, and then push them into the Antelope RPC endpoint http://127.0.0.1:8888
+In this environment settings, Tx Wrapper will listen to 127.0.0.1:18888, use `5JURSKS1BrJ1TagNBw1uVSzTQL2m9eHGkjknWeZkjSt33Awtior` to wrap and sign the in-coming ETH trasnactions into Antelope transactions, and then push them into the Antelope RPC endpoint http://127.0.0.1:8888
 
 #### Start Tx Wrapper Service
 
@@ -596,7 +596,7 @@ Example output:
 }
 ```
 
-You will notice that the balance of account ```2787b98fc4e731d0456b3941f0b3fe2e01439961``` has changed due to gas fee spent, and nonce was changed to 1 from 0.
+You will notice that the balance of account `2787b98fc4e731d0456b3941f0b3fe2e01439961` has changed due to gas fee spent, and nonce was changed to 1 from 0.
 
 #### Compile Simple Solidity Smart Contract
 
@@ -728,17 +728,17 @@ Check the account from Antelope blockchain to verify if your solidity bytecode h
 }
 ```
 
-In the above case the solidity bytecode was deployed into ETH address ```51a97d86ae7c83f050056f03ebbe451001046764``` which is determined by the "From" address and "nonce".
+In the above case the solidity bytecode was deployed into ETH address `51a97d86ae7c83f050056f03ebbe451001046764` which is determined by the "From" address and "nonce".
 
 #### Run The Functions Defined In The Solidity Contract
 
-In order to execute function ```store(uint256 num)```, we need to first make the signed ETH raw transaction:
+In order to execute function `store(uint256 num)`, we need to first make the signed ETH raw transaction:
 
 ```shell
 python3 sign_ethraw.py 2787b98fc4e731d0456b3941f0b3fe2e01439961 51a97d86ae7c83f050056f03ebbe451001046764 0 6057361d000000000000000000000000000000000000000000000000000000000000007b 2
 ```
 
-In this case ```6057361d``` is the function first 4 bytes of hash of ```store(uint256 num)```(more precisely, ```bytes4(keccak256("store(uint256)"))```, see https://solidity-by-example.org/function-selector/) , we use 123 as the value of ```num```, which is 7b in hex form.
+In this case `6057361d` is the function first 4 bytes of hash of `store(uint256 num)` (more precisely, `bytes4(keccak256("store(uint256)"))`, see https://solidity-by-example.org/function-selector/) , we use 123 as the value of `num`, which is 7b in hex form.
 
 Once you get the raw trasnaction, then we can push into Tx Wrapper to sign as the Antelope transaction and push to Antelope blockchain:
 
@@ -832,7 +832,7 @@ to get the response:
 
 ##### Read The Storage Table Data Of The Contract
 
-From the response, contract address 51a97d86ae7c83f050056f03ebbe451001046764 will use table id 2. So we get the storage table data of evmevmevmevm (with scope = 2, table name = ```storage```)
+From the response, contract address 51a97d86ae7c83f050056f03ebbe451001046764 will use table id 2. So we get the storage table data of evmevmevmevm (with scope = 2, table name = `storage`)
 
 ```shell
 ./cleos get table evmevmevmevm 2 storage
@@ -970,7 +970,7 @@ Run below commmand to start the Trust-EVM node:
 ./trustevm-rpc --api-spec=eth,net --http-port=0.0.0.0:8881 --trust-evm-node=127.0.0.1:8080 --chaindata=./chain-data
 ```
 
-The ```--chain-data``` parameter value must point to the same directory of the chain-data in TrustEVM-node.
+The `--chain-data` parameter value must point to the same directory of the chain-data in TrustEVM-node.
 In the above command, TrustEVM-rpc will listen on port 8881 for RPC requests.
 
 #### Verify The RPC Response
@@ -1018,7 +1018,7 @@ response:
 #### Example: Execute View Actions From RPC
 
 Request:
-data - 0x2e64cec1 is the hash of a solidity function ```retrieve() public view returns (uint256)```
+data - 0x2e64cec1 is the hash of a solidity function `retrieve() public view returns (uint256)`
 
 ```shell
 curl --location --request POST 'localhost:8881/' --header 'Content-Type: application/json' --data-raw '{"method":"eth_call","params":[{"from":" 2787b98fc4e731d0456b3941f0b3fe2e01439961","to":"3f4b0f92007341792aa61e065484e48e583ebeb9","data":"0x2e64cec1"},"latest"],"id":11}'
@@ -1098,7 +1098,7 @@ Example response:
 
 #### [Optional] Setup Metamask Chrome extension
 
-- Ensure TrustEVM-RPC is running with ```--api-spec=eth,debug,net,trace```
+- Ensure TrustEVM-RPC is running with `--api-spec=eth,debug,net,trace`
 - Install Metamask Plugin in Chrome
 - Click Account ICON on the top right, the Find Settings -> Networks -> Add Network
 
