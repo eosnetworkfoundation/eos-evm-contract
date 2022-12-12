@@ -361,7 +361,7 @@ Deploy evm_runtime contract, wasm and abi file, to account evmevmevmevm:
 
 #### Set Initial Balance For Genesis ETH Accounts
 
-In this document we use `0x2787b98fc4e731d0456b3941f0b3fe2e01439961` (private key `a3f1b69da92a0233ce29485d3049a4ace39e8d384bbc2557e3fc60940ce4e954` as genesis. Developers can use one or more other genesis eth accounts.
+In this document we use `0x2787b98fc4e731d0456b3941f0b3fe2e01439961` (private key `a3f1b69da92a0233ce29485d3049a4ace39e8d384bbc2557e3fc60940ce4e954` as genesis. Developers can use one or more other genesis ETH accounts.
 
 <b>Notice that the balance string must be in hex and must be exactly 64 bytes long (representing a full 256-bit integer value). Failure to meet such criteria will result in incorrect balance calculation in transfers. </b>
 
