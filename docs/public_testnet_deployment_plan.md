@@ -1,6 +1,6 @@
-# Deploy EVM support to public testnet
+# Enable EVM Support For Public Testnet
 
-This document will describle how to enable EVM support for public testnet (such as Jungle testnet) without token economy. 
+This document will describes how to enable EVM support for public testnet (such as Jungle testnet) without token economy.
 (For local testnet deployment, please refer to https://github.com/eosnetworkfoundation/TrustEVM/blob/main/docs/local_testnet_deployment_plan.md)
 
 ## For Block Producers
