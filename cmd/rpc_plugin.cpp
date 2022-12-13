@@ -92,21 +92,14 @@ void rpc_plugin::plugin_initialize( const appbase::variables_map& options ) try 
    silkrpc::LogLevel log_level = to_silkrpc_log_level(verbosity);
 
    using evmc::operator""_bytes32;
-   silkworm::ChainConfig config{
-      options.at("chain-id").as<uint32_t>(),  // chain_id
-      00_bytes32, // genesis-hash
-      silkworm::SealEngineType::kNoProof,
-      {
-         0,          // Homestead
-         0,          // Tangerine Whistle
-         0,          // Spurious Dragon
-         0,          // Byzantium
-         0,          // Constantinople
-         0,          // Petersburg
-         0,          // Istanbul
-      },
-   };
-
+   
+   uint32_t chain_id = options.at("chain-id").as<uint32_t>();
+   const auto chain_info = silkworm::lookup_known_chain(chain_id);
+   if (!chain_info) {
+      throw std::runtime_error{"unknown chain ID: " + std::to_string(chain_id)};
+   }
+   silkworm::ChainConfig config = *(chain_info->second);
+   
    silkworm::NodeSettings node_settings;
    node_settings.data_directory = std::make_unique<silkworm::DataDirectory>(data_dir, false);
    node_settings.network_id = config.chain_id;
