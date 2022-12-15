@@ -1,74 +1,76 @@
-# Setting up a Local Antelope testnet with EVM support
+# Deploy Local Testnet With EVM Support
 
-Setting up a local testing environment of Antelope with EVM support allows developers to speed up their smart contract developments without worrying about any resource, network, version or other stabliliy issues that public testnet may introduce. Developers are free to modify, debug, or reset the environment to facilite their dApps developments.
+This document describes how to set up a local Antelope test environment with EVM support. This setup allows developers to speed up their smart contracts development without worry about any resource, network, version or other stability issues that public testnet may introduce. Developers are free to modify, debug, or reset the environment to facilitate their applications development.
 
-## Hardware requirments
+## Hardware Requirements
 
-- CPU
-  A high end CPU with good single threaded performance is recommended, such as i9 or Ryzen 9 or Server grade CPU. Middle or Low end CPU would also be OK but will end up having less transactions per second.
-- RAM
-  32GB+ is recommended. Using 16GB is OK but it can't support much data and compilation will be significantly slow
-- SSD
-  A big SSD is required for storing all history (blocks + State History). Recommend 1TB+. Using very small amount of storage like 100GB would still work fine but it will only support much fewer transactions / data.
-- Network
-  A low latency network is recommened if you plan to run multiple nodes. A simple network (or even WiFi) would works for single node.
+- CPU: a high end CPU with good single threaded performance is recommended, such as i9 or Ryzen 9 or Server grade CPU. Middle or Low end CPU would also be OK but will end up having less transactions per second
+- RAM: 32GB+ is recommended. 16GB is OK but it can not support much data and compilation will be significantly slower
+- SSD: a big SSD is required for storing all history (blocks + State History). Recommend 1TB+. Using very small amount of storage like 100GB would still work fine but it will only support much fewer transactions / data
+- Network: a low latency network is recommended if you plan to run multiple nodes. A simple network (or even WiFi) would work for single node
   
-  
-## software requirements
+## Software Requirements
+
 - Operating System: Ubuntu 20.04 or 22.04
 
-Have the following binaries built from https://github.com/AntelopeIO/leap
-- Nodeos: the main process of an Antelope node
-- Cleos: the command line interface for queries and transaction 
-- keosd: the key and wallet manager.
+Make sure you have the following binaries built from https://github.com/AntelopeIO/leap:
 
-Have the following binaries built from https://github.com/AntelopeIO/cdt
+- nodeos: the main process of an Antelope node
+- cleos: the command line interface for queries and transaction
+- keosd: the key and wallet manager
+
+Have the following binaries built from https://github.com/AntelopeIO/cdt:
+
 - cdt-cpp: the Antelope smart contract compiler
 - eosio-wast2wasm & eosio-wasm2wast: conversion tools for building EVM contract
 
 List of compiled system contracts from https://github.com/eosnetworkfoundation/eos-system-contracts (compiled by cdt):
+
 - eosio.boot.wasm
 - eosio.bios.wasm
 - eosio.msig.wasm (optional, if you want to test multisig)
-- eosio.token.wasm (optional, if you want to test token econonmy)
-- eosio.system.wasm (optional, if you want to test resources, RAM, ... etc)
+- eosio.token.wasm (optional, if you want to test token economy)
+- eosio.system.wasm (optional, if you want to test resources: RAM, NET, CPU)
 
-Compiled EVM contracts in DEBUG mode, from this repo (see https://github.com/eosnetworkfoundation/TrustEVM/blob/main/docs/compilation_and_testing_guide.md)
+Compiled EVM contracts in DEBUG mode, from this repo, see https://github.com/eosnetworkfoundation/TrustEVM/blob/main/docs/compilation_and_testing_guide.md for details.
+
+The compilation result should be these two files:
+
 - evm_runtime.wasm
 - evm_runtime.abi
 
 <b> Ensure action "setbal" exists in evm_runtime.abi </b>
 
-Compiled binaries from this repo
-- trustevm-node: (silkworm node process that receive data from the main Antelope chain and convert to the EVM chain)
-- trustevm-rpc: (silkworm rpc server that provide service for view actions and other read operations)
+Compiled binaries from this repo:
 
+- trustevm-node: silkworm node process that receive data from the main Antelope chain and convert to the EVM chain
+- trustevm-rpc: silkworm rpc server that provide service for view actions and other read operations
 
-  
-## Running a local node with Trust EVM service, Overview:
+## Run A Local Node With Trust EVM Service
 
-  In order to run a Trust EVM service, we need to have the follow items inside one physical server / VM:
-  
-  We need the following steps to setup the Antelope blockchain with capabilities to push EVM transactions:
-  
-  1. run a local Antelope node (nodeos process) with SHIP plugin enabled, which is a single block producer
-  2. blockchain bootstrapping and initialization
-  3. deploy evm contract and initilize evm
-  4. setup the transaction wrapper for to wrap ETH write requests into Antelope transactions
-  5. run a TrustEVM-node(silkworm node) process connecting to the local Antelope node
-  6. run a TrustEVM-RPC(silkworm RPC) process locally to serve the eth RPC requests
-  7. setup a trustEVM proxy to route read requests to TrustEVM-RPC and write requests to transaction wrapper
+In order to run a Trust EVM service, and thus have setup the Antelope blockchain with capabilities to push EVM transactions, we need to have the follow items inside one physical server / VM.
 
-## Step by Step in details:
+1. [Run A Local Antelope Node](#1-run-a-local-antelope-node)
+2. [Blockchain Bootstrap And Initialization](#2-blockchain-bootstrap-and-initialization)
+3. [Deploy And Initialize EVM Contract](#3-deploy-and-initialize-evm-contract)
+4. [Setup The Transaction Wrapper Service](#4-setup-the-transaction-wrapper-service)
+5. [Start TrustEVM-node (a.k.a. Silkworm Node)](#5-start-trustevm-node-aka-silkworm-node)
+6. [Start TrustEVM-RPC (a.k.a. Silkworm RPC)](#6-start-trustevm-rpc-aka-silkworm-rpc)
+7. [Setup The Flask Proxy](#7-setup-the-flask-proxy)
 
-## 1. Run a local Antelope node 
+### 1. Run A Local Antelope Node
 
-make a data-dir directory:
-```
+#### Create a local data-dir directory
+
+```shell
 mkdir data-dir
 ```
-prepare the genesis file in ./data-dir/genesis.json, for example
-```
+
+#### Prepare The Genesis File
+
+Prepare the genesis file, for example `./data-dir/genesis.json`:
+
+```json
 {
   "initial_key": "EOS6MRyAjQq8ud7hVNYcfnVPJqcVpscN5So8BhtHuGYqET5GDW5CV",
   "initial_timestamp": "2022-01-01T00:00:00",
@@ -78,11 +80,14 @@ prepare the genesis file in ./data-dir/genesis.json, for example
   }
 }
 ```
-In this case the initial genesis public key - private key pair is "EOS6MRyAjQq8ud7hVNYcfnVPJqcVpscN5So8BhtHuGYqET5GDW5CV"/"5KQwrPbwdL6PhXujxW37FSSQZ1JiwsST4cqQzDeyXtP79zkvFD3"
-You can you any other key pair as the genesis key.
 
-prepare the config file in ./data-dir/config.ini, for example
-```
+In this case the initial genesis public key - private key pair is "EOS6MRyAjQq8ud7hVNYcfnVPJqcVpscN5So8BhtHuGYqET5GDW5CV"/"5KQwrPbwdL6PhXujxW37FSSQZ1JiwsST4cqQzDeyXtP79zkvFD3". You can use any other key pair as the genesis key.
+
+#### Prepare The Config File 
+
+Prepare the config file, for example `./data-dir/config.ini`:
+
+```txt
 chain-state-db-size-mb = 16384
 
 # Track only transactions whose scopes involve the listed accounts. Default is to track all transactions.
@@ -94,7 +99,6 @@ chain-state-db-size-mb = 16384
 
 # Pairs of [BLOCK_NUM,BLOCK_ID] that should be enforced as checkpoints.
 # checkpoint = 
-
 
 # The local IP and port to listen for incoming http connections.
 http-server-address = 127.0.0.1:8888
@@ -171,40 +175,46 @@ plugin = eosio::producer_api_plugin
 plugin = eosio::state_history_plugin
 plugin = eosio::net_plugin
 plugin = eosio::net_api_plugin
+```
 
-```
-startup Antelope node:
-```
+#### Start Antelope Node
+
+Start the Antelope node with the below command:
+
+```shell
 ./build/programs/nodeos/nodeos --data-dir=./data-dir  --config-dir=./data-dir --genesis-json=./data-dir/genesis.json --disable-replay-opts --contracts-console
 ```
-you will see the node is started and blocks are produced, for example:
 
-```
+You will see the node is started and blocks are produced, for example:
+
+```txt
 info  2022-10-14T04:03:19.911 nodeos    producer_plugin.cpp:2437      produce_block        ] Produced block 12ef38e0bcf48b35... #2 @ 2022-10-14T04:03:20.000 signed by eosio [trxs: 0, lib: 1, confirmed: 0]
 info  2022-10-14T04:03:20.401 nodeos    producer_plugin.cpp:2437      produce_block        ] Produced block df3ab0d68f1d0aaf... #3 @ 2022-10-14T04:03:20.500 signed by eosio [trxs: 0, lib: 2, confirmed: 0]
 ```
 
-If you want to start by discarding all previous blockchain data, add --delete-all-blocks:
-```
+If you want to start and discard all previous blockchain data, add `--delete-all-blocks`:
+
+```shell
 ./build/programs/nodeos/nodeos --data-dir=./data-dir  --config-dir=./data-dir --genesis-json=./data-dir/genesis.json --disable-replay-opts --contracts-console --delete-all-blocks
 ```
 
-If you want to start with the previous blockchain data, but encounter the "dirty flag" error, try to restart with --hard-replay (in this case the state will be disgarded, the node will validate and apply every block from the beginning.
-```
+If you want to start with the previous blockchain data, but encounter the "dirty flag" error, try to restart with `--hard-replay`, in this case the state will be discarded, the node will validate and apply every block from the beginning.
+
+```shell
 ./build/programs/nodeos/nodeos --data-dir=./data-dir  --config-dir=./data-dir --genesis-json=./data-dir/genesis.json --disable-replay-opts --contracts-console --hard-replay
 ```
 
+### 2. Blockchain Bootstrap And Initialization
 
-## 2. Blockchain bootstrapping and initialization
+You will use `cleos` command line tool from here onward, you can find the command line interface [here](https://docs.eosnetwork.com/leap/3.2-rc1/cleos/command-reference/) or you can run `./build/programs/cleos/cleos` so try the following command now:
 
-You can find the command line interface "cleos" in ./build/programs/cleos/cleos
-
-try the following command:
-```
+```shell
 ./cleos get info
 ```
-If you can get the similar response as follow:
-```
+
+If you can get the similar response as below:
+
+```json
 {
   "server_version": "f36e59e5",
   "chain_id": "4a920ae9b3b9c99e79542834f2332201d9393adfca26cdcca10aa3fd4a3dc68d",
@@ -228,51 +238,68 @@ If you can get the similar response as follow:
   "last_irreversible_block_time": "2022-10-14T06:06:53.000"
 }
 ```
-It means your local node is running fine and cleos has successfully communicated with nodeos.
+
+It means your local node is running fine and cleos tool has successfully communicated with nodeos.
+
+#### Setup Wallet And Keys
 
 Generate some public/private key pairs for testing, command:
-```
+
+```shell
 ./cleos create key --to-console
 ```
+
 You will get similar output as follow:
-```
+
+```txt
 Private key: 5Ki7JeCMXQmxreZnL2JubQEYuqByehbPhKGUXyxqo6RYGNS2F3i
 Public key: EOS8j4zHDrqRrf84QJLDTEgUbhB24VUkqVCjAxMzmeJuJSvZ8S1FU
 ```
+
 Repeat the same command to generate multiple key pairs. Save your key pairs for later testing use.
 
-create your new wallet named w123 (any other name is fine)
-```
+Create your new wallet named w123 (any other name is fine):
+
+```shell
 ./build/programs/cleos/cleos wallet create -n w123 --file w123.key
 ```
-your wallet password is saved into w123.key
 
-import one or more private keys into wallet w123
-```
+Your wallet password is saved into w123.key
+
+Import one or more private keys into wallet w123:
+
+```shell
 ./cleos wallet import -n w123 --private-key 5KQwrPbwdL6PhXujxW37FSSQZ1JiwsST4cqQzDeyXtP79zkvFD3
 ./cleos wallet import -n w123 --private-key 5JURSKS1BrJ1TagNBw1uVSzTQL2m9eHGkjknWeZkjSt33Awtior
 ```
 
-Once you have done everything with the wallet, it is fine to bootstrapping the blockchain
+Once you have done everything with the wallet, it is fine to bootstrap the blockchain.
 
-### activate protocol features:
+#### Activate Protocol Features
 
 First we need to use curl to schedule protocol feature activation:
-```
+
+```shell
 curl --data-binary '{"protocol_features_to_activate":["0ec7e080177b2c02b278d5088611686b49d739925a92d9bfcacd7fc6b74053bd"]}' http://127.0.0.1:8888/v1/producer/schedule_protocol_feature_activations
 ```
 
 You'll get the "OK" response if succeed:
-```
+
+```json
 {"result":"ok"}
 ```
 
-### deploy boot contract, command:
-```
+#### Deploy Boot Contract
+
+Run below command to deploy the boot contract:
+
+```shell
 ./cleos set code eosio ../eos-system-contracts/build/contracts/eosio.boot/eosio.boot.wasm
 ```
-output:
-```
+
+Output:
+
+```txt
 Reading WASM from /home/kayan-u20/workspaces/leap/../eos-system-contracts/build/contracts/eosio.boot/eosio.boot.wasm...
 Setting Code...
 executed transaction: acaf5ed70a7ce271627532cf76b6303ebab8d24656f57c69b03cfe8103f6f457  2120 bytes  531 us
@@ -280,20 +307,24 @@ executed transaction: acaf5ed70a7ce271627532cf76b6303ebab8d24656f57c69b03cfe8103
 warning: transaction executed locally, but may not be confirmed by the network yetult         ] 
 ```
 
-set boot.abi, command:
-```
+Run below commmand to set boot.abi:
+
+```shell
 ./cleos set abi eosio ../eos-system-contracts/build/contracts/eosio.boot/eosio.boot.abi
 ```
-output
-```
+
+Output:
+
+```txt
 Setting ABI...
 executed transaction: b972e178d182c1523e9abbd1fae27efae90d7711e152261a21169372a19d9d3a  1528 bytes  171 us
 #         eosio <= eosio::setabi                {"account":"eosio","abi":"0e656f73696f3a3a6162692f312e32001008616374697661746500010e666561747572655f...
 warning: transaction executed locally, but may not be confirmed by the network yetult         ] 
 ```
 
-activate the other protocol features:
-```
+Activate the other protocol features:
+
+```shell
 ./cleos push action eosio activate '["f0af56d2c5a48d60a4a5b5c903edfb7db3a736a94ed589d0b797df33ff9d3e1d"]' -p eosio 
 ./cleos push action eosio activate '["e0fb64b1085cc5538970158d05a009c24e276fb94e1a0bf6a528b48fbc4ff526"]' -p eosio
 ./cleos push action eosio activate '["d528b9f6e9693f45ed277af93474fd473ce7d831dae2180cca35d907bd10cb40"]' -p eosio
@@ -313,37 +344,45 @@ activate the other protocol features:
 ./cleos push action eosio activate '["1a99a59d87e06e09ec5b028a9cbb7749b4a5ad8819004365d02dc4379a8b7241"]' -p eosio
 ```
 
+### 3. Deploy And Initialize EVM Contract
 
+Create account evmevmevmevm with key pair EOS8kE63z4NcZatvVWY4jxYdtLg6UEA123raMGwS6QDKwpQ69eGcP 5JURSKS1BrJ1TagNBw1uVSzTQL2m9eHGkjknWeZkjSt33Awtior:
 
-## 3. Deploy and initialize EVM contract
-
-Create account evmevmevmevm (using key pair EOS8kE63z4NcZatvVWY4jxYdtLg6UEA123raMGwS6QDKwpQ69eGcP 5JURSKS1BrJ1TagNBw1uVSzTQL2m9eHGkjknWeZkjSt33Awtior)
-```
+```shell
 ./cleos create account eosio evmevmevmevm EOS8kE63z4NcZatvVWY4jxYdtLg6UEA123raMGwS6QDKwpQ69eGcP EOS8kE63z4NcZatvVWY4jxYdtLg6UEA123raMGwS6QDKwpQ69eGcP
 ```
 
-deploy evm_runtime contract (wasm & abi file) to account evmevmevmevm
-```
+Deploy evm_runtime contract, wasm and abi file, to account evmevmevmevm:
+
+```shell
 ./cleos set code evmevmevmevm ../TrustEVM/contract/build/evm_runtime/evm_runtime.wasm
 ./cleos set abi evmevmevmevm ../TrustEVM/contract/build/evm_runtime/evm_runtime.abi
 ```
 
-setting initial balance for genesis eth accounts.
-In this document we use ```0x2787b98fc4e731d0456b3941f0b3fe2e01439961```, (private key ```a3f1b69da92a0233ce29485d3049a4ace39e8d384bbc2557e3fc60940ce4e954```) as genesis. Developers can use one or more other genesis eth accounts.
+#### Set Initial Balance For Genesis ETH Accounts
+
+In this document we use `0x2787b98fc4e731d0456b3941f0b3fe2e01439961` (private key `a3f1b69da92a0233ce29485d3049a4ace39e8d384bbc2557e3fc60940ce4e954` as genesis. Developers can use one or more other genesis ETH accounts.
 
 <b>Notice that the balance string must be in hex and must be exactly 64 bytes long (representing a full 256-bit integer value). Failure to meet such criteria will result in incorrect balance calculation in transfers. </b>
-```
+
+```shell
 ./cleos push action evmevmevmevm setbal '{"addy":"2787b98fc4e731d0456b3941f0b3fe2e01439961", "bal":"0000000000000000000000000000000100000000000000000000000000000000"}' -p evmevmevmevm
 ```
+
 Repeat this action for all genesis accounts.
 
-Now EVM initialization is completed. Verify all EVM account balances directly from Antelope node. 
-the simplest command is (replace your contract name "evmevmevmevm" if needed):
-```
+Now EVM initialization is completed. 
+
+#### Verify EVM account balances 
+
+To verify all EVM account balances directly on the Antelope node run the following command and replace your contract name "evmevmevmevm" if needed:
+
+```shell
 ./cleos get table evmevmevmevm evmevmevmevm account
 ```
-example output:
-```
+
+Example output:
+```json
 {
   "rows": [{
       "id": 0,
@@ -359,29 +398,37 @@ example output:
   "next_key": ""
 }
 ```
-Notice that the value ```0000000000000000000000000000000100000000000000000000000000000000``` is in hexdecimal form and must be exactly 64 characters long (256-bit integer value).
 
+Notice that the value `0000000000000000000000000000000100000000000000000000000000000000` is in hexadecimal form and must be exactly 64 characters long (256-bit integer value).
 
+### 4. Setup The Transaction Wrapper Service
 
-## 4. setup the transaction wrapper service for to wrap ETH write requests into Antelope transactions
+Setup the transaction wrapper service to wrap ETH write requests into Antelope transactions.
 
-### Install necessary nodejs tools:
-```
+#### Install The Necessary nodejs Tools
+
+```shell
 sudo apt install nodejs
 sudo apt install npm
 npm install eosjs
 npm install ethereumjs-util
 ```
 
-### create another Antelope account (sender account) as the wrapper account for signing wrapped Antelope transactions
-We use ```a123``` for example (public key EOS8kE63z4NcZatvVWY4jxYdtLg6UEA123raMGwS6QDKwpQ69eGcP, private key 5JURSKS1BrJ1TagNBw1uVSzTQL2m9eHGkjknWeZkjSt33Awtior):
-```
+#### Create Sender Antelope Account
+
+Create an additional Antelope account, a.k.a. the sender account, as the wrapper account for signing wrapped Antelope transactions.
+
+We use `a123` for example (public key EOS8kE63z4NcZatvVWY4jxYdtLg6UEA123raMGwS6QDKwpQ69eGcP, private key 5JURSKS1BrJ1TagNBw1uVSzTQL2m9eHGkjknWeZkjSt33Awtior). Note, you may need to unlock your Antelope wallet again if it was already timed out.
+
+```shell
 ./cleos create account eosio a123 EOS8kE63z4NcZatvVWY4jxYdtLg6UEA123raMGwS6QDKwpQ69eGcP EOS8kE63z4NcZatvVWY4jxYdtLg6UEA123raMGwS6QDKwpQ69eGcP
 ```
-(Note, you may need to unlock your Antelope wallet again if it was already timed out)
 
-### prepare the .env file to configure Antelope RPC endpoint, listening port, EVM contract account, sender account, ... etc
-```
+#### Prepare The .env File
+
+Prepare the `.env` file to configure Antelope RPC endpoint, listening port, EVM contract account, sender account and other details:
+
+```txt
 EOS_RPC="http://127.0.0.1:8888"
 EOS_KEY="5JURSKS1BrJ1TagNBw1uVSzTQL2m9eHGkjknWeZkjSt33Awtior"
 HOST="127.0.0.1"
@@ -389,27 +436,38 @@ PORT="18888"
 EOS_EVM_ACCOUNT="evmevmevmevm"
 EOS_SENDER="a123"
 ```
-In this environment settings, Tx Wrapper will listen to 127.0.0.1:18888, use ```5JURSKS1BrJ1TagNBw1uVSzTQL2m9eHGkjknWeZkjSt33Awtior``` to wrap and sign the in-coming eth trasnactions into Antelope transactions, and then push them into the Antelope RPC endpoint http://127.0.0.1:8888
 
-### Start Tx Wrapper Service
-use index.js from https://github.com/eosnetworkfoundation/TrustEVM/tree/main/peripherals/tx_wrapper
-```
+In this environment settings, Tx Wrapper will listen to 127.0.0.1:18888, use `5JURSKS1BrJ1TagNBw1uVSzTQL2m9eHGkjknWeZkjSt33Awtior` to wrap and sign the in-coming ETH trasnactions into Antelope transactions, and then push them into the Antelope RPC endpoint http://127.0.0.1:8888
+
+#### Start Tx Wrapper Service
+
+Start the Tx Wrapper service and use the `index.js` from https://github.com/eosnetworkfoundation/TrustEVM/tree/main/peripherals/tx_wrapper:
+
+```shell
 node index.js
 ```
 
-### check if Tx Wrapper is running
-```
+#### Check Tx Wrapper Status
+
+Check if Tx Wrapper is running:
+
+```shell
 curl http://127.0.0.1:18888 -X POST -H "Accept: application/json" -H "Content-Type: application/json" --data '{"method":"eth_gasPrice","params":[],"id":1,"jsonrpc":"2.0"}'
 ```
+
 Example output:
-```
+
+```json
 {"jsonrpc":"2.0","id":1,"result":"0x22ecb25c00"}
 ```
 
+#### Sign An Ethereum Transaction
 
-### Sign a normal Ethereum transacation to produce a raw signed eth transaction
+Sign a normal Ethereum transaction to produce a raw signed ETH transaction.
+
 You can skip this if you are already familiar with. This is a example script sign_ethraw.py:
-```
+
+```python
 import os
 import sys
 from getpass import getpass
@@ -453,28 +511,36 @@ rlptx = rlp.encode(unsigned_tx.sign(EVM_SENDER_KEY, EVM_CHAINID), transactions.T
 print("Eth signed raw transaction is {}".format(rlptx.hex()))
 ```
 
-Example: sign a eth transaction of transfering amount "1" (minimal positive amount) from 0x2787b98fc4e731d0456b3941f0b3fe2e01439961 to itself without input data, using nonce 0
-```
+Example: sign a ETH transaction of transfering amount "1" (minimal positive amount) from 0x2787b98fc4e731d0456b3941f0b3fe2e01439961 to itself without input data, using nonce 0:
+
+```shell
 python3 sign_ethraw.py 0x2787b98fc4e731d0456b3941f0b3fe2e01439961 0x2787b98fc4e731d0456b3941f0b3fe2e01439961 1 "" 0
 ```
+
 Example output:
-```
+
+```txt
 Enter private key for 2787b98fc4e731d0456b3941f0b3fe2e01439961:
 Eth signed raw transaction is f86680843b9aca00830f4240942787b98fc4e731d0456b3941f0b3fe2e0143996101808279aaa00c028e3a5086d2ed6c4fdd8e1612691d6dd715386d35c4764726ad0f9f281fb3a0652f0fbdf0f13b3492ff0e30468efc98bef8774ea15374b64a0a13da24ba8879
 ```
 
+#### Push AN Ethereum Raw Transaction Via Tx Wrapper
 
-### push Eth raw transaction via Tx Wrapper
 For example:
-```
+
+```shell
 curl http://127.0.0.1:18888 -X POST -H "Accept: application/json" -H "Content-Type: application/json" --data '{"method":"eth_sendRawTransaction","params":["0xf86680843b9aca00830f4240942787b98fc4e731d0456b3941f0b3fe2e0143996101808279aaa00c028e3a5086d2ed6c4fdd8e1612691d6dd715386d35c4764726ad0f9f281fb3a0652f0fbdf0f13b3492ff0e30468efc98bef8774ea15374b64a0a13da24ba8879"],"id":1,"jsonrpc":"2.0"}'
 ```
+
 Example output:
-```
+
+```txt
 {"jsonrpc":"2.0","id":1,"result":"0xee030784f84dde7302bdfb07e6d5eb21c406dbc7824926bb7549dad8a2112db5"}
 ```
+
 Example output from Tx Wrapper:
-```
+
+```json
 {"method":"eth_sendRawTransaction","params":["0xf86680843b9aca00830f4240942787b98fc4e731d0456b3941f0b3fe2e0143996101808279aaa00c028e3a5086d2ed6c4fdd8e1612691d6dd715386d35c4764726ad0f9f281fb3a0652f0fbdf0f13b3492ff0e30468efc98bef8774ea15374b64a0a13da24ba8879"],"id":1,"jsonrpc":"2.0"}
 ----rlptx-----
 f86680843b9aca00830f4240942787b98fc4e731d0456b3941f0b3fe2e0143996101808279aaa00c028e3a5086d2ed6c4fdd8e1612691d6dd715386d35c4764726ad0f9f281fb3a0652f0fbdf0f13b3492ff0e30468efc98bef8774ea15374b64a0a13da24ba8879
@@ -498,13 +564,14 @@ f86680843b9aca00830f4240942787b98fc4e731d0456b3941f0b3fe2e0143996101808279aaa00c
      error_code: null } }
 ```
 
+#### Check The ETH Balance Again
 
-### check the ETH balance again
-```
+```shell
 ./cleos get table evmevmevmevm evmevmevmevm account
 ```
-example output:
-```
+
+Example output:
+```json
 {
   "rows": [{
       "id": 0,
@@ -528,12 +595,14 @@ example output:
   "next_key": ""
 }
 ```
-You will notice that the balance of account ```2787b98fc4e731d0456b3941f0b3fe2e01439961``` has changed due to gas fee spent, and nonce was changed to 1 from 0.
 
+You will notice that the balance of account `2787b98fc4e731d0456b3941f0b3fe2e01439961` has changed due to gas fee spent, and nonce was changed to 1 from 0.
 
-### Play with Solidity smart contract, compile simple solidity smart contract:
-You can skip this one if you're already familiar. Take this example solidity smart contract:
-```
+#### Compile Simple Solidity Smart Contract
+
+Yoy can now play with Solidity smart contract and compile simple solidity smart contract. You can skip this one if you're already familiar. Take this example solidity smart contract:
+
+```solidity
 // SPDX-License-Identifier: GPL-3.0
 
 pragma solidity >=0.7.0 <0.9.0;
@@ -564,28 +633,40 @@ contract Storage {
     }
 }
 ```
+
 Use other open source tool (for example https://remix.ethereum.org/) to compile into the solidity byte code:
-```
+
+```txt
 608060405234801561001057600080fd5b50610150806100206000396000f3fe608060405234801561001057600080fd5b50600436106100365760003560e01c80632e64cec11461003b5780636057361d14610059575b600080fd5b610043610075565b60405161005091906100d9565b60405180910390f35b610073600480360381019061006e919061009d565b61007e565b005b60008054905090565b8060008190555050565b60008135905061009781610103565b92915050565b6000602082840312156100b3576100b26100fe565b5b60006100c184828501610088565b91505092915050565b6100d3816100f4565b82525050565b60006020820190506100ee60008301846100ca565b92915050565b6000819050919050565b600080fd5b61010c816100f4565b811461011757600080fd5b5056fea26469706673582212209a159a4f3847890f10bfb87871a61eba91c5dbf5ee3cf6398207e292eee22a1664736f6c63430008070033
 ```
+
 According to the standard of Ethereum, to deploy the contract, we need to put the byte code into "Input_data" field, while setting the "To" field to be null. Using sign_ethraw.py:
-```
+
+```shell
 python3 sign_ethraw.py 2787b98fc4e731d0456b3941f0b3fe2e01439961 "" 0 608060405234801561001057600080fd5b50610150806100206000396000f3fe608060405234801561001057600080fd5b50600436106100365760003560e01c80632e64cec11461003b5780636057361d14610059575b600080fd5b610043610075565b60405161005091906100d9565b60405180910390f35b610073600480360381019061006e919061009d565b61007e565b005b60008054905090565b8060008190555050565b60008135905061009781610103565b92915050565b6000602082840312156100b3576100b26100fe565b5b60006100c184828501610088565b91505092915050565b6100d3816100f4565b82525050565b60006020820190506100ee60008301846100ca565b92915050565b6000819050919050565b600080fd5b61010c816100f4565b811461011757600080fd5b5056fea26469706673582212209a159a4f3847890f10bfb87871a61eba91c5dbf5ee3cf6398207e292eee22a1664736f6c63430008070033 1
 ```
+
 You'll get the signed ETH raw transation:
-```
+
+```txt
 f901c401843b9aca00830f42408080b90170608060405234801561001057600080fd5b50610150806100206000396000f3fe608060405234801561001057600080fd5b50600436106100365760003560e01c80632e64cec11461003b5780636057361d14610059575b600080fd5b610043610075565b60405161005091906100d9565b60405180910390f35b610073600480360381019061006e919061009d565b61007e565b005b60008054905090565b8060008190555050565b60008135905061009781610103565b92915050565b6000602082840312156100b3576100b26100fe565b5b60006100c184828501610088565b91505092915050565b6100d3816100f4565b82525050565b60006020820190506100ee60008301846100ca565b92915050565b6000819050919050565b600080fd5b61010c816100f4565b811461011757600080fd5b5056fea26469706673582212209a159a4f3847890f10bfb87871a61eba91c5dbf5ee3cf6398207e292eee22a1664736f6c634300080700338279aaa0b1b54ab370d1f3e820249b64ca1a1edb53779a20cd6fbf29540af17d95546d2ca02ff89e2476a5022da7f39e0b98b895de6f73445c3961b0affd404c17141c537b
 ```
-push it to Tx Wrapper:
-```
+
+Push it to Tx Wrapper:
+
+```shell
 curl http://127.0.0.1:18888 -X POST -H "Accept: application/json" -H "Content-Type: application/json" --data '{"method":"eth_sendRawTransaction","params":["0xf901c401843b9aca00830f42408080b90170608060405234801561001057600080fd5b50610150806100206000396000f3fe608060405234801561001057600080fd5b50600436106100365760003560e01c80632e64cec11461003b5780636057361d14610059575b600080fd5b610043610075565b60405161005091906100d9565b60405180910390f35b610073600480360381019061006e919061009d565b61007e565b005b60008054905090565b8060008190555050565b60008135905061009781610103565b92915050565b6000602082840312156100b3576100b26100fe565b5b60006100c184828501610088565b91505092915050565b6100d3816100f4565b82525050565b60006020820190506100ee60008301846100ca565b92915050565b6000819050919050565b600080fd5b61010c816100f4565b811461011757600080fd5b5056fea26469706673582212209a159a4f3847890f10bfb87871a61eba91c5dbf5ee3cf6398207e292eee22a1664736f6c634300080700338279aaa0b1b54ab370d1f3e820249b64ca1a1edb53779a20cd6fbf29540af17d95546d2ca02ff89e2476a5022da7f39e0b98b895de6f73445c3961b0affd404c17141c537b"],"id":1,"jsonrpc":"2.0"}'
 ```
+
 Example output:
-```
+
+```json
 {"jsonrpc":"2.0","id":1,"result":"0x040892a24769881b5c9b9edbd57a869f10e5e4ec9ee185e7d586ec5694d9e639"}
 ```
+
 Example output from Tx Wrapper:
-```
+
+```txt
 {"method":"eth_sendRawTransaction","params":["0xf901c401843b9aca00830f42408080b90170608060405234801561001057600080fd5b50610150806100206000396000f3fe608060405234801561001057600080fd5b50600436106100365760003560e01c80632e64cec11461003b5780636057361d14610059575b600080fd5b610043610075565b60405161005091906100d9565b60405180910390f35b610073600480360381019061006e919061009d565b61007e565b005b60008054905090565b8060008190555050565b60008135905061009781610103565b92915050565b6000602082840312156100b3576100b26100fe565b5b60006100c184828501610088565b91505092915050565b6100d3816100f4565b82525050565b60006020820190506100ee60008301846100ca565b92915050565b6000819050919050565b600080fd5b61010c816100f4565b811461011757600080fd5b5056fea26469706673582212209a159a4f3847890f10bfb87871a61eba91c5dbf5ee3cf6398207e292eee22a1664736f6c634300080700338279aaa0b1b54ab370d1f3e820249b64ca1a1edb53779a20cd6fbf29540af17d95546d2ca02ff89e2476a5022da7f39e0b98b895de6f73445c3961b0affd404c17141c537b"],"id":1,"jsonrpc":"2.0"}
 ----rlptx-----
 f901c401843b9aca00830f42408080b90170608060405234801561001057600080fd5b50610150806100206000396000f3fe608060405234801561001057600080fd5b50600436106100365760003560e01c80632e64cec11461003b5780636057361d14610059575b600080fd5b610043610075565b60405161005091906100d9565b60405180910390f35b610073600480360381019061006e919061009d565b61007e565b005b60008054905090565b8060008190555050565b60008135905061009781610103565b92915050565b6000602082840312156100b3576100b26100fe565b5b60006100c184828501610088565b91505092915050565b6100d3816100f4565b82525050565b60006020820190506100ee60008301846100ca565b92915050565b6000819050919050565b600080fd5b61010c816100f4565b811461011757600080fd5b5056fea26469706673582212209a159a4f3847890f10bfb87871a61eba91c5dbf5ee3cf6398207e292eee22a1664736f6c634300080700338279aaa0b1b54ab370d1f3e820249b64ca1a1edb53779a20cd6fbf29540af17d95546d2ca02ff89e2476a5022da7f39e0b98b895de6f73445c3961b0affd404c17141c537b
@@ -609,8 +690,11 @@ f901c401843b9aca00830f42408080b90170608060405234801561001057600080fd5b5061015080
      error_code: null } }
 ```
 
-### Check account from Antelope blockchain to verify if your solidity bytecode has been deployed:
-```
+#### Check The Account From Antelope Blockchain
+
+Check the account from Antelope blockchain to verify if your solidity bytecode has been deployed:
+
+```shell
 ./cleos get table evmevmevmevm evmevmevmevm account
 {
   "rows": [{
@@ -643,20 +727,28 @@ f901c401843b9aca00830f42408080b90170608060405234801561001057600080fd5b5061015080
   "next_key": ""
 }
 ```
-In the above case the solidity bytecode was deployed into eth address ```51a97d86ae7c83f050056f03ebbe451001046764``` which is determined by the "From" address and "nonce".
 
-### Run functions defined in solidity contract
-In order to execute function ```store(uint256 num)```, we need to first make the signed eth raw transaction:
-```
+In the above case the solidity bytecode was deployed into ETH address `51a97d86ae7c83f050056f03ebbe451001046764` which is determined by the "From" address and "nonce".
+
+#### Run The Functions Defined In The Solidity Contract
+
+In order to execute function `store(uint256 num)`, we need to first make the signed ETH raw transaction:
+
+```shell
 python3 sign_ethraw.py 2787b98fc4e731d0456b3941f0b3fe2e01439961 51a97d86ae7c83f050056f03ebbe451001046764 0 6057361d000000000000000000000000000000000000000000000000000000000000007b 2
 ```
-in this case ```6057361d``` is the function first 4 bytes of hash of ```store(uint256 num)```(more precisely, ```bytes4(keccak256("store(uint256)"))```, see https://solidity-by-example.org/function-selector/) , we use 123 as the value of ```num```, which is 7b in hex form.
-Once you get the raw trasnaction, then we can push into Tx wrapper to sign as the Antelope transaction and push to Antelope blockchain
-```
+
+In this case `6057361d` is the function first 4 bytes of hash of `store(uint256 num)` (more precisely, `bytes4(keccak256("store(uint256)"))`, see https://solidity-by-example.org/function-selector/) , we use 123 as the value of `num`, which is 7b in hex form.
+
+Once you get the raw trasnaction, then we can push into Tx Wrapper to sign as the Antelope transaction and push to Antelope blockchain:
+
+```shell
 curl http://127.0.0.1:18888 -X POST -H "Accept: application/json" -H "Content-Type: application/json" --data '{"method":"eth_sendRawTransaction","params":["0xf88a02843b9aca00830f42409451a97d86ae7c83f050056f03ebbe45100104676480a46057361d000000000000000000000000000000000000000000000000000000000000007b8279a9a0a2fc71e4beebd9cd1a3d9a55da213f126641f7ed0bb708a3882fa2b85dd6c30ea0164a5d8a8b9b37950091665194f07b5c4e8f6d1b0d6ef162b0e0a1f9bf10c7a7"],"id":1,"jsonrpc":"2.0"}'
 ```
+
 You'll get a response in Tx Wrapper:
-```
+
+```txt
 {"method":"eth_sendRawTransaction","params":["0xf88a02843b9aca00830f42409451a97d86ae7c83f050056f03ebbe45100104676480a46057361d000000000000000000000000000000000000000000000000000000000000007b8279a9a0a2fc71e4beebd9cd1a3d9a55da213f126641f7ed0bb708a3882fa2b85dd6c30ea0164a5d8a8b9b37950091665194f07b5c4e8f6d1b0d6ef162b0e0a1f9bf10c7a7"],"id":1,"jsonrpc":"2.0"}
 ----rlptx-----
 f88a02843b9aca00830f42409451a97d86ae7c83f050056f03ebbe45100104676480a46057361d000000000000000000000000000000000000000000000000000000000000007b8279a9a0a2fc71e4beebd9cd1a3d9a55da213f126641f7ed0bb708a3882fa2b85dd6c30ea0164a5d8a8b9b37950091665194f07b5c4e8f6d1b0d6ef162b0e0a1f9bf10c7a7
@@ -680,8 +772,9 @@ f88a02843b9aca00830f42409451a97d86ae7c83f050056f03ebbe45100104676480a46057361d00
      error_code: null } }
 ```
 
-Verify from Antelope blockchain to ensure nonce & balance were updated:
-```
+Verify on Antelope blockchain to ensure nonce & balance were updated:
+
+```shell
 ./cleos get table evmevmevmevm evmevmevmevm account
 {
   "rows": [{
@@ -715,27 +808,39 @@ Verify from Antelope blockchain to ensure nonce & balance were updated:
 }
 ```
 
-### [Debug only] Investigate the current EVM storage state from Antelope
+#### [Debug only] Investigate The Current EVM Storage State On Antelope
+
 Since we don't support running View actions directly from Antelope node (read requests will go to TrustEVM-RPC), it is quite complicated to investigate the storage of EVM directly from Antelope. However, If you really want to do that. These are the steps:
 
-#### Identify the "id" field of the contract address
-in the above example, contract address is 51a97d86ae7c83f050056f03ebbe451001046764), we use
-```
+##### Identify The "id" Field Of The Contract Address
+
+In the above example, contract address is 51a97d86ae7c83f050056f03ebbe451001046764), we use
+
+```shell
 ./cleos get table evmevmevmevm evmevmevmevm account --index 2 -L 51a97d86ae7c83f050056f03ebbe451001046764 --key-type sha256
 ```
+
 to get the response:
-```
+
+```json
   "rows": [{
       "id": 2,
       "eth_address": "51a97d86ae7c83f050056f03ebbe451001046764",
 ...
+  }]
 ```
-From the response, contract address 51a97d86ae7c83f050056f03ebbe451001046764 will use table id 2. So we get the storage table data of evmevmevmevm (with scope = 2, table name = ```storage```)
-```
+
+##### Read The Storage Table Data Of The Contract
+
+From the response, contract address 51a97d86ae7c83f050056f03ebbe451001046764 will use table id 2. So we get the storage table data of evmevmevmevm (with scope = 2, table name = `storage`)
+
+```shell
 ./cleos get table evmevmevmevm 2 storage
 ```
-example output:
-```
+
+Example output:
+
+```json
 {
   "rows": [{
       "id": 0,
@@ -748,38 +853,35 @@ example output:
 }
 ```
 
+### 5. Start TrustEVM-node (a.k.a. Silkworm Node)
 
-
-## 5. Start up TrustEVM-node (silkworm node) 
-
-A TrustEVM-node is a node process of the virtual ethereum blockchain that validates virtual ethereum blocks and serves the read requests coming from TrustEVM-RPC. It will not produce blocks. However, it will consume blocks from Antelope node and convert Antelope blocks into Virutal Ethereum blocks in a deterministic way. 
+A TrustEVM-node is a node process of the virtual ethereum blockchain that validates virtual ethereum blocks and serves the read requests coming from TrustEVM-RPC. It will not produce blocks. However, it will consume blocks from Antelope node and convert Antelope blocks into Virutal Ethereum blocks in a deterministic way.
 
 To set it up, we need to first make up a genesis of the virtual ethereum blockchain that maps to the same EVM state of the evm account of the Antelope chain that just initialized in the previous steps.
 
-### Antelope to EVM Block mapping
-We need choose a block x in Antelope as the starting point to build up the Virtual EVM blockchain. This block x need to be equal or eariler than the first EVM related transaction happened in Antelope. 
+#### Antelope To EVM Block Mapping
+
+We need to choose a block, let's say X, in Antelope as the starting point to build up the Virtual EVM blockchain. This block X need to be equal or eariler than the first EVM related transaction happened in Antelope.
 
 For example:
 
-if we choose x = 2, it means that the virtual Ethereum blockchain will be built from the 2nd block of Antelope. As compared to Antelope, which have a 0.5 second block time, Ethereum protocol can only support block timestamp of up to second level precision. To make it compatible with Ethereum protocol, there is a block mapping mechanism between Antelope blocks and EVM virtual blocks, for example:
+If we choose X = 2, it means that the virtual Ethereum blockchain will be built from the 2nd block of Antelope. As compared to Antelope, which have a 0.5 second block time, Ethereum protocol can only support block timestamp of up to second level precision. To make it compatible with Ethereum protocol, there is a block mapping mechanism between Antelope blocks and EVM virtual blocks, for example:
 
-
+```txt
 Antelope block 3 -> EVM virtual block 1
-
 Antelope block 4 & 5 -> EVM virtual block 2
-
 Antelope block 6 & 7 -> EVM virtual block 3
-
 Antelope block 8 & 9 -> EVM virtual block 4
-
 ...
+```
 
+#### Set The Correct EVM Genesis
 
-### Setting up the correct EVM genesis 
 Once we have decided the starting block number, the next step is to build up the correct genesis for the virtual Ethereum chain. Take this as example.
 
 Antelope block 2:
-```
+
+```json
 {
   "timestamp": "2022-11-18T07:58:34.000",
   "producer": "eosio",
@@ -798,23 +900,28 @@ Antelope block 2:
 ```
 
 Using the following python command to get the time difference in second between 1970-01-01 and 2022-11-18T07:58:34.000 in hex form:
-```
+
+```shell
 python3 -c 'from datetime import datetime; print(hex(int((datetime.strptime("2022-11-18T07:58:34.000","%Y-%m-%dT%H:%M:%S.%f")-datetime(1970,1,1)).total_seconds())))'
 ```
-result:
-```
+
+Result:
+
+```txt
 0x63773b2a
 ```
-This determines the value of the "timestamp" field in EVM genesis
 
-set the "mixHash" field to be "0x + Antelope starting block id", e.g.  "0x000000026d392f1bfeddb000555bcb03ca6e31a54c0cf9edc23cede42bda17e6"
+This determines the value of the "timestamp" field in EVM genesis.
 
-set the "nonce" field with "0x3e8". This is re-purposed to be the block time (in mill-second) of the EVM chain.
+Set the "mixHash" field to be "0x + Antelope starting block id", e.g.  "0x000000026d392f1bfeddb000555bcb03ca6e31a54c0cf9edc23cede42bda17e6"
+
+Set the "nonce" field with "0x3e8". This is re-purposed to be the block time (in mill-second) of the EVM chain.
 
 In the "alloc" part, setup the genesis EVM account balance.
 
 Final EVM genesis example:
-```
+
+```json
     {
         "alloc": {
             "2787b98fc4e731d0456b3941f0b3fe2e01439961": {
@@ -842,81 +949,102 @@ Final EVM genesis example:
     }
 ```
 
-### Starting the TrustEVM process:
-```
+#### Start The TrustEVM Process
+
+Run the below commamnd to start the TrustEVM node:
+
+```shell
 mkdir ./chain-data
 ./trustevm-node --chain-data ./chain-data --plugin block_conversion_plugin --plugin blockchain_plugin --nocolor 1 --verbosity=5 --genesis-json=./genesis.json
 ```
 
-## 6. Start up TrustEVM-RPC (silkworm RPC)
+### 6. Start TrustEVM-RPC (a.k.a. Silkworm RPC)
 
-The TrustEVM-RPC process provides ethereum compatible RPC service for clients. It queries state (including blocks, accounts, storage) from TrustEVM-node, and it can also run view actions requested by clients.
+The TrustEVM-RPC process provides Ethereum compatible RPC service for clients. It queries state (including blocks, accounts, storage) from TrustEVM-node, and it can also run view actions requested by clients.
 
-### To start the trustevm-rpc process:
-```
+#### Start The TrustEVM-RPC process
+
+Run below commmand to start the Trust-EVM node:
+
+```shell
 ./trustevm-rpc --api-spec=eth,net --http-port=0.0.0.0:8881 --trust-evm-node=127.0.0.1:8080 --chaindata=./chain-data
 ```
-here ```--chain-data``` must point to the same directory of the chain-data in TrustEVM-node
+
+The `--chain-data` parameter value must point to the same directory of the chain-data in TrustEVM-node.
 In the above command, TrustEVM-rpc will listen on port 8881 for RPC requests.
 
-### Make sure RPC response:
-Try 
-```
+#### Verify The RPC Response
+
+To verify the RPC response run below command:
+
+```shell
 curl --location --request POST 'localhost:8881/' --header 'Content-Type: application/json' --data-raw '{"method":"eth_blockNumber","id":0}'
 ```
-You'll recevie a response similar to follow:
-```
+
+You'll recevie a response similar to the one below:
+
+```json
 {"id":0,"jsonrpc":"2.0","result":"0x1"}
 ```
 
-### get block by number example
-Request
-```
+#### Get Block By Number Example
+
+Request:
+
+```shell
 curl --location --request POST 'localhost:8881/' --header 'Content-Type: application/json' --data-raw '{"method":"eth_getBlockByNumber","params":["0x1",true],"id":0}'
 ```
+
 Response:
-```
+
+```json
 {"id":0,"jsonrpc":"2.0","result":{"difficulty":"0x","extraData":"0x","gasLimit":"0xffffffffffffffff","gasUsed":"0x0","hash":"0x62438d9e228c32a3033a961161f913b700e0d6aecf0ecb141e92ae41d1fb9845","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","miner":"0x0000000000000000000000000000000000000000","mixHash":"0x0000000000000000000000000000000000000000000000000000000000000000","nonce":"0x0000000000000000","number":"0x1","parentHash":"0x0000000000000000000000000000000000000000000000000000000000000000","receiptsRoot":"0x0000000000000000000000000000000000000000000000000000000000000000","sha3Uncles":"0x0000000000000000000000000000000000000000000000000000000000000000","size":"0x3cc","stateRoot":"0x0000000000000000000000000000000000000000000000000000000000000000","timestamp":"0x183c5f2fea0","totalDifficulty":"0x","transactions":[{"blockHash":"0x62438d9e228c32a3033a961161f913b700e0d6aecf0ecb141e92ae41d1fb9845","blockNumber":"0x1","from":"0x2787b98fc4e731d0456b3941f0b3fe2e01439961","gas":"0xf4240","gasPrice":"0x3b9aca00","hash":"0xc4372998d1f7fc02a24fbb381947f7a10ed0826c404b7533e8431df9e48a27d0","input":"0x608060405234801561001057600080fd5b50610150806100206000396000f3fe608060405234801561001057600080fd5b50600436106100365760003560e01c80632e64cec11461003b5780636057361d14610059575b600080fd5b610043610075565b60405161005091906100d9565b60405180910390f35b610073600480360381019061006e919061009d565b61007e565b005b60008054905090565b8060008190555050565b60008135905061009781610103565b92915050565b6000602082840312156100b3576100b26100fe565b5b60006100c184828501610088565b91505092915050565b6100d3816100f4565b82525050565b60006020820190506100ee60008301846100ca565b92915050565b6000819050919050565b600080fd5b61010c816100f4565b811461011757600080fd5b5056fea26469706673582212209a159a4f3847890f10bfb87871a61eba91c5dbf5ee3cf6398207e292eee22a1664736f6c63430008070033","nonce":"0x0","r":"0x8cd1b11f5a5a9a811ad415b3f3d360a4d8aa4a8bae20467ad3649cfbad25a5ae","s":"0x5eab2829885d473747727d54caae01a8076244c3f6a4af8cad742a248b7a19ec","to":null,"transactionIndex":"0x0","type":"0x0","v":"0x79aa","value":"0x0"}],"transactionsRoot":"0x0000000000000000000000000000000000000000000000000000000000000000","uncles":[]}}
 ```
 
-### get balance example:
+#### Get Balance Example
+
 Request:
-```
+
+```shell
 curl --location --request POST 'localhost:8881/' --header 'Content-Type: application/json' --data-raw '{"method":"eth_getBalance","params":["9edf022004846bc987799d552d1b8485b317b7ed","latest"],"id":0}'
 ```
+
 response:
-```
+
+```json
 {"id":0,"jsonrpc":"2.0","result":"0x100"}
 ```
 
+#### Example: Execute View Actions From RPC
 
-### Example: execute View actions from RPC
-Request: 
-data - 0x2e64cec1 is the hash of a solidity function ```retrieve() public view returns (uint256)```
-```
+Request:
+data - 0x2e64cec1 is the hash of a solidity function `retrieve() public view returns (uint256)`
+
+```shell
 curl --location --request POST 'localhost:8881/' --header 'Content-Type: application/json' --data-raw '{"method":"eth_call","params":[{"from":" 2787b98fc4e731d0456b3941f0b3fe2e01439961","to":"3f4b0f92007341792aa61e065484e48e583ebeb9","data":"0x2e64cec1"},"latest"],"id":11}'
 ```
+
 Response:
-```
+
+```json
 {"id":11,"jsonrpc":"2.0","result":"0x000000000000000000000000000000000000000000000000000000000000007b"}
 ```
 
-
-
-## 7. Setup proxy to separate read requests and write requests
+#### Setup Proxy To Separate Read Requests From Write Requests
 
 The proxy program will separate Ethereum's write requests (such as eth_sendRawTransaction,eth_gasPrice) from other requests (treated as read requests). The write requests should go to Transaction Wrapper (which wrap the ETH transaction into Antelope transaction and sign it and push to the Antelope blockchain). The read requests should go to TrustEVM-RPC.
 
-In order to get it working, docker is required. 
+In order to get it working, docker is required. To install docker in Linux, see https://docs.docker.com/engine/install/ubuntu/
 
-To install docker in Linux, see https://docs.docker.com/engine/install/ubuntu/
+You can find the proxy tool here: TrustEVM/perfipherals/proxy
 
-You can find the proxy tool from TrustEVM/perfipherals/proxy
-```
+```shell
 cd TrustEVM/peripherals/proxy/
 ```
-Edit the file ```nginx.conf```, find the follow settings:
-```
+
+- Edit the file `nginx.conf`, find the follow settings:
+
+```json
   upstream write {
     server 192.168.56.101:18888;
   }
@@ -926,44 +1054,51 @@ Edit the file ```nginx.conf```, find the follow settings:
   }
 ```
 
-change the IP & port of the write session to your Transaction Wrapper server endpoint
+- Change the IP and port of the write session to your Transaction Wrapper server endpoint.
+- Change the IP and port of the read session to your TrustEVM-RPC server endpoint
+- Build the docker image for the proxy program:
 
-change the IP & port of the read session to your TrustEVM-RPC server endpoint
-
-build the docker image for the proxy program
-```
+```shell
 sudo docker build .
 ```
-check the image ID after building the image
-```
+
+- Check the image ID after building the image
+
+```shell
 sudo docker image ls
 ```
+
 Example output:
-```
+
+```txt
 REPOSITORY   TAG       IMAGE ID       CREATED         SIZE
 <none>       <none>    49564d312df7   2 hours ago     393MB
 debian       jessie    3aaeab7a4777   19 months ago   129MB
 ```
 
-Run the proxy in docker:
-```
+- Run the proxy in docker:
+
+```shell
 sudo docker run -p 81:80 -v ${PWD}/nginx.conf:/etc/nginx.conf 49564d312df7
 ```
-Here we map the host port 81 to the port 80 inside the docker.
 
-Check if the proxy is responding:
-```
+In the commmand above we map the host port 81 to the port 80 inside the docker.
+
+- Check if the proxy is responding:
+
+```shell
 curl http://127.0.0.1:81 -X POST -H "Accept: application/json" -H "Content-Type: application/json" --data '{"method":"eth_gasPrice","params":[],"id":1,"jsonrpc":"2.0"}'
 ```
+
 Example response:
-```
+
+```json
 {"jsonrpc":"2.0","id":1,"result":"0x22ecb25c00"}
 ```
 
+#### [Optional] Setup Metamask Chrome extension
 
-## 8. [Optional] Setup Metamask Chrome extension
-
-- Ensure TrustEVM-RPC is running with ```--api-spec=eth,debug,net,trace```
+- Ensure TrustEVM-RPC is running with `--api-spec=eth,debug,net,trace`
 - Install Metamask Plugin in Chrome
 - Click Account ICON on the top right, the Find Settings -> Networks -> Add Network
 
@@ -980,21 +1115,25 @@ And then click "Save"
 
 After setting up Metamask, you should able to import or create accounts via this plugin, or go to https://metamask.github.io/test-dapp/ to test basic dapp integration.
 
-
-## 9. [Optional] Setup EVM block explorer 
+#### [Optional] Setup EVM block explorer
 
 In this example, we will use the blockscout explorer (https://github.com/elmato/blockscout). Any other Ethereum compatible block explorer will also works.
 
 Requirements:
-- TrustEVM-RPC is running with ```--api-spec=eth,debug,net,trace``` parameter. This is the source the block explore will retrieve data from.
+
+- TrustEVM-RPC is running with `--api-spec=eth,debug,net,trace` parameter. This is the source the block explore will retrieve data from.
 - docker in Linux
 - Python3
 
-### Setup the flask proxy to convert the bulk requests into single requests.
-- Since TrustEVM-RPC does not support bulk requests, we need a simple proxy script to convert those requests into multiple single requests:
+### 7. Setup The Flask Proxy
+
+Setup the Flask proxy to convert the bulk requests into single requests.
+
+Since TrustEVM-RPC does not support bulk requests, we need a simple proxy script to convert those requests into multiple single requests:
 
 This is an example proxy script "flask_proxy.py" that convert requests and forward them to the TrustEVM-RPC endpoint (for example http://127.0.0.1:8881):
-```
+
+```python
 #!/usr/bin/env python3
 import random
 import os
@@ -1037,14 +1176,17 @@ finally:
     exit(0)
 ```
 
-Run the flask_proxy.py script in the background. 
-```
+Run the flask_proxy.py script in the background.
+
+```shell
 python3 ./flask_proxy.py
 ```
 
+#### Run blockscout Docker
 
-### checkout and run blockscout in the same machine that the flask proxy is running
-```
+Checkout and run blockscout in the same machine that the flask proxy is running
+
+```shell
 git clone https://github.com/elmato/blockscout
 cd blockscout
 git checkout trust
@@ -1057,13 +1199,14 @@ docker-compose -f docker-compose.yml up
 Once the blockscout docker is up, access http://127.0.0.1:4000 from any web explorer. You will see the web interface of the explorer, such as:
 ![image](https://user-images.githubusercontent.com/37097018/205851442-40a7efa5-bca6-4ef4-adfc-1be4cceeb707.png)
 
-### Cleanup the explorer database
+#### Cleanup The Explorer Database
+
 These are the steps to cleanup the explorer database in case you want to start from scratch:
-```
+
+```shell
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
 # WARNING THIS WILL DELETE ALL DOCKER VOLUMES
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
 docker rm -f $(docker ps -a -q)
 docker volume rm $(docker volume ls -q)
 ```
-
