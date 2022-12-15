@@ -4,7 +4,13 @@
 using evmc::operator""_bytes32;
 
 inline silkworm::ChainConfig kJungle4{
-    15555,  // chain_id
+
+#ifdef OVERRIDE_CHAIN_ID
+#warning "overriding chain id"
+    OVERRIDE_CHAIN_ID, 
+#else
+    15555, // chain id
+#endif
     00_bytes32,
     silkworm::SealEngineType::kNoProof,
     {
