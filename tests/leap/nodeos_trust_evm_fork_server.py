@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import random
 import os
+import sys
 import json
 import time
 import signal
@@ -14,6 +15,10 @@ import requests
 import json
 
 from binascii import unhexlify
+
+sys.path.append(os.getcwd())
+sys.path.append(os.path.join(os.getcwd(), "tests"))
+
 from TestHarness import Cluster, TestHelper, Utils, WalletMgr
 from TestHarness.TestHelper import AppArgs
 from core_symbol import CORE_SYMBOL
@@ -37,7 +42,8 @@ from core_symbol import CORE_SYMBOL
 # --read-endpoint trustnode-rpc endpoint (read endpoint)
 #
 # Example:
-#  ./tests/nodeos_trust_fork_server.py --trust-evm-contract-root ~/ext/TrustEVM/contract/build --leave-running
+#  cd ~/ext/leap/build
+#  ~/ext/TrustEVM/tests/leap/nodeos_trust_evm_test.py --trust-evm-contract-root ~/ext/TrustEVM/contract/build --leave-running
 #
 #  Launches wallet at port: 9899
 #    Example: bin/cleos --wallet-url http://127.0.0.1:9899 ...

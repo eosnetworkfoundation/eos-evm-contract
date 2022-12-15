@@ -6,11 +6,16 @@ import json
 import time
 
 import rlp
+import sys
 from ethereum import transactions
 from binascii import unhexlify
-from tests.TestHarness import Cluster, TestHelper, Utils, WalletMgr
-from tests.TestHarness.TestHelper import AppArgs
-from tests.core_symbol import CORE_SYMBOL
+
+sys.path.append(os.getcwd())
+sys.path.append(os.path.join(os.getcwd(), "tests"))
+
+from TestHarness import Cluster, TestHelper, Utils, WalletMgr
+from TestHarness.TestHelper import AppArgs
+from core_symbol import CORE_SYMBOL
 
 
 ###############################################################
@@ -34,7 +39,8 @@ from tests.core_symbol import CORE_SYMBOL
 # --trust-evm-contract-root should point to root of TrustEVM contract build dir
 #
 # Example:
-#  ./tests/nodeos_trust_evm_test.py --trust-evm-contract-root ~/ext/TrustEVM/contract/build --leave-running
+#  cd ~/ext/leap/build
+#  ~/ext/TrustEVM/tests/leap/nodeos_trust_evm_test.py --trust-evm-contract-root ~/ext/TrustEVM/contract/build --leave-running
 #
 #  Launches wallet at port: 9899
 #    Example: bin/cleos --wallet-url http://127.0.0.1:9899 ...
