@@ -1,10 +1,5 @@
 # EVM runtime contract
 
-### Add python deps (needed for post-build)
-```
-pip install wasm
-```
-
 ### Build Contract
 ```
 git clone //https://github.com/eosnetworkfoundation/TrustEVM

@@ -69,14 +69,10 @@ Prerequisites:
 - cmake 3.19 or later
 - install cdt
 ```
-wget https://github.com/AntelopeIO/cdt/releases/download/v3.1.0-rc1/cdt_3.1.0-rc1_amd64.deb
-sudo apt install ./cdt_3.1.0-rc1_amd64.deb
+wget https://github.com/AntelopeIO/cdt/releases/download/v3.1.0/cdt_3.1.0_amd64.deb
+sudo apt install ./cdt_3.1.0_amd64.deb
 ```
 or refer to the detail instructions from https://github.com/AntelopeIO/cdt
-- python3 with wasm module:
-```
-pip3 install wasm
-```
 
 steps of building EVM smart contracts:
 ```
