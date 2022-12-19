@@ -6,7 +6,7 @@ BOOST_FIXTURE_TEST_CASE(check_init, basic_evm_tester) try {
 
    BOOST_REQUIRE_EXCEPTION(push_action("evm"_n, "pushtx"_n, "evm"_n, mvo()("ram_payer", "evm"_n)("rlptx", bytes())),
                            eosio_assert_message_exception,
-                           [](const eosio_assert_message_exception& e) {return testing::expect_assert_message(e, "assertion failure with message: singleton does not exist");});
+                           [](const eosio_assert_message_exception& e) {return testing::expect_assert_message(e, "assertion failure with message: contract not initialized");});
    BOOST_REQUIRE_EXCEPTION(push_action("evm"_n, "issue"_n, "evm"_n, mvo()("to", "evm"_n)("quantity", asset(5, symbol(0, "EVM")))("memo", "")),
                            eosio_assert_message_exception,
                            [](const eosio_assert_message_exception& e) {return testing::expect_assert_message(e, "assertion failure with message: contract not initialized");});
@@ -25,7 +25,7 @@ BOOST_FIXTURE_TEST_CASE(check_init, basic_evm_tester) try {
 
    BOOST_REQUIRE_EXCEPTION(push_action("evm"_n, "testtx"_n, "evm"_n, mvo()("rlptx", bytes())("bi", mvo()("coinbase", bytes())("difficulty", 0)("gasLimit", 0)("number", 0)("timestamp", 0))),
                            eosio_assert_message_exception,
-                           [](const eosio_assert_message_exception& e) {return testing::expect_assert_message(e, "assertion failure with message: singleton does not exist");});
+                           [](const eosio_assert_message_exception& e) {return testing::expect_assert_message(e, "assertion failure with message: contract not initialized");});
    BOOST_REQUIRE_EXCEPTION(push_action("evm"_n, "updatecode"_n, "evm"_n, mvo()("address", bytes())("incarnation", 0)("code_hash", bytes())("code", bytes())),
                            eosio_assert_message_exception,
                            [](const eosio_assert_message_exception& e) {return testing::expect_assert_message(e, "assertion failure with message: contract not initialized");});
@@ -48,9 +48,12 @@ BOOST_FIXTURE_TEST_CASE(check_init, basic_evm_tester) try {
                            eosio_assert_message_exception,
                            [](const eosio_assert_message_exception& e) {return testing::expect_assert_message(e, "assertion failure with message: contract not initialized");});
 
-   init(42, symbol(0, "EVM"));
-   produce_block();
    BOOST_REQUIRE_EXCEPTION(init(42, symbol(0, "EVM")),
+                           eosio_assert_message_exception,
+                           [](const eosio_assert_message_exception& e) {return testing::expect_assert_message(e, "assertion failure with message: unknown chainid");});
+   init(15555, symbol(0, "EVM"));
+   produce_block();
+   BOOST_REQUIRE_EXCEPTION(init(15555, symbol(0, "EVM")),
                            eosio_assert_message_exception,
                            [](const eosio_assert_message_exception& e) {return testing::expect_assert_message(e, "assertion failure with message: contract already initialized");});
 

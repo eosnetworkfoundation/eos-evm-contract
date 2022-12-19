@@ -27,7 +27,6 @@ CONTRACT evm_contract : public contract {
       void issue(const name& to, const asset& quantity, const std::string& memo);
       [[eosio::action]]
       void retire(const asset& quantity, const std::string& memo);
-      // The `ram_payer` must be the same as owner
       [[eosio::action]] 
       void open(const name& owner, const symbol& symbol, const name& ram_payer);
       [[eosio::action]]
@@ -49,7 +48,7 @@ CONTRACT evm_contract : public contract {
    private:
       struct [[eosio::table]] account {
          asset    balance;
-         uint64_t dust;
+         uint64_t dust = 0;
 
          uint64_t primary_key() const { return balance.symbol.code().raw(); }
       };
@@ -65,7 +64,18 @@ CONTRACT evm_contract : public contract {
       typedef eosio::multi_index<"accounts"_n, account> accounts;
       typedef eosio::multi_index<"stat"_n, currency_stats> stats;
 
-      eosio::singleton<"chainid"_n, uint64_t> _chainid{get_self(), get_self().value};  //also used as totem to detect if init'ed
+      struct configuration {
+         eosio::unsigned_int version; //placeholder for future variant index
+         uint64_t chainid = 0;
+      };
+      EOSLIB_SERIALIZE(configuration, (version)(chainid));
+
+      eosio::singleton<"config"_n, configuration> _config{get_self(), get_self().value};
+
+      void assert_inited() {
+         check( _config.exists(), "contract not initialized" );
+         check( _config.get().version == 0u, "unsupported configuration singleton" );
+      }
 
       void sub_balance(const name& owner, const asset& value);
       void add_balance(const name& owner, const asset& value);

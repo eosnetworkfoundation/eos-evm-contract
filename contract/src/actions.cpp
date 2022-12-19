@@ -24,8 +24,13 @@ using namespace silkworm;
 void evm_contract::init(const uint64_t chainid, const symbol& native_token_symbol) {
     eosio::require_auth(get_self());
 
-    check( !_chainid.exists(), "contract already initialized" );
-    _chainid.set(chainid, get_self());
+    check( !_config.exists(), "contract already initialized" );
+    check( !!lookup_known_chain(chainid), "unknown chainid" );
+
+    _config.set({
+        .version = 0,
+        .chainid = chainid
+    }, get_self());
 
     stats statstable( get_self(), native_token_symbol.code().raw() );
 
@@ -37,18 +42,13 @@ void evm_contract::init(const uint64_t chainid, const symbol& native_token_symbo
 }
 
 void evm_contract::pushtx( eosio::name ram_payer, const bytes& rlptx ) {
+    assert_inited();
+
     LOGTIME("EVM START");
     eosio::require_auth(ram_payer);
 
-    const silkworm::ChainConfig chain_config {
-        _chainid.get(),
-        00_bytes32,
-        silkworm::SealEngineType::kNoProof,
-        {
-            // Homestead Tangerine Whistle Spurious Dragon Byzantium Constantinople Petersburg Istanbul (no Berlin & London)
-               0,        0,                0,              0,        0,             0,         0
-        },
-    };
+    std::optional<std::pair<const std::string, const ChainConfig*>> found_chain_config = lookup_known_chain(_config.get().chainid);
+    check( found_chain_config.has_value(), "failed to find expected chain config" );
 
     Block block;
     block.header.difficulty  = 0;
@@ -68,7 +68,7 @@ void evm_contract::pushtx( eosio::name ram_payer, const bytes& rlptx ) {
 
     evm_runtime::engine engine;
     evm_runtime::state state{get_self(), ram_payer};
-    evm_runtime::ExecutionProcessor ep{block, engine, state, chain_config};
+    evm_runtime::ExecutionProcessor ep{block, engine, state, *found_chain_config->second};
 
     Receipt receipt;
     ep.execute_transaction(tx, receipt);
@@ -77,10 +77,11 @@ void evm_contract::pushtx( eosio::name ram_payer, const bytes& rlptx ) {
 }
 
 void evm_contract::issue( const name& to, const asset& quantity, const std::string& memo ) {
+    assert_inited();
+
     auto sym = quantity.symbol;
     check( sym.is_valid(), "invalid symbol name" );
     check( memo.size() <= 256, "memo has more than 256 bytes" );
-    check( _chainid.exists(), "contract not initialized" );
 
     stats statstable( get_self(), sym.code().raw() );
     auto existing = statstable.find( sym.code().raw() );
@@ -104,10 +105,11 @@ void evm_contract::issue( const name& to, const asset& quantity, const std::stri
 }
 
 void evm_contract::retire( const asset& quantity, const std::string& memo ) {
+    assert_inited();
+
     auto sym = quantity.symbol;
     check( sym.is_valid(), "invalid symbol name" );
     check( memo.size() <= 256, "memo has more than 256 bytes" );
-    check( _chainid.exists(), "contract not initialized" );
 
     stats statstable( get_self(), sym.code().raw() );
     auto existing = statstable.find( sym.code().raw() );
@@ -128,11 +130,11 @@ void evm_contract::retire( const asset& quantity, const std::string& memo ) {
 }
 
 void evm_contract::open( const name& owner, const symbol& symbol, const name& ram_payer ) {
+    assert_inited();
+
     require_auth( ram_payer );
 
     check( is_account( owner ), "owner account does not exist" );
-    check( owner == ram_payer, "owner must be ram_payer" );
-    check( _chainid.exists(), "contract not initialized" );
 
     auto sym_code_raw = symbol.code().raw();
     stats statstable( get_self(), sym_code_raw );
@@ -149,9 +151,9 @@ void evm_contract::open( const name& owner, const symbol& symbol, const name& ra
 }
 
 void evm_contract::close( const name& owner, const symbol& symbol ) {
-    require_auth( owner );
+    assert_inited();
 
-    check( _chainid.exists(), "contract not initialized" );
+    require_auth( owner );
 
     accounts acnts( get_self(), owner.value );
     auto it = acnts.find( symbol.code().raw() );
@@ -161,11 +163,12 @@ void evm_contract::close( const name& owner, const symbol& symbol ) {
 }
 
 void evm_contract::transfer( const name& from, const name& to, const asset& quantity, const std::string& memo ) {
+    assert_inited();
+
     check( from != to, "cannot transfer to self" );
     require_auth( from );
 
     check( is_account( to ), "to account does not exist");
-    check( _chainid.exists(), "contract not initialized" );
 
     auto sym = quantity.symbol.code();
     stats statstable( get_self(), sym.raw() );
@@ -206,17 +209,12 @@ void evm_contract::add_balance( const name& owner, const asset& value ) {
 
 #ifdef WITH_TEST_ACTIONS
 ACTION evm_contract::testtx( const bytes& rlptx, const evm_runtime::test::block_info& bi ) {
+    assert_inited();
+
     eosio::require_auth(get_self());
 
-    const silkworm::ChainConfig chain_config {
-        _chainid.get(),
-        00_bytes32,
-        silkworm::SealEngineType::kNoProof,
-        {
-            // Homestead Tangerine Whistle Spurious Dragon Byzantium Constantinople Petersburg Istanbul (no Berlin & London)
-               0,        0,                0,              0,        0,             0,         0
-        },
-    };
+    std::optional<std::pair<const std::string, const ChainConfig*>> found_chain_config = lookup_known_chain(_config.get().chainid);
+    check( found_chain_config.has_value(), "failed to find expected chain config" );
     
     Block block;
     block.header = bi.get_block_header();
@@ -231,16 +229,16 @@ ACTION evm_contract::testtx( const bytes& rlptx, const evm_runtime::test::block_
 
     evm_runtime::test::engine engine;
     evm_runtime::state state{get_self(), get_self()};
-    evm_runtime::ExecutionProcessor ep{block, engine, state, chain_config};
+    evm_runtime::ExecutionProcessor ep{block, engine, state, *found_chain_config->second};
 
     Receipt receipt;
     ep.execute_transaction(tx, receipt);
 }
 
 ACTION evm_contract::dumpstorage(const bytes& addy) {
-    eosio::require_auth(get_self());
+    assert_inited();
 
-    check( _chainid.exists(), "contract not initialized" );
+    eosio::require_auth(get_self());
 
     account_table accounts(_self, _self.value);
     auto inx = accounts.get_index<"by.address"_n>();
@@ -272,9 +270,9 @@ ACTION evm_contract::dumpstorage(const bytes& addy) {
 }
 
 ACTION evm_contract::dumpall() {
-    eosio::require_auth(get_self());
+    assert_inited();
 
-    check( _chainid.exists(), "contract not initialized" );
+    eosio::require_auth(get_self());
 
     account_table accounts(_self, _self.value);
     auto itr = accounts.begin();
@@ -301,9 +299,9 @@ ACTION evm_contract::dumpall() {
 
 
 ACTION evm_contract::clearall() {
-    eosio::require_auth(get_self());
+    assert_inited();
 
-    check( _chainid.exists(), "contract not initialized" );
+    eosio::require_auth(get_self());
 
     account_table accounts(_self, _self.value);
     auto itr = accounts.begin();
@@ -335,9 +333,9 @@ ACTION evm_contract::clearall() {
 }
 
 ACTION evm_contract::updatecode( const bytes& address, uint64_t incarnation, const bytes& code_hash, const bytes& code) {
-    eosio::require_auth(get_self());
+    assert_inited();
 
-    check( _chainid.exists(), "contract not initialized" );
+    eosio::require_auth(get_self());
 
     evm_runtime::state state{get_self(), get_self()};
     auto bvcode = ByteView{(const uint8_t *)code.data(), code.size()};
@@ -345,9 +343,9 @@ ACTION evm_contract::updatecode( const bytes& address, uint64_t incarnation, con
 }
 
 ACTION evm_contract::updatestore(const bytes& address, uint64_t incarnation, const bytes& location, const bytes& initial, const bytes& current) {
-    eosio::require_auth(get_self());
+    assert_inited();
 
-    check( _chainid.exists(), "contract not initialized" );
+    eosio::require_auth(get_self());
 
     evm_runtime::state state{get_self(), get_self()};
     eosio::print("updatestore: ");
@@ -362,9 +360,9 @@ ACTION evm_contract::updatestore(const bytes& address, uint64_t incarnation, con
 }
 
 ACTION evm_contract::updateaccnt(const bytes& address, const bytes& initial, const bytes& current) {
-    eosio::require_auth(get_self());
+    assert_inited();
 
-    check( _chainid.exists(), "contract not initialized" );
+    eosio::require_auth(get_self());
 
     evm_runtime::state state{get_self(), get_self()};
     auto maybe_account = [](const bytes& data) -> std::optional<Account> {
@@ -386,9 +384,9 @@ ACTION evm_contract::updateaccnt(const bytes& address, const bytes& initial, con
 }
 
 ACTION evm_contract::setbal(const bytes& addy, const bytes& bal) {
-    eosio::require_auth(get_self());
+    assert_inited();
 
-    check( _chainid.exists(), "contract not initialized" );
+    eosio::require_auth(get_self());
 
     account_table accounts(_self, _self.value);
     auto inx = accounts.get_index<"by.address"_n>();

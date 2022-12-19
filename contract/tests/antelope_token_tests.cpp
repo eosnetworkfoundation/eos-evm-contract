@@ -23,16 +23,14 @@ public:
       return base_tester::push_action(std::move(act), signer.to_uint64_t());
    }
 
-   fc::variant get_stats(const string& symbolname)
-   {
+   fc::variant get_stats(const string& symbolname) {
       auto symb = eosio::chain::symbol::from_string(symbolname);
       auto symbol_code = symb.to_symbol_code().value;
       vector<char> data = get_row_by_account("evm"_n, name(symbol_code), "stat"_n, account_name(symbol_code));
       return data.empty() ? fc::variant() : abi_ser.binary_to_variant("currency_stats", data, abi_serializer::create_yield_function(abi_serializer_max_time));
    }
 
-   fc::variant get_account(account_name acc, const string& symbolname)
-   {
+   fc::variant get_account(account_name acc, const string& symbolname) {
       auto symb = eosio::chain::symbol::from_string(symbolname);
       auto symbol_code = symb.to_symbol_code().value;
       vector<char> data = get_row_by_account("evm"_n, acc, "accounts"_n, account_name(symbol_code));
@@ -90,7 +88,7 @@ public:
 BOOST_AUTO_TEST_SUITE(antelope_token_tests)
 
 BOOST_FIXTURE_TEST_CASE(create_tests, antelope_token_tester) try {
-   init(42, symbol(4, "EVM"));
+   init(15555, symbol(4, "EVM"));
 
    auto stats = get_stats("4,EVM");
    REQUIRE_MATCHING_OBJECT(stats, mvo()
@@ -102,10 +100,8 @@ BOOST_FIXTURE_TEST_CASE(create_tests, antelope_token_tester) try {
 
 } FC_LOG_AND_RETHROW()
 
-///XXX skip symbol_already_exists, create_max_supply, create_max_decimals
-
 BOOST_FIXTURE_TEST_CASE(issue_tests, antelope_token_tester) try {
-   init(42, symbol(3, "EVM"));
+   init(15555, symbol(3, "EVM"));
    produce_block();
 
    issue("evm"_n, asset::from_string("500.000 EVM"), "hola");
@@ -146,7 +142,7 @@ BOOST_FIXTURE_TEST_CASE(issue_tests, antelope_token_tester) try {
 } FC_LOG_AND_RETHROW()
 
 BOOST_FIXTURE_TEST_CASE(retire_tests, antelope_token_tester) try {
-   init(42, symbol(3, "EVM"));
+   init(15555, symbol(3, "EVM"));
    produce_block();
 
    BOOST_REQUIRE_EQUAL(success(), issue("evm"_n, asset::from_string("500.000 EVM"), "hola"));
@@ -182,8 +178,7 @@ BOOST_FIXTURE_TEST_CASE(retire_tests, antelope_token_tester) try {
 
    //account must already be open before transfer
    BOOST_REQUIRE_EQUAL(wasm_assert_msg("account transfering to must already be open"), transfer("evm"_n, "bob"_n, asset::from_string("200.000 EVM"), "hola"));
-   BOOST_REQUIRE_EQUAL(wasm_assert_msg("owner must be ram_payer"), open("bob"_n, "3,EVM", "evm"_n));
-   BOOST_REQUIRE_EQUAL(success(), open("bob"_n, "3,EVM", "bob"_n));
+   BOOST_REQUIRE_EQUAL(success(), open("bob"_n, "3,EVM", "evm"_n));
    BOOST_REQUIRE_EQUAL(success(), transfer("evm"_n, "bob"_n, asset::from_string("200.000 EVM"), "hola"));
 
    //should fail to retire since tokens are not on the issuer's balance
@@ -210,7 +205,7 @@ BOOST_FIXTURE_TEST_CASE(retire_tests, antelope_token_tester) try {
 } FC_LOG_AND_RETHROW()
 
 BOOST_FIXTURE_TEST_CASE(transfer_tests, antelope_token_tester) try {
-   init(42, symbol(0, "EVM"));
+   init(15555, symbol(0, "EVM"));
    produce_block();
 
    issue("evm"_n, asset::from_string("1000 EVM"), "hola");
@@ -254,7 +249,7 @@ BOOST_FIXTURE_TEST_CASE(transfer_tests, antelope_token_tester) try {
 } FC_LOG_AND_RETHROW()
 
 BOOST_FIXTURE_TEST_CASE(open_tests, antelope_token_tester) try {
-   init(42, symbol(0, "EVM"));
+   init(15555, symbol(0, "EVM"));
    produce_block();
 
    auto evm_balance = get_account("evm"_n, "0,EVM");
@@ -274,8 +269,6 @@ BOOST_FIXTURE_TEST_CASE(open_tests, antelope_token_tester) try {
 
    BOOST_REQUIRE_EQUAL(wasm_assert_msg("owner account does not exist"),
                        open("nonexistent"_n, "0,EVM", "evm"_n));
-   BOOST_REQUIRE_EQUAL(wasm_assert_msg("owner must be ram_payer"),
-                       open("bob"_n,         "0,EVM", "evm"_n));
    BOOST_REQUIRE_EQUAL(success(),
                        open("bob"_n,         "0,EVM", "bob"_n));
 
@@ -302,7 +295,7 @@ BOOST_FIXTURE_TEST_CASE(open_tests, antelope_token_tester) try {
 } FC_LOG_AND_RETHROW()
 
 BOOST_FIXTURE_TEST_CASE(close_tests, antelope_token_tester) try {
-   init(42, symbol(0, "EVM"));
+   init(15555, symbol(0, "EVM"));
    produce_block();
 
    auto evm_balance = get_account("evm"_n, "0,EVM");
