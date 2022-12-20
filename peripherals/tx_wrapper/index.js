@@ -102,7 +102,7 @@ async function eth_sendRawTransaction(params) {
 
 async function eth_gasPrice(params) {
   // TODO: get price from somewhere
-  return "0x22ecb25c00";
+  return "0x2540BE400";
 }
 
 function zero_pad(hexstr) {
