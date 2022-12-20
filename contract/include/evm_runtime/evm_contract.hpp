@@ -67,8 +67,9 @@ CONTRACT evm_contract : public contract {
       struct configuration {
          eosio::unsigned_int version; //placeholder for future variant index
          uint64_t chainid = 0;
+         time_point_sec genesis_time;
       };
-      EOSLIB_SERIALIZE(configuration, (version)(chainid));
+      EOSLIB_SERIALIZE(configuration, (version)(chainid)(genesis_time));
 
       eosio::singleton<"config"_n, configuration> _config{get_self(), get_self().value};
 

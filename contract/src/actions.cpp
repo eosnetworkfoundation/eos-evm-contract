@@ -29,7 +29,8 @@ void evm_contract::init(const uint64_t chainid, const symbol& native_token_symbo
 
     _config.set({
         .version = 0,
-        .chainid = chainid
+        .chainid = chainid,
+        .genesis_time = current_time_point()
     }, get_self());
 
     stats statstable( get_self(), native_token_symbol.code().raw() );
