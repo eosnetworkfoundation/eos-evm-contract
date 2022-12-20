@@ -124,6 +124,11 @@ Set EVM contract into account evmevmevmevm
 code hash: 8789fe904edbe10aafb5330da7ab41395f8ae1620a6d2a0a4f68fe75464c1e19
 ```
 
+<b>Initialize EVM contract</b>
+The EVM contract will not allow any actions except `init` until its chain id & native token is configured
+```
+./cleos push action evmevmevmevm init '{"chainid": 15555, "native_token_symbol":"4,EVM"}'
+```
 
 ## Set balance and transfer native EVM token via EVM smart contract: ##
 

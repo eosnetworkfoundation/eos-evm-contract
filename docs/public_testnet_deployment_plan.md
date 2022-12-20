@@ -380,6 +380,12 @@ Run the following `cleos` commands to deploy the `debug` version of the EVM cont
 ./cleos set abi evmevmevmevm EVM_DEBUG_PATH/evm_runtime.abi
 ```
 
+### 2a. Initialize EVM contract
+The EVM contract will not allow any actions except `init` until its chain id & native token is configured. Exact values to use here are TBD.
+```
+./cleos push action evmevmevmevm init '{"chainid": 15555, "native_token_symbol":"4,EVM"}'
+```
+
 ### 3. Setup The Initial EVM Token Balance
 
 We need to set the EVM token balance for the initial ETH account, which is specially managed by TrustEVM team.
