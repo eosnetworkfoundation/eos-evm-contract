@@ -16,10 +16,6 @@ if (WITH_TEST_ACTIONS)
     add_compile_definitions(WITH_TEST_ACTIONS)
 endif()
 
-if (OVERRIDE_CHAIN_ID)
-    add_compile_definitions(OVERRIDE_CHAIN_ID=${OVERRIDE_CHAIN_ID})
-endif()
-
 if (WITH_LOGTIME)
     add_compile_definitions(WITH_LOGTIME)
 endif()
@@ -68,6 +64,7 @@ list(APPEND SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/../../silkworm/third_party/silkpre/lib/silkpre/ecdsa.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../silkworm/third_party/silkpre/lib/silkpre/secp256k1n.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../../silkworm/core/silkworm/chain/intrinsic_gas.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../silkworm/core/silkworm/chain/config.cpp
 )
 
 add_contract( evm_contract evm_runtime ${SOURCES})

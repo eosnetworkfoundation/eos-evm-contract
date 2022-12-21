@@ -412,6 +412,8 @@ struct evm_runtime_tester : eosio_system_tester, silkworm::State {
       abi_def abi;
       BOOST_REQUIRE_EQUAL(abi_serializer::to_abi(accnt.abi, abi), true);
       evm_runtime_abi.set_abi(abi, abi_serializer_max_time);
+
+      base_tester::push_action(ME, "init"_n, ME, mvo()("chainid", 15555)("native_token_symbol", symbol(0, "EVM")));
    }
 
    std::string to_str(const fc::variant& o) {
