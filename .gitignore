@@ -37,6 +37,10 @@ cmake-build-debug
 *.exe
 *.out
 
+# logs
+*.log
+*.txt
+
 # macOS
 .DS_Store
 
