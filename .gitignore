@@ -26,6 +26,16 @@ cmake-build-debug
 *.lai
 *.lib
 
+# data
+*.csv
+*.html
+*.json
+*.tsv
+*.xhtml
+*.xls
+*.xlsx
+*.xml
+
 # editor files
 .ccls-cache
 .idea
