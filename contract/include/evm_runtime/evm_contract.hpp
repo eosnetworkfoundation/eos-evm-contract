@@ -2,6 +2,8 @@
 #include <eosio/asset.hpp>
 #include <eosio/singleton.hpp>
 
+#include <evm_runtime/types.hpp>
+
 #ifdef WITH_TEST_ACTIONS
 #include <evm_runtime/test/block_info.hpp>
 #endif
