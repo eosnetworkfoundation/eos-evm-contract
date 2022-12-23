@@ -1,3 +1,10 @@
+# archives
+*.7z
+*.tar
+*.tar.gz
+*.tgz
+*.zip
+
 # build artifacts
 build
 cmake-build-debug
