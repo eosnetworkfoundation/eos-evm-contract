@@ -18,7 +18,7 @@ include_directories(
     ${CMAKE_SOURCE_DIR}/../external/intx/include
     ${CMAKE_SOURCE_DIR}/../external/ethash/include
     ${CMAKE_SOURCE_DIR}/external
-    ${eosio_DIR}/../../../../libraries/fc/secp256k1/secp256k1/include
+    ${CMAKE_SOURCE_DIR}/../../silkworm/third_party/silkpre/third_party/secp256k1/include
 )
 
 #file(GLOB UNIT_TESTS "*.cpp" "*.hpp")
