@@ -2,7 +2,7 @@
  
 Prerequisite:
 
-   cmake 3.19 or later
+   cmake 3.16 or later
    Compile and install cdt project (https://github.com/AntelopeIO/cdt.git), please refer to https://github.com/AntelopeIO/cdt. 
    After install, you need to ensure the following soft links exist (if not, please manually create these soft links). 
    

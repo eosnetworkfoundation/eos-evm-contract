@@ -66,7 +66,7 @@ make -j8
 
 ### compile EVM smart contract for Antelope blockchain:
 Prerequisites:
-- cmake 3.19 or later
+- cmake 3.16 or later
 - install cdt
 ```
 wget https://github.com/AntelopeIO/cdt/releases/download/v3.1.0/cdt_3.1.0_amd64.deb
