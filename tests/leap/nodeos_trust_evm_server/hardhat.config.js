@@ -50,11 +50,19 @@ task("send-loop", "Send ERC20 token in a loop")
     const Token = await ethers.getContractFactory('Token')
     const token = Token.attach(taskArgs.contract)
     while(true) {
-      const destination = accounts[parseInt(Math.random()*accounts.length)];
-      const amount = ethers.utils.parseEther((1+Math.random()*3).toString());
-      const res = await token.transfer(destination, amount)
-      console.log(res);
-      console.log("############################################ SENT #######");
+      let res = [];
+      for(let source_index=0; source_index<accounts.length; ++source_index) {
+        let destination_index=source_index;
+        while(destination_index == source_index) {
+          destination_index = parseInt(Math.random()*accounts.length);
+        }
+        const amount = ethers.utils.parseEther((1+Math.random()*3).toString());
+        res.push(token.connect(await ethers.getSigner(source_index)).transfer(accounts[destination_index], amount));
+      }
+      const rrr = await Promise.all(res);
+      rrr.forEach((r,i)=>{
+        console.log("txhash => ", r.hash);
+      });
     }
 });
 
@@ -72,6 +80,63 @@ task("storage-loop", "Store incremental values to the storage contract")
 });
 
 
+task("load-erc20", "Load erc20 tokens on every account")
+  .addParam("contract", "Token contract address")
+  .setAction(async (taskArgs) => {
+    const accounts = await web3.eth.getAccounts();
+    const Token = await ethers.getContractFactory('Token')
+    const token = Token.attach(taskArgs.contract);
+
+    for(let i=0; i<7; ++i) {
+      const amount = ethers.utils.parseEther((1e6/8).toString());
+      const r = await token.connect(await ethers.getSigner(0)).transfer(accounts[i+1], amount);
+      console.log(`0 => ${i+1} : ${r.hash}`);
+    }
+
+    for(let i=0; i<10; ++i) {
+      const amount = ethers.utils.parseEther((1e6/8/10).toString());
+    
+      let res = [];
+      for(let j=0; j<8; ++j) {
+        res.push(token.connect(await ethers.getSigner(j)).transfer(accounts[i*8+j], amount));
+      }
+
+      const r = await Promise.all(res);
+      console.log(`${i+1}/10`);
+    }
+});
+
+task("erc20-balance", "Prints erc20 balance")
+  .addParam("contract", "The erc20 contract address")
+  .addParam("account", "The account's address")
+  .setAction(async (taskArgs) => {
+    const Token = await ethers.getContractFactory('Token')
+    const token = Token.attach(taskArgs.contract)
+    const balance = await token.balanceOf(taskArgs.account);
+    console.log(balance)
+});
+
+task("all-erc20-balance", "Prints erc20 balance of all accounts")
+  .addParam("contract", "The erc20 contract address")
+  .setAction(async (taskArgs) => {
+    const Token = await ethers.getContractFactory('Token')
+    const token = Token.attach(taskArgs.contract)
+    const accounts = await web3.eth.getAccounts();
+    
+    let res = []
+    for(let i=0; i<accounts.length; ++i) {
+      res.push(token.balanceOf(accounts[i]));
+    }
+
+    const r = await Promise.all(res);
+    r.forEach((b,i) => {
+      console.log(accounts[i], b);
+    });
+
+});
+
+
+
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
   defaultNetwork: "ltrust",
@@ -82,7 +147,7 @@ module.exports = {
         mnemonic: "test test test test test test test test test test test junk",
         path: "m/44'/60'/0'/0",
         initialIndex: 0,
-        count: 20,
+        count: 80,
         passphrase: "",
       },
     }
