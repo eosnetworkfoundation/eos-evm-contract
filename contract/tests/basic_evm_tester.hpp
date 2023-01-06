@@ -74,7 +74,7 @@ public:
       set_abi("evm"_n, testing::contracts::evm_runtime_abi().data());
    }
 
-   void init(const uint64_t chainid, const symbol& native_token_symbol) {
-      push_action("evm"_n, "init"_n, "evm"_n, mvo()("chainid", chainid)("native_token_symbol", native_token_symbol));
+   void init(const uint64_t chainid) {
+      push_action("evm"_n, "init"_n, "evm"_n, mvo()("chainid", chainid));
    }
 };

@@ -361,7 +361,7 @@ Deploy evm_runtime contract, wasm and abi file, to account evmevmevmevm:
 
 Set chain ID & native token configuration
 ```
-./cleos push action evmevmevmevm init '{"chainid": 15555, "native_token_symbol":"4,EVM"}'
+./cleos push action evmevmevmevm init '{"chainid": 15555}'
 ```
 
 #### Set Initial Balance For Genesis ETH Accounts
