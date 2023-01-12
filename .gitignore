@@ -1,0 +1,66 @@
+# archives
+*.7z
+*.tar
+*.tar.gz
+*.tgz
+*.zip
+
+# build artifacts
+build
+cmake-build-debug
+
+# compiled dynamic libraries
+*.dll
+*.dylib
+*.so
+
+# compiled object files
+*.lo
+*.o
+*.obj
+*.slo
+
+# compiled static libraries
+*.a
+*.la
+*.lai
+*.lib
+
+# data
+*.csv
+*.html
+*.json
+*.tsv
+*.xhtml
+*.xls
+*.xlsx
+*.xml
+
+# editor files
+.ccls-cache
+.idea
+*.vim
+.vscode
+
+# executables
+*.app
+*.exe
+*.out
+
+# logs
+*.log
+*.txt
+
+# macOS
+.DS_Store
+
+# precompiled headers
+*.gch
+*.pch
+
+# prerequisites
+*.d
+
+# python
+__pycache__
+.mypy_cache
