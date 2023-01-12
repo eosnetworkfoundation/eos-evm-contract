@@ -33,14 +33,14 @@ CONTRACT evm_contract : public contract {
       ACTION setbal(const bytes& addy, const bytes& bal);
 #endif
    private:
-      struct configuration {
+      struct [[eosio::table]] [[eosio::contract("evm_contract")]] config {
          eosio::unsigned_int version; //placeholder for future variant index
          uint64_t chainid = 0;
          time_point_sec genesis_time;
       };
-      EOSLIB_SERIALIZE(configuration, (version)(chainid)(genesis_time));
+      EOSLIB_SERIALIZE(config, (version)(chainid)(genesis_time));
 
-      eosio::singleton<"config"_n, configuration> _config{get_self(), get_self().value};
+      eosio::singleton<"config"_n, config> _config{get_self(), get_self().value};
 
       void assert_inited() {
          check( _config.exists(), "contract not initialized" );
