@@ -44,7 +44,7 @@ void evm_contract::pushtx( eosio::name ram_payer, const bytes& rlptx ) {
     check( found_chain_config.has_value(), "failed to find expected chain config" );
 
     Block block;
-    block.header.difficulty  = 0;
+    block.header.difficulty  = 1;
     block.header.gas_limit   = INT64_MAX;
     block.header.number      = eosio::internal_use_do_not_use::get_block_num();
     block.header.timestamp   = eosio::current_time_point().sec_since_epoch();

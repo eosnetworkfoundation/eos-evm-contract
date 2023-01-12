@@ -200,8 +200,12 @@ try:
     wasmFile="evm_runtime.wasm"
     abiFile="evm_runtime.abi"
     Utils.Print("Publish evm_runtime contract")
-    trans = prodNode.publishContract(evmAcc, contractDir, wasmFile, abiFile, waitForTransBlock=True)
-    transId=prodNode.getTransId(trans)
+    prodNode.publishContract(evmAcc, contractDir, wasmFile, abiFile, waitForTransBlock=True)
+    
+    trans = prodNode.pushMessage(evmAcc.name, "init", '{"chainid":15555}', '-p evmevmevmevm')
+    prodNode.waitForTransBlockIfNeeded(trans[1], True)
+
+    transId=prodNode.getTransId(trans[1])
     blockNum = prodNode.getBlockNumByTransId(transId)
     block = prodNode.getBlock(blockNum)
     Utils.Print("Block Id: ", block["id"])
@@ -322,7 +326,7 @@ try:
 
     for i,k in enumerate(addys):
         print("addys: [{0}] [{1}] [{2}]".format(i,k[2:].lower(), len(k[2:])))
-        trans = prodNode.pushMessage(evmAcc.name, "setbal", '{"addy":"' + k[2:].lower() + '", "bal":"00000000000000000000000000000000100000000000000000000000000000"}', '-p evmevmevmevm')
+        trans = prodNode.pushMessage(evmAcc.name, "setbal", '{"addy":"' + k[2:].lower() + '", "bal":"0000000000000000000000000000000000100000000000000000000000000000"}', '-p evmevmevmevm')
         genesis_info["alloc"][k.lower()] = {"balance":"0x100000000000000000000000000000"}
         if not (i+1) % 20: time.sleep(1)
     prodNode.waitForTransBlockIfNeeded(trans[1], True)
