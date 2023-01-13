@@ -45,9 +45,9 @@ void evm_contract::pushtx( eosio::name ram_payer, const bytes& rlptx ) {
 
     Block block;
     block.header.difficulty  = 1;
-    block.header.gas_limit   = INT64_MAX;
-    block.header.number      = eosio::internal_use_do_not_use::get_block_num();
+    block.header.gas_limit   = 0x7ffffffffff;
     block.header.timestamp   = eosio::current_time_point().sec_since_epoch();
+    block.header.number = 1 + (block.header.timestamp - _config.get().genesis_time.sec_since_epoch()); // same logic with block_mapping in TrustEVM
 
     Transaction tx;
     ByteView bv{(const uint8_t*)rlptx.data(), rlptx.size()};
