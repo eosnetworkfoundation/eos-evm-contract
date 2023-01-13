@@ -21,7 +21,7 @@ if (WITH_LOGTIME)
 endif()
 
 add_compile_definitions(ANTELOPE)
-add_compile_definitions(PROJECT_VERSION="1.0.0")
+add_compile_definitions(PROJECT_VERSION="0.2.0")
 
 # ethash
 list(APPEND SOURCES 
