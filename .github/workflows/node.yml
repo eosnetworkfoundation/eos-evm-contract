@@ -4,6 +4,7 @@ on: [push, workflow_dispatch]
 
 jobs:
   build:
+    name: TrustEVM Node Build
     runs-on: ubuntu-20.04
 
     steps:
