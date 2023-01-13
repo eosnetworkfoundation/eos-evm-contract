@@ -1,0 +1,22 @@
+name: TrustEVM Node CI
+
+on: [push, workflow_dispatch]
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: TrustEVM Node Build
+        run: .github/workflows/node-build.sh
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: build.tar.gz
+          path: build.tar.gz
