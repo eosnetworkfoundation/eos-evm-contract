@@ -11,6 +11,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
+          submodules: 'true'
 
       - name: TrustEVM Node Build
         run: .github/workflows/node-build.sh
