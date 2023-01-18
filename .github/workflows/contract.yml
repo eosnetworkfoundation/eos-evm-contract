@@ -24,7 +24,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install CDT
-        run: sudo apt-get install -y ./cdt_.*amd64.deb
+        run: sudo apt-get install -y ./cdt*.deb
 
       - name: TrustEVM Contract Build
         run: .github/workflows/contract-build.sh
