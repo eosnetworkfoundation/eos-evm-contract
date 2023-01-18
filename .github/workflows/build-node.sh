@@ -15,4 +15,4 @@ ee cmake ..
 ee make -j "$(nproc)"
 ee popd
 ee 'tar -czf build.tar.gz build/*'
-echo 'Done! - node-build.sh'
+echo 'Done! - build-node.sh'

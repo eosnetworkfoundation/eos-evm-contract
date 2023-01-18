@@ -14,8 +14,8 @@ jobs:
           fetch-depth: 0
           submodules: 'true'
 
-      - name: TrustEVM Node Build
-        run: .github/workflows/node-build.sh
+      - name: Build TrustEVM Node
+        run: .github/workflows/build-node.sh
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v3
