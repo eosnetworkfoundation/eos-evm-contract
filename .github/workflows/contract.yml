@@ -33,5 +33,5 @@ jobs:
       - name: Upload Artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: build.tar.gz
-          path: build.tar.gz
+          name: contract.tar.gz
+          path: contract.tar.gz
