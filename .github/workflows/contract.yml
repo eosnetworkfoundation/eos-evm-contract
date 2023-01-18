@@ -1,0 +1,37 @@
+name: TrustEVM Contract CI
+
+on: [push, workflow_dispatch]
+
+jobs:
+  build:
+    name: TrustEVM Contract Build
+    runs-on: ubuntu-20.04
+
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          submodules: 'true'
+
+      - name: Download CDT
+        uses: AntelopeIO/asset-artifact-download-action@v2
+        with:
+          owner: AntelopeIO
+          repo: cdt
+          target: 'v3.1.0'
+          prereleases: false
+          file: 'cdt_.*amd64.deb'
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install CDT
+        run: sudo apt-get install -y ./cdt_.*amd64.deb
+
+      - name: TrustEVM Contract Build
+        run: .github/workflows/contract-build.sh
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: build.tar.gz
+          path: build.tar.gz
