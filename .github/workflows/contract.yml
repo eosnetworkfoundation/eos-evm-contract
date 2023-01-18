@@ -27,7 +27,7 @@ jobs:
         run: sudo apt-get install -y ./cdt*.deb
 
       - name: Build TrustEVM Contract
-        run: .github/workflows/contract-build.sh
+        run: .github/workflows/build-contract.sh
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v3
