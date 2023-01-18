@@ -24,4 +24,4 @@ ee popd
 ee 'tar -czf ../contract.tar.gz build/*'
 ee popd
 
-echo 'Done! - build-contract.sh'
+echo "Done! - ${0##*/}"
