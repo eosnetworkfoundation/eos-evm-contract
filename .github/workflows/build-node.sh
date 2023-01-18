@@ -22,4 +22,4 @@ ee make -j "$(nproc)"
 ee popd
 ee 'tar -czf build.tar.gz build/*'
 
-echo 'Done! - build-node.sh'
+echo "Done! - ${0##*/}"
