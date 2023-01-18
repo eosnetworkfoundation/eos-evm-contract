@@ -48,3 +48,12 @@ jobs:
 
       - name: Install Leap
         run: sudo apt-get install -y ./leap*.deb
+
+      - name: Build TrustEVM Contract Tests
+        run: .github/workflows/build-contract-test.sh
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: contract-test.tar.gz
+          path: contract-test.tar.gz
