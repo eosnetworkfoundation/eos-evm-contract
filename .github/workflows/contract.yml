@@ -22,27 +22,27 @@ jobs:
           submodules: 'true'
           token: ${{ steps.auth.outputs.token }}
 
-      - name: Download CDT
-        uses: AntelopeIO/asset-artifact-download-action@v2
-        with:
-          owner: AntelopeIO
-          repo: cdt
-          target: 'v3.1.0'
-          prereleases: false
-          file: 'cdt_.*amd64.deb'
-          token: ${{ secrets.GITHUB_TOKEN }}
+      # - name: Download CDT
+      #   uses: AntelopeIO/asset-artifact-download-action@v2
+      #   with:
+      #     owner: AntelopeIO
+      #     repo: cdt
+      #     target: 'v3.1.0'
+      #     prereleases: false
+      #     file: 'cdt_.*amd64.deb'
+      #     token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install CDT
-        run: sudo apt-get install -y ./cdt*.deb
+      # - name: Install CDT
+      #   run: sudo apt-get install -y ./cdt*.deb
 
-      - name: Build TrustEVM Contract
-        run: .github/workflows/build-contract.sh
+      # - name: Build TrustEVM Contract
+      #   run: .github/workflows/build-contract.sh
 
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@v3
-        with:
-          name: contract.tar.gz
-          path: contract.tar.gz
+      # - name: Upload Artifacts
+      #   uses: actions/upload-artifact@v3
+      #   with:
+      #     name: contract.tar.gz
+      #     path: contract.tar.gz
 
       - name: Download Leap - dev binary
         uses: AntelopeIO/asset-artifact-download-action@v2
