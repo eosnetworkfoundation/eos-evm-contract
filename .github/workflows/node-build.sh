@@ -7,6 +7,8 @@ function ee()
     eval "$@"
 }
 
+ee cmake --version
+ee gcc --version
 ee mkdir build
 ee pushd build
 ee cmake ..
