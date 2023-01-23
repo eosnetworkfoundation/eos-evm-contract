@@ -2,7 +2,6 @@
 #include <eosio/transaction.hpp>
 #include <evm_runtime/evm_contract.hpp>
 #include <evm_runtime/tables.hpp>
-#include <evm_runtime/processor.hpp>
 #include <evm_runtime/state.hpp>
 #include <evm_runtime/engine.hpp>
 #include <evm_runtime/intrinsics.hpp>
@@ -11,11 +10,23 @@
 #include <evm_runtime/test/engine.hpp>
 #endif
 
+#define private public // HACK alert! Provide access to ep.consensus_engine_.finalize and ep.state_write_to_db
+#include <silkworm/execution/processor.hpp>
+#undef  private
+#include <silkworm/execution/processor.cpp>
+
 #ifdef WITH_LOGTIME
 #define LOGTIME(MSG) eosio::internal_use_do_not_use::logtime(MSG)
 #else
 #define LOGTIME(MSG)
 #endif
+
+namespace silkworm {
+    // provide no-op bloom
+    Bloom logs_bloom(const std::vector<Log>& logs) {
+        return {};
+    }
+}
 
 namespace evm_runtime {
 
@@ -61,10 +72,15 @@ void evm_contract::pushtx( eosio::name ram_payer, const bytes& rlptx ) {
 
     evm_runtime::engine engine;
     evm_runtime::state state{get_self(), ram_payer};
-    evm_runtime::ExecutionProcessor ep{block, engine, state, *found_chain_config->second};
+    silkworm::ExecutionProcessor ep{block, engine, state, *found_chain_config->second};
 
     Receipt receipt;
+    eosio::print("before execute_transaction");
     ep.execute_transaction(tx, receipt);
+    eosio::print("after execute_transaction");
+
+    ep.consensus_engine_.finalize(ep.state_, ep.evm().block(), ep.evm().revision());
+    ep.state_.write_to_db(ep.evm().block().header.number);
     
     LOGTIME("EVM EXECUTE");
 }
@@ -91,10 +107,13 @@ ACTION evm_contract::testtx( const bytes& rlptx, const evm_runtime::test::block_
 
     evm_runtime::test::engine engine;
     evm_runtime::state state{get_self(), get_self()};
-    evm_runtime::ExecutionProcessor ep{block, engine, state, *found_chain_config->second};
+    silkworm::ExecutionProcessor ep{block, engine, state, *found_chain_config->second};
 
     Receipt receipt;
     ep.execute_transaction(tx, receipt);
+
+    ep.consensus_engine_.finalize(ep.state_, ep.evm().block(), ep.evm().revision());
+    ep.state_.write_to_db(ep.evm().block().header.number);
 }
 
 ACTION evm_contract::dumpstorage(const bytes& addy) {

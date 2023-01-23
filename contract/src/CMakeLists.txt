@@ -10,7 +10,6 @@ list(APPEND SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/state.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/utils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/actions.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/processor.cpp
 )
 if (WITH_TEST_ACTIONS)
     add_compile_definitions(WITH_TEST_ACTIONS)
