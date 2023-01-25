@@ -75,9 +75,7 @@ void evm_contract::pushtx( eosio::name ram_payer, const bytes& rlptx ) {
     silkworm::ExecutionProcessor ep{block, engine, state, *found_chain_config->second};
 
     Receipt receipt;
-    eosio::print("before execute_transaction");
     ep.execute_transaction(tx, receipt);
-    eosio::print("after execute_transaction");
 
     ep.consensus_engine_.finalize(ep.state_, ep.evm().block(), ep.evm().revision());
     ep.state_.write_to_db(ep.evm().block().header.number);
