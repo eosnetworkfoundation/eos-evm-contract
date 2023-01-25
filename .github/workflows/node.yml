@@ -14,8 +14,6 @@ jobs:
         with:
           app_id: ${{ secrets.TRUSTEVM_CI_APP_ID }}
           private_key: ${{ secrets.TRUSTEVM_CI_APP_KEY }}
-          permissions: >-
-            {"contents": "read"}
 
       - name: Checkout Repo
         uses: actions/checkout@v3
