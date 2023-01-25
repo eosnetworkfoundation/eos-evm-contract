@@ -28,6 +28,8 @@ cmake-build-debug
 
 # data
 *.csv
+*.db
+*.dbf
 *.html
 *.json
 *.tsv
