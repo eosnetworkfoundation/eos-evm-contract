@@ -1,6 +1,7 @@
 # archives
 *.7z
 *.iso
+*.rar
 *.tar
 *.tar.gz
 *.tgz
