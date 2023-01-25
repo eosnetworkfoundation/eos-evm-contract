@@ -10,8 +10,9 @@ function ee()
 
 export Deosio_DIR='/usr/lib/x86_64-linux-gnu/cmake/eosio'
 # debug code
-ee nodeos --full-version
 ee cmake --version
+echo 'Leap version:'
+cat "$Deosio_DIR/EosioTester.cmake" | grep 'EOSIO_VERSION' | grep -oP "['\"].*['\"]" | tr -d "'\"" || :
 
 # build
 ee mkdir -p contract/tests/build
