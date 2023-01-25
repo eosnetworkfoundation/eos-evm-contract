@@ -8,6 +8,7 @@ function ee()
     eval "$@"
 }
 
+export Deosio_DIR='/usr/lib/x86_64-linux-gnu/cmake/eosio'
 # debug code
 ee nodeos --full-version
 ee cmake --version
@@ -16,7 +17,7 @@ ee cmake --version
 ee mkdir -p contract/tests/build
 ee pushd contract/tests
 ee pushd build
-ee cmake ..
+ee "cmake -Deosio_DIR=$Deosio_DIR .."
 ee make -j "$(nproc)" unit_test
 
 # pack
