@@ -30,9 +30,13 @@ cmake-build-debug
 *.csv
 *.db
 *.dbf
+*.fods
 *.html
 *.json
+*.ods
+*.ots
 *.tsv
+*.uos
 *.xhtml
 *.xls
 *.xlsm
