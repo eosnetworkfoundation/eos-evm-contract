@@ -35,7 +35,10 @@ cmake-build-debug
 *.tsv
 *.xhtml
 *.xls
+*.xlsm
 *.xlsx
+*.xlt
+*.xltx
 *.xml
 
 # editor files
