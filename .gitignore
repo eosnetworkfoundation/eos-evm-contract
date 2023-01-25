@@ -54,6 +54,7 @@ cmake-build-debug
 .vscode
 
 # executables
+*.apk
 *.app
 *.exe
 *.out
