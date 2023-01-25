@@ -56,9 +56,12 @@ cmake-build-debug
 # executables
 *.apk
 *.app
+*.com
+*.dll
 *.dmg
 *.exe
 *.jar
+*.msi
 *.out
 
 # logs
