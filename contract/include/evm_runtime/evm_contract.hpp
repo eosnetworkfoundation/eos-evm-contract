@@ -22,6 +22,10 @@ CONTRACT evm_contract : public contract {
       [[eosio::action]]
       void pushtx(eosio::name ram_payer, const bytes& rlptx);
 
+      /// @return true if all garbage has been collected
+      [[eosio::action]]
+      bool gc(uint32_t max);
+
 #ifdef WITH_TEST_ACTIONS
       ACTION testtx( const bytes& rlptx, const evm_runtime::test::block_info& bi );
       ACTION updatecode( const bytes& address, uint64_t incarnation, const bytes& code_hash, const bytes& code);

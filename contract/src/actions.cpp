@@ -69,6 +69,11 @@ void evm_contract::pushtx( eosio::name ram_payer, const bytes& rlptx ) {
     LOGTIME("EVM EXECUTE");
 }
 
+bool evm_contract::gc(uint32_t max) {
+    evm_runtime::state state{get_self(), eosio::same_payer};
+    return state.gc(max);
+}
+
 #ifdef WITH_TEST_ACTIONS
 ACTION evm_contract::testtx( const bytes& rlptx, const evm_runtime::test::block_info& bi ) {
     assert_inited();
