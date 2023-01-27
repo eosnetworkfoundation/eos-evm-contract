@@ -141,6 +141,14 @@ ACTION evm_contract::dumpall() {
 
     eosio::require_auth(get_self());
 
+    auto print_store = [](auto sitr) {
+        eosio::print("    ");
+        eosio::printhex(sitr->key.data(), sitr->key.size());
+        eosio::print(":");
+        eosio::printhex(sitr->value.data(), sitr->value.size());
+        eosio::print("\n");
+    };
+
     account_table accounts(_self, _self.value);
     auto itr = accounts.begin();
     eosio::print("DUMPALL start\n");
@@ -151,16 +159,29 @@ ACTION evm_contract::dumpall() {
         storage_table db(_self, itr->id);
         auto sitr = db.begin();
         while( sitr != db.end() ) {
-            eosio::print("    ");
-            eosio::printhex(sitr->key.data(), sitr->key.size());
-            eosio::print(":");
-            eosio::printhex(sitr->value.data(), sitr->value.size());
-            eosio::print("\n");
+            print_store( sitr );
             sitr++;
         }
         
         itr++;
     }
+    eosio::print("  gc:");
+    gc_store_table gc(_self, _self.value);
+    auto i = gc.begin();
+    while( i != gc.end() ) {
+        eosio::print("   storage_id:");
+        eosio::print(i->storage_id);
+        eosio::print("\n");
+        storage_table db(_self, i->storage_id);
+        auto sitr = db.begin();
+        while( sitr != db.end() ) {
+            print_store( sitr );
+            ++sitr;
+        }
+
+        ++i;
+    }
+
     eosio::print("DUMPALL end\n");
 }
 
@@ -192,6 +213,7 @@ ACTION evm_contract::clearall() {
         eosio::print("db size:", uint64_t(db_size), "\n");
         itr = accounts.erase(itr);
     }
+    gc(std::numeric_limits<uint32_t>::max());
 
     auto account_size = std::distance(accounts.cbegin(), accounts.cend());
     eosio::print("accounts size:", uint64_t(account_size), "\n");
