@@ -5,15 +5,11 @@
 #include <evm_runtime/state.hpp>
 #include <evm_runtime/engine.hpp>
 #include <evm_runtime/intrinsics.hpp>
+#include <silkworm/execution/processor.hpp>
 
 #ifdef WITH_TEST_ACTIONS
 #include <evm_runtime/test/engine.hpp>
 #endif
-
-#define private public // HACK alert! Provide access to ep.consensus_engine_.finalize and ep.state_write_to_db
-#include <silkworm/execution/processor.hpp>
-#undef  private
-#include <silkworm/execution/processor.cpp>
 
 #ifdef WITH_LOGTIME
 #define LOGTIME(MSG) eosio::internal_use_do_not_use::logtime(MSG)
@@ -77,9 +73,9 @@ void evm_contract::pushtx( eosio::name ram_payer, const bytes& rlptx ) {
     Receipt receipt;
     ep.execute_transaction(tx, receipt);
 
-    ep.consensus_engine_.finalize(ep.state_, ep.evm().block(), ep.evm().revision());
-    ep.state_.write_to_db(ep.evm().block().header.number);
-    
+    engine.finalize(ep.state(), ep.evm().block(), ep.evm().revision());
+    ep.state().write_to_db(ep.evm().block().header.number);
+
     LOGTIME("EVM EXECUTE");
 }
 
@@ -110,8 +106,8 @@ ACTION evm_contract::testtx( const bytes& rlptx, const evm_runtime::test::block_
     Receipt receipt;
     ep.execute_transaction(tx, receipt);
 
-    ep.consensus_engine_.finalize(ep.state_, ep.evm().block(), ep.evm().revision());
-    ep.state_.write_to_db(ep.evm().block().header.number);
+    engine.finalize(ep.state(), ep.evm().block(), ep.evm().revision());
+    ep.state().write_to_db(ep.evm().block().header.number);
 }
 
 ACTION evm_contract::dumpstorage(const bytes& addy) {

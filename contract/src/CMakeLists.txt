@@ -50,6 +50,7 @@ list(APPEND SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/../../silkworm/third_party/silkpre/lib/silkpre/precompile.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../../silkworm/core/silkworm/execution/analysis_cache.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../../silkworm/core/silkworm/execution/address.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../silkworm/core/silkworm/execution/processor.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../../silkworm/core/silkworm/state/intra_block_state.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../../silkworm/core/silkworm/state/delta.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../../silkworm/core/silkworm/types/account.cpp
