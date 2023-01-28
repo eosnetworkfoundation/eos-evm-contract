@@ -70,6 +70,8 @@ void evm_contract::pushtx( eosio::name ram_payer, const bytes& rlptx ) {
 }
 
 bool evm_contract::gc(uint32_t max) {
+    assert_inited();
+
     evm_runtime::state state{get_self(), eosio::same_payer};
     return state.gc(max);
 }
