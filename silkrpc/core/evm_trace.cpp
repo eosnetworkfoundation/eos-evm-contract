@@ -1024,12 +1024,13 @@ boost::asio::awaitable<std::vector<Trace>> TraceCallExecutor<WorldState, VM>::tr
     }
 
     const auto chain_config{co_await silkrpc::core::rawdb::read_chain_config(database_reader_)};
-    const auto block_rewards = ethash::compute_reward(chain_config, block_with_hash.block);
 
+    // Mining reward should be logged here.
+    // We do not have mining rewards, but we still report zero here for compatibility.
     RewardAction action;
     action.author = block_with_hash.block.header.beneficiary;
     action.reward_type = "block";
-    action.value = block_rewards.miner_reward;
+    action.value = 0;
 
     Trace trace;
     trace.block_number = block_with_hash.block.header.number;

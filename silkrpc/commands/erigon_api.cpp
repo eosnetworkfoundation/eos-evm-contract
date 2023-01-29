@@ -276,17 +276,11 @@ boost::asio::awaitable<void> ErigonRpcApi::handle_erigon_issuance(const nlohmann
 
         Issuance issuance{}; // default is empty: no PoW => no issuance
         if (chain_config.config.count("ethash") != 0) {
-            const auto block_number{co_await core::get_block_number(block_id, tx_database)};
-            const auto block_with_hash{co_await core::rawdb::read_block_by_number(tx_database, block_number)};
-            const auto block_reward{ethash::compute_reward(chain_config, block_with_hash.block)};
-            intx::uint256 total_ommer_reward;
-            for (const auto ommer_reward :  block_reward.ommer_rewards) {
-                total_ommer_reward += ommer_reward;
-            }
-            intx::uint256 block_issuance = block_reward.miner_reward + total_ommer_reward;
-            issuance.block_reward = "0x" + intx::to_string(block_reward.miner_reward);
-            issuance.ommer_reward = "0x" + intx::to_string(total_ommer_reward);
-            issuance.issuance = "0x" + intx::to_string(block_issuance);
+	    // Mining rewards should be return here.
+	    // We do not have mining rewards, so we return 0 here.
+            issuance.block_reward = "0x" + intx::to_string(intx::uint256(0));
+            issuance.ommer_reward = "0x" + intx::to_string(intx::uint256(0));
+            issuance.issuance = "0x" + intx::to_string(intx::uint256(0));
         }
         reply = make_json_content(request["id"], issuance);
     } catch (const std::exception& e) {
