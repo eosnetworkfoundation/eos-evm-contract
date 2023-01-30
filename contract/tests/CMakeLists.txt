@@ -21,13 +21,12 @@ include_directories(
     ${CMAKE_SOURCE_DIR}/../../silkworm/third_party/silkpre/third_party/secp256k1/include
 )
 
-#file(GLOB UNIT_TESTS "*.cpp" "*.hpp")
-
 set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -Wno-deprecated-declarations")
 
 add_eosio_test( unit_test 
     ${CMAKE_SOURCE_DIR}/evm_runtime_tests.cpp
     ${CMAKE_SOURCE_DIR}/init_tests.cpp
+    ${CMAKE_SOURCE_DIR}/native_token_tests.cpp
     ${CMAKE_SOURCE_DIR}/main.cpp
     ${CMAKE_SOURCE_DIR}/silkworm/core/silkworm/rlp/encode.cpp
     ${CMAKE_SOURCE_DIR}/silkworm/core/silkworm/rlp/decode.cpp
