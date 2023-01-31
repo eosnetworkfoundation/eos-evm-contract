@@ -69,6 +69,9 @@ struct state : State {
     void update_account(const evmc::address& address, std::optional<Account> initial,
                         std::optional<Account> current) override;
 
+    /// @return true if all garbage has been collected
+    bool gc(uint32_t max);
+
     void update_account_code(const evmc::address& address, uint64_t incarnation, const evmc::bytes32& code_hash,
                              ByteView code) override;
 
