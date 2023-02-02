@@ -47,7 +47,7 @@ Note that, due to actions/upload-artifact [issue 39](https://github.com/actions/
 - [github-app-token-action](https://github.com/AntelopeIO/github-app-token-action) GitHub action
 - [TrustEVM Documentation](../../README.md)
 
-For assistance with the CI system, please open an issue in this repo or reach out in the #help-automation channel via IM.
+For assistance with the CI system, please open an issue in this repo or reach out in the `#help-automation` channel via IM.
 
 ***
 **_Legal notice_:**  
