@@ -10,8 +10,9 @@ This GitHub Actions workflow builds the TrustEVM contract and its associated tes
 1. [See Also](#see-also)
 
 ## Triggers
-This GitHub action will run on the following events:
-1. Push event, which is triggered every time changes are pushed to the repository.
+This GitHub action will run under the following circumstances:
+1. When code is pushed to the `main` branch.
+1. When code is pushed to any branch with a name starting with `release/`.
 1. Workflow dispatch event, which is triggered manually using the "Workflow Dispatch" button in the Actions tab of the GitHub repository.
 
 ## Inputs

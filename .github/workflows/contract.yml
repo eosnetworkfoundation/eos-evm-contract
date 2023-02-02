@@ -1,6 +1,12 @@
 name: TrustEVM Contract CI
 
-on: [push, workflow_dispatch]
+on:
+  push:
+    branches:
+      - main
+      - release/*
+  pull_request:
+  workflow_dispatch:
 
 jobs:
   build:
