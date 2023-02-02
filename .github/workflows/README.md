@@ -30,6 +30,7 @@ These inputs are used in various steps of the workflow to perform actions such a
 This workflow performs the following steps:
 1. Authenticate to the `trustevm-ci-submodule-checkout` GitHub app using the [AntelopeIO/github-app-token-action](https://github.com/AntelopeIO/github-app-token-action) action.
 1. Checkout the repo and submodules.
+1. Attach an annotation to the build with CI documentation.
 1. Download the CDT binary using the [AntelopeIO/asset-artifact-download-action](https://github.com/AntelopeIO/asset-artifact-download-action) action.
 1. Install the CDT binary.
 1. Build the TrustEVM contract using `make` and `cmake`.

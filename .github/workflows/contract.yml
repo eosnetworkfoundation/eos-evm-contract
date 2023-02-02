@@ -25,6 +25,9 @@ jobs:
           submodules: 'recursive'
           token: ${{ steps.auth.outputs.token }}
 
+      - name: Attach Documentation
+        run: cat .github/workflows/README.md > $GITHUB_STEP_SUMMARY
+
       - name: Download CDT
         uses: AntelopeIO/asset-artifact-download-action@v2
         with:
