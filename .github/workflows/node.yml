@@ -24,6 +24,9 @@ jobs:
 
       - name: Build TrustEVM Node
         run: .github/workflows/build-node.sh
+        env:
+          CC: gcc-10
+          CXX: g++-10
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v3
