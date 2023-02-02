@@ -6,6 +6,7 @@ This GitHub Actions workflow builds the TrustEVM contract and its associated tes
 1. [Inputs](#inputs)
 1. [Steps](#steps)
 1. [Outputs](#outputs)
+1. [GitHub App Integration](#github-app-integration)
 1. [See Also](#see-also)
 
 ## Triggers
@@ -41,6 +42,11 @@ This workflow produces the following outputs:
 1. Contract Test Artifacts: A `contract-test.tar.gz` file that contains the built contract test artifacts.
 
 Note that, due to actions/upload-artifact [issue 39](https://github.com/actions/upload-artifact/issues/39) which has been open for over _three years_ and counting, the archives attached as artifacts will be zipped by GitHub when you download them such that you get a `*.zip` containing the `*.tar.gz`. There is nothing anyone can do about this except for GitHub.
+
+## GitHub App Integration
+This workflow uses the [AntelopeIO/github-app-token-action](https://github.com/AntelopeIO/github-app-token-action) GitHub action to assume the role of a GitHub application installed to the AntelopeIO organization to clone the private submodules. It requests a token from the GitHub app, clones everything using this token under the identity of the app, then the token expires. This is advantageous over a persistent API key from a GitHub service account because this does not consume a paid user seat, the "account" associated with the app cannot be logged into in the GitHub web UI, the app is scoped to exactly the permissions it needs to perform the clones for this repo _and nothing more_, and the API key expires very quickly so a bad actor who exfiltrates this key from the CI system should find it is not useful.
+
+**The downside is that if TrustEVM adds additional private submodules, the GitHub app must be granted permissions to these new submodules.** The CI system will not work until this happens.
 
 ## See Also
 - [asset-artifact-download-action](https://github.com/AntelopeIO/asset-artifact-download-action) GitHub Action
