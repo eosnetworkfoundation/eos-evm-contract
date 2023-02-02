@@ -23,7 +23,11 @@ ee make -j "$(nproc)" unit_test
 
 # pack
 ee popd
-ee 'tar -czf ../../contract-unit-test.tar.gz build/*'
+ee pwd
+ee 'tar -czvf ../../contract-unit-test.tar.gz build/*'
+ee ls -la
 ee popd
+ee ls -la
+ee ls -la ..
 
 echo "Done! - ${0##*/}"
