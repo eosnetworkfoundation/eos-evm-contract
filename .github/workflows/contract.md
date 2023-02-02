@@ -1,24 +1,19 @@
-# GitHub Actions Workflows
-This repo contains the following GitHub Actions workflows for CI:
-- [TrustEVM Contract CI](https://github.com/eosnetworkfoundation/TrustEVM/actions/workflows/contract.yml) - build the TrustEVM contract and its associated tests
+# TrustEVM Contract CI
+This GitHub Actions workflow builds the TrustEVM contract and its associated tests.
 
 ### Index
-1. [TrustEVM Contract CI](#trustevm-contract-ci)
-    1. [Triggers](#triggers)
-    1. [Inputs](#inputs)
-    1. [Steps](#steps)
-    1. [Outputs](#outputs)
+1. [Triggers](#triggers)
+1. [Inputs](#inputs)
+1. [Steps](#steps)
+1. [Outputs](#outputs)
 1. [See Also](#see-also)
 
-## TrustEVM Contract CI
-This GitHub Actions workflow automates the building of the TrustEVM contract and its associated tests.
-
-### Triggers
+## Triggers
 This GitHub action will run on the following events:
 1. Push event, which is triggered every time changes are pushed to the repository.
 1. Workflow dispatch event, which is triggered manually using the "Workflow Dispatch" button in the Actions tab of the GitHub repository.
 
-### Inputs
+## Inputs
 The inputs for this GitHub action are:
 1. `TRUSTEVM_CI_APP_ID` - the app ID of the `trustevm-ci-submodule-checkout` GitHub App.
 1. `TRUSTEVM_CI_APP_KEY` - the private key to the `trustevm-ci-submodule-checkout` GitHub App.
@@ -26,7 +21,7 @@ The inputs for this GitHub action are:
 
 These inputs are used in various steps of the workflow to perform actions such as authentication, downloading artifacts, and uploading artifacts.
 
-### Steps
+## Steps
 This workflow performs the following steps:
 1. Authenticate to the `trustevm-ci-submodule-checkout` GitHub app using the [AntelopeIO/github-app-token-action](https://github.com/AntelopeIO/github-app-token-action) action.
 1. Checkout the repo and submodules.
@@ -40,7 +35,7 @@ This workflow performs the following steps:
 1. Build the TrustEVM contract tests using `make` and `cmake`.
 1. Upload the build folder for the contract test code to GitHub Actions.
 
-### Outputs
+## Outputs
 This workflow produces the following outputs:
 1. Contract Build Artifacts: A `contract.tar.gz` file that contains the built contract.
 1. Contract Test Artifacts: A `contract-test.tar.gz` file that contains the built contract test artifacts.
