@@ -49,6 +49,7 @@ jobs:
         with:
           name: contract.tar.gz
           path: contract.tar.gz
+          if-no-files-found: error
 
       - name: Download Leap - dev binary
         uses: AntelopeIO/asset-artifact-download-action@v2
@@ -72,3 +73,4 @@ jobs:
         with:
           name: contract-test.tar.gz
           path: contract-test.tar.gz
+          if-no-files-found: error
