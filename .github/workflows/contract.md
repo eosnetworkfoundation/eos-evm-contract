@@ -39,8 +39,8 @@ This workflow performs the following steps:
 
 ## Outputs
 This workflow produces the following outputs:
-1. Contract Build Artifacts - A `contract.tar.gz` file that contains the built contract from the `contract/build` folder.
-1. Contract Test Artifacts - A `contract-test.tar.gz` file that contains the built contract test artifacts from the `contract/tests/build` folder.
+1. Contract Build Artifacts - `contract.tar.gz` containing the built contract from the `contract/build` folder.
+1. Contract Test Artifacts - `contract-test.tar.gz` containing the built contract test artifacts from the `contract/tests/build` folder.
 
 Note that, due to actions/upload-artifact [issue 39](https://github.com/actions/upload-artifact/issues/39) which has been open for over _three years_ and counting, the archives attached as artifacts will be zipped by GitHub when you download them such that you get a `*.zip` containing the `*.tar.gz`. There is nothing anyone can do about this except for GitHub.
 
