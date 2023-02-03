@@ -1,5 +1,7 @@
 # archives
 *.7z
+*.iso
+*.rar
 *.tar
 *.tar.gz
 *.tgz
@@ -28,12 +30,21 @@ cmake-build-debug
 
 # data
 *.csv
+*.db
+*.dbf
+*.fods
 *.html
 *.json
+*.ods
+*.ots
 *.tsv
+*.uos
 *.xhtml
 *.xls
+*.xlsm
 *.xlsx
+*.xlt
+*.xltx
 *.xml
 
 # editor files
@@ -43,9 +54,18 @@ cmake-build-debug
 .vscode
 
 # executables
+*.apk
 *.app
+*.AppImage
+*.com
+*.deb
+*.dll
+*.dmg
 *.exe
+*.jar
+*.msi
 *.out
+*.rpm
 
 # logs
 *.log
