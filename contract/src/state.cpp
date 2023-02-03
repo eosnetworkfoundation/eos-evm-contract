@@ -111,15 +111,33 @@ void state::update_account(const evmc::address& address, std::optional<Account> 
     } else {
         if(itr != inx.end()) {
             storage_table db(_self, itr->id);
-            auto sitr = db.begin();
-            while( sitr != db.end() ) {
-                sitr = db.erase(sitr);
-                ++stats.storage.remove;
-            }
+            // add to garbage collection table for later removal
+            gc_store_table gc(_self, _self.value);
+            gc.emplace(_ram_payer, [&](auto& row){
+                row.id = gc.available_primary_key();
+                row.storage_id = itr->id;
+            });
             accounts.erase(*itr);
             ++stats.account.remove;
         }
     }
+}
+
+bool state::gc(uint32_t max) {
+    gc_store_table gc(_self, _self.value);
+    auto i = gc.begin();
+    while( max && i != gc.end() ) {
+        storage_table db(_self, i->storage_id);
+        auto sitr = db.begin();
+        while( max && sitr != db.end() ) {
+            sitr = db.erase(sitr);
+            --max;
+        }
+        if( !max ) break;
+        i = gc.erase(i);
+        --max;
+    }
+    return gc.begin() == gc.end();
 }
 
 void state::update_account_code(const evmc::address& address, uint64_t, const evmc::bytes32& code_hash, ByteView code) {
