@@ -364,6 +364,21 @@ struct storage {
 };
 FC_REFLECT(storage, (id)(key)(value));
 
+struct gcstore {
+   uint64_t id;
+   uint64_t storage_id;
+
+   static name table_name() { return "gcstore"_n; }
+   static name index_name(const name& n) {
+      BOOST_REQUIRE(false);
+      return name{0};
+   }
+
+   static name index_name(uint64_t n) {
+      return index_name(name{n});
+   }
+};
+FC_REFLECT(gcstore, (id)(storage_id));
 
 struct assert_message_check {
    string _expected;
@@ -493,6 +508,12 @@ struct evm_runtime_tester : eosio_system_tester, silkworm::State {
    
    action_result clearall(name signer=ME ) { 
       return call(signer, "clearall"_n, mvo()
+      );
+   }
+
+   action_result gc( uint32_t max, name signer=ME ) {
+      return call(signer, "gc"_n, mvo()
+                  ("max", max)
       );
    }
 
@@ -725,6 +746,26 @@ struct evm_runtime_tester : eosio_system_tester, silkworm::State {
       return count;
    }
 
+   size_t gc_size() {
+      auto& db = const_cast<chainbase::database&>(control->db());
+      const auto* tid = db.find<table_id_object, by_code_scope_table>(
+          boost::make_tuple("evm"_n, "evm"_n, gcstore::table_name())
+      );
+
+      if(tid == nullptr) {
+         return 0;
+      }
+
+      const auto& idx = db.get_index<key_value_index, by_scope_primary>();
+      auto itr = idx.lower_bound( boost::make_tuple(tid->id) );
+      size_t count=0;
+      while ( itr != idx.end() && itr->t_id == tid->id ) {
+         ++itr;
+         ++count;
+      }
+      return count;
+   }
+
    //----
    std::vector<fs::path> excluded_tests;
    std::vector<fs::path> included_tests;
@@ -914,6 +955,11 @@ struct evm_runtime_tester : eosio_system_tester, silkworm::State {
          }
       }
 
+      if( gc_size() != 0 ) {
+         std::cout << "gcstore is not empty: " << gc_size() << std::endl;
+         return false;
+      }
+
       return true;
    }
 
@@ -934,6 +980,8 @@ struct evm_runtime_tester : eosio_system_tester, silkworm::State {
       if (json_test.contains("postStateHash")) {
          return Status::kPassed;
       }
+
+      gc(std::numeric_limits<uint32_t>::max());
 
       if (post_check(json_test["postState"])) {
          return Status::kPassed;

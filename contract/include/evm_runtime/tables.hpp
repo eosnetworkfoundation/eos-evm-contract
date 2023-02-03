@@ -70,4 +70,15 @@ typedef multi_index< "storage"_n, storage,
     indexed_by<"by.key"_n, const_mem_fun<storage, checksum256, &storage::by_key>> 
 > storage_table;
 
+struct [[eosio::table]] [[eosio::contract("evm_contract")]] gcstore {
+    uint64_t id;
+    uint64_t storage_id;
+
+    uint64_t primary_key()const { return id; }
+
+    EOSLIB_SERIALIZE(gcstore, (id)(storage_id));
+};
+
+typedef multi_index< "gcstore"_n, gcstore> gc_store_table;
+
 } //namespace evm_runtime

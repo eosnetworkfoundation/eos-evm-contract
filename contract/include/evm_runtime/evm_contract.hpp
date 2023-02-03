@@ -33,6 +33,10 @@ CONTRACT evm_contract : public contract {
 
       [[eosio::action]]
       void withdraw(eosio::name owner, eosio::asset quantity);
+      
+      /// @return true if all garbage has been collected
+      [[eosio::action]]
+      bool gc(uint32_t max);
 
 #ifdef WITH_TEST_ACTIONS
       ACTION testtx( const bytes& rlptx, const evm_runtime::test::block_info& bi );
