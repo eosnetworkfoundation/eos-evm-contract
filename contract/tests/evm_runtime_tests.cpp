@@ -237,7 +237,6 @@ struct account {
    bytes       eth_address;
    uint64_t    nonce;
    bytes       balance;
-   name        eos_account;
    bytes       code;
    bytes       code_hash;
 
@@ -247,13 +246,6 @@ struct account {
       typedef index256_object index_object;
       static name index_name() {
          return account::index_name("by.address"_n);
-      }
-   };
-
-   struct by_account {
-      typedef index64_object index_object;
-      static name index_name() {
-         return account::index_name("by.account"_n);
       }
    };
 
@@ -280,13 +272,11 @@ struct account {
    static name index_name(const name& n) {
       uint64_t index_table_name = table_name().to_uint64_t() & 0xFFFFFFFFFFFFFFF0ULL;
 
-      //0=>by.address, 1=>by.account, 2=>by.codehash
+      //0=>by.address, 1=>by.codehash
       if( n == "by.address"_n ) {
          return name{index_table_name | 0};
-      } else if( n == "by.account"_n ) {
-         return name{index_table_name | 1};
       } else if( n == "by.codehash"_n ) {
-         return name{index_table_name | 2};
+         return name{index_table_name | 1};
       }
 
       dlog("index name not found: ${a}", ("a",n.to_string()));
@@ -320,7 +310,7 @@ struct account {
    }
 
 };
-FC_REFLECT(account, (id)(eth_address)(nonce)(balance)(eos_account)(code)(code_hash));
+FC_REFLECT(account, (id)(eth_address)(nonce)(balance)(code)(code_hash));
 
 struct storage {
    uint64_t id;

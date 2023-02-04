@@ -13,15 +13,10 @@ struct [[eosio::table]] [[eosio::contract("evm_contract")]] account {
     bytes       eth_address;
     uint64_t    nonce;
     bytes       balance;
-    name        eos_account;
     bytes       code;
     bytes       code_hash;
 
     uint64_t primary_key()const { return id; }
-
-    uint64_t by_eos_account()const { 
-        return eos_account.value;
-    }
 
     checksum256 by_eth_address()const { 
         return make_key(eth_address);
@@ -43,12 +38,11 @@ struct [[eosio::table]] [[eosio::contract("evm_contract")]] account {
         return res;
     }
 
-    EOSLIB_SERIALIZE(account, (id)(eth_address)(nonce)(balance)(eos_account)(code)(code_hash));
+    EOSLIB_SERIALIZE(account, (id)(eth_address)(nonce)(balance)(code)(code_hash));
 };
 
 typedef multi_index< "account"_n, account,
     indexed_by<"by.address"_n, const_mem_fun<account, checksum256, &account::by_eth_address>>,
-    indexed_by<"by.account"_n, const_mem_fun<account, uint64_t, &account::by_eos_account>>,
     indexed_by<"by.codehash"_n, const_mem_fun<account, checksum256, &account::by_code_hash>>
 > account_table;
 
