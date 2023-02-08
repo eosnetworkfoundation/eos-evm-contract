@@ -18,6 +18,7 @@ This GitHub action will run under the following circumstances:
 ## Inputs
 The inputs for this GitHub action are:
 1. `DCMAKE_BUILD_TYPE` - defined in the GitHub Action YAML, this sets the build type and determines the level of optimization, debugging information, and other flags; one of `Debug`, `Release`, `RelWithDebInfo`, or `MinSizeRel`.
+1. `DWITH_TEST_ACTIONS` - defined in the GitHub Action YAML, build with or without code paths intended to be excercised exclusively by tests.
 1. `GITHUB_TOKEN` - a GitHub Actions intrinsic used to access the repository and other public resources.
 1. `TRUSTEVM_CI_APP_ID` - the app ID of the `trustevm-ci-submodule-checkout` GitHub App.
 1. `TRUSTEVM_CI_APP_KEY` - the private key to the `trustevm-ci-submodule-checkout` GitHub App.
