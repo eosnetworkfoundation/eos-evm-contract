@@ -10,7 +10,6 @@ list(APPEND SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/state.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/utils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/actions.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/processor.cpp
 )
 if (WITH_TEST_ACTIONS)
     add_compile_definitions(WITH_TEST_ACTIONS)
@@ -47,6 +46,7 @@ list(APPEND SOURCES
 list(APPEND SOURCES 
     ${CMAKE_CURRENT_SOURCE_DIR}/../../silkworm/core/silkworm/common/util.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../../silkworm/core/silkworm/common/endian.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../silkworm/core/silkworm/consensus/engine.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../../silkworm/core/silkworm/execution/evm.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../../silkworm/third_party/silkpre/lib/silkpre/precompile.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../../silkworm/core/silkworm/execution/analysis_cache.cpp

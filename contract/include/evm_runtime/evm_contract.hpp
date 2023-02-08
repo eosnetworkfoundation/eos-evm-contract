@@ -72,6 +72,8 @@ CONTRACT evm_contract : public contract {
          check( _config.exists(), "contract not initialized" );
          check( _config.get().version == 0u, "unsupported configuration singleton" );
       }
+
+      void push_trx(eosio::name ram_payer, silkworm::Block& block, const bytes& rlptx);
 };
 
 
