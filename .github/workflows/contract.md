@@ -17,9 +17,9 @@ This GitHub action will run under the following circumstances:
 
 ## Inputs
 The inputs for this GitHub action are:
+1. `GITHUB_TOKEN` - a GitHub Actions intrinsic used to access the repository and other public resources.
 1. `TRUSTEVM_CI_APP_ID` - the app ID of the `trustevm-ci-submodule-checkout` GitHub App.
 1. `TRUSTEVM_CI_APP_KEY` - the private key to the `trustevm-ci-submodule-checkout` GitHub App.
-1. `GITHUB_TOKEN` - a GitHub Actions intrinsic used to access the repository and other public resources.
 
 These inputs are used in various steps of the workflow to perform actions such as authentication, downloading artifacts, and uploading artifacts.
 
