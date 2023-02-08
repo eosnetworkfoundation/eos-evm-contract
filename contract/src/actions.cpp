@@ -6,6 +6,7 @@
 #include <evm_runtime/state.hpp>
 #include <evm_runtime/engine.hpp>
 #include <evm_runtime/intrinsics.hpp>
+#include <evm_runtime/eosio.token.hpp>
 
 #ifdef WITH_TEST_ACTIONS
 #include <evm_runtime/test/engine.hpp>
@@ -16,6 +17,9 @@
 #else
 #define LOGTIME(MSG)
 #endif
+
+static constexpr eosio::name token_account("eosio.token"_n);
+static constexpr eosio::symbol token_symbol("EOS", 4u);
 
 namespace evm_runtime {
 
@@ -67,6 +71,64 @@ void evm_contract::pushtx( eosio::name ram_payer, const bytes& rlptx ) {
     ep.execute_transaction(tx, receipt);
     
     LOGTIME("EVM EXECUTE");
+}
+
+void evm_contract::open(eosio::name owner, eosio::name ram_payer) {
+    assert_inited();
+    require_auth(ram_payer);
+    check(is_account(owner), "owner account does not exist");
+
+    accounts account_table(get_self(), get_self().value);
+    if(account_table.find(owner.value) == account_table.end())
+        account_table.emplace(ram_payer, [&](account& a) {
+            a.owner = owner;
+            a.balance = asset(0, token_symbol);
+        });
+}
+
+void evm_contract::close(eosio::name owner) {
+    assert_inited();
+    require_auth(owner);
+
+    accounts account_table(get_self(), get_self().value);
+    const account& owner_account = account_table.get(owner.value, "account is not open");
+
+    eosio::check(owner_account.balance.amount == 0 && owner_account.dust == 0, "cannot close because balance is not zero");
+    account_table.erase(owner_account);
+}
+
+void evm_contract::transfer(eosio::name from, eosio::name to, eosio::asset quantity, std::string memo) {
+    assert_inited();
+
+    if(to != get_self() || from == get_self())
+        return;
+
+    eosio::check(!memo.empty(), "memo must be already opened account name to credit deposit to");
+
+    eosio::name receiver(memo);
+
+    accounts account_table(get_self(), get_self().value);
+    const account& receiver_account = account_table.get(receiver.value, "receiving account has not been opened");
+
+    account_table.modify(receiver_account, eosio::same_payer, [&](account& a) {
+        a.balance += quantity;
+    });
+}
+
+void evm_contract::withdraw(eosio::name owner, eosio::asset quantity) {
+    assert_inited();
+    require_auth(owner);
+
+    accounts account_table(get_self(), get_self().value);
+    const account& owner_account = account_table.get(owner.value, "account is not open");
+
+    check(owner_account.balance.amount >= quantity.amount, "overdrawn balance");
+    account_table.modify(owner_account, eosio::same_payer, [&](account& a) {
+        a.balance -= quantity;
+    });
+
+    token::transfer_action transfer_act(token_account, {{get_self(), "active"_n}});
+    transfer_act.send(get_self(), owner, quantity, std::string("Withdraw from EVM balance"));
 }
 
 bool evm_contract::gc(uint32_t max) {

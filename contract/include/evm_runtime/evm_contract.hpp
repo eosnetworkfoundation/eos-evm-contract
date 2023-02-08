@@ -22,6 +22,18 @@ CONTRACT evm_contract : public contract {
       [[eosio::action]]
       void pushtx(eosio::name ram_payer, const bytes& rlptx);
 
+      [[eosio::action]]
+      void open(eosio::name owner, eosio::name ram_payer);
+
+      [[eosio::action]]
+      void close(eosio::name owner);
+
+      [[eosio::on_notify("eosio.token::transfer")]]
+      void transfer(eosio::name from, eosio::name to, eosio::asset quantity, std::string memo);
+
+      [[eosio::action]]
+      void withdraw(eosio::name owner, eosio::asset quantity);
+      
       /// @return true if all garbage has been collected
       [[eosio::action]]
       bool gc(uint32_t max);
@@ -37,6 +49,16 @@ CONTRACT evm_contract : public contract {
       ACTION setbal(const bytes& addy, const bytes& bal);
 #endif
    private:
+      struct [[eosio::table]] [[eosio::contract("evm_contract")]] account {
+         name     owner;
+         asset    balance;
+         uint64_t dust = 0;
+
+         uint64_t primary_key() const { return owner.value; }
+      };
+
+      typedef eosio::multi_index<"accounts"_n, account> accounts;
+
       struct [[eosio::table]] [[eosio::contract("evm_contract")]] config {
          eosio::unsigned_int version; //placeholder for future variant index
          uint64_t chainid = 0;
