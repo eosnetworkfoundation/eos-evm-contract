@@ -23,7 +23,7 @@ The inputs for this GitHub action are:
 1. `TRUSTEVM_CI_APP_ID` - the app ID of the `trustevm-ci-submodule-checkout` GitHub App.
 1. `TRUSTEVM_CI_APP_KEY` - the private key to the `trustevm-ci-submodule-checkout` GitHub App.
 
-These inputs are used in various steps of the workflow to perform actions such as authentication, downloading artifacts, and uploading artifacts.
+These inputs are used in various steps of the workflow to perform actions such as authentication, downloading artifacts, configuring the build, and uploading artifacts.
 
 ## Steps
 This workflow performs the following steps:
