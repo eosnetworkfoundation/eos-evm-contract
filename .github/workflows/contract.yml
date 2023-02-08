@@ -100,3 +100,7 @@ jobs:
           name: contract-test.tar.gz
           path: contract-test.tar.gz
           if-no-files-found: error
+
+      - name: Test TrustEVM Contract
+        if: matrix.DWITH_TEST_ACTIONS == 'on' || matrix.DWITH_TEST_ACTIONS == 'true'
+        run: .github/workflows/test-contract.sh
