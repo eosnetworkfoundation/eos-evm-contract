@@ -18,7 +18,7 @@ cat "$Deosio_DIR/EosioTester.cmake" | grep 'EOSIO_VERSION' | grep -oP "['\"].*['
 ee mkdir -p contract/tests/build
 ee pushd contract/tests
 ee pushd build
-ee "cmake -DCMAKE_BUILD_TYPE=Release .."
+ee "cmake -DCMAKE_BUILD_TYPE .."
 ee make -j "$(nproc)" unit_test
 
 # pack

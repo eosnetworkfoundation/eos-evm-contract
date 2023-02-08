@@ -16,7 +16,7 @@ ee cmake --version
 ee mkdir -p contract/build
 ee pushd contract
 ee pushd build
-ee cmake -DCMAKE_BUILD_TYPE=Release -DWITH_TEST_ACTIONS ..
+ee cmake -DCMAKE_BUILD_TYPE -DWITH_TEST_ACTIONS ..
 ee make -j "$(nproc)"
 
 # pack

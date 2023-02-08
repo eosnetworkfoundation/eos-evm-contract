@@ -15,6 +15,7 @@ jobs:
     env:
       CC: gcc-10
       CXX: g++-10
+      DCMAKE_BUILD_TYPE: 'Release'
 
     steps:
       - name: Authenticate
