@@ -27,17 +27,21 @@ These inputs are used in various steps of the workflow to perform actions such a
 
 ## Steps
 This workflow performs the following steps:
-1. Authenticate to the `trustevm-ci-submodule-checkout` GitHub app using the [AntelopeIO/github-app-token-action](https://github.com/AntelopeIO/github-app-token-action) action to obtain an ephemeral token.
-1. Checkout the repo and submodules using the ephemeral token.
-1. Attach an annotation to the build with CI documentation.
-1. Download the CDT binary using the [AntelopeIO/asset-artifact-download-action](https://github.com/AntelopeIO/asset-artifact-download-action) action.
-1. Install the CDT binary.
-1. Build the TrustEVM contract using `make` and `cmake`.
-1. Upload the contract build folder to GitHub Actions.
-1. Download the `leap-dev` binary using [AntelopeIO/asset-artifact-download-action](https://github.com/AntelopeIO/asset-artifact-download-action) action.
-1. Install the `leap-dev` binary.
-1. Build the TrustEVM contract tests using `make` and `cmake`.
-1. Upload the build folder for the contract test code to GitHub Actions.
+1. Attach Documentation
+    1. Checkout the repo with no submodules.
+    1. Attach an annotation to the GitHub Actions build summary page containing CI documentation.
+1. TrustEVM Contract Build
+    > This is a build matrix with and without tests enabled.
+    1. Authenticate to the `trustevm-ci-submodule-checkout` GitHub app using the [AntelopeIO/github-app-token-action](https://github.com/AntelopeIO/github-app-token-action) action to obtain an ephemeral token.
+    1. Checkout the repo and submodules using the ephemeral token.
+    1. Download the CDT binary using the [AntelopeIO/asset-artifact-download-action](https://github.com/AntelopeIO/asset-artifact-download-action) action.
+    1. Install the CDT binary.
+    1. Build the TrustEVM contract using `make` and `cmake`.
+    1. Upload the contract build folder to GitHub Actions.
+    1. If tests are enabled, download the `leap-dev` binary using [AntelopeIO/asset-artifact-download-action](https://github.com/AntelopeIO/asset-artifact-download-action) action.
+    1. If tests are enabled, install the `leap-dev` binary.
+    1. If tests are enabled, build the TrustEVM contract tests using `make` and `cmake`.
+    1. If tests are enabled, upload the build folder for the contract test code to GitHub Actions.
 
 ## Outputs
 This workflow produces the following outputs:
