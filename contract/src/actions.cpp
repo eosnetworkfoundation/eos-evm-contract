@@ -5,12 +5,12 @@
 #include <evm_runtime/evm_contract.hpp>
 #include <evm_runtime/tables.hpp>
 #include <evm_runtime/state.hpp>
-#include <evm_runtime/engine.hpp>
 #include <evm_runtime/intrinsics.hpp>
 #include <evm_runtime/eosio.token.hpp>
 
 // included here so NDEBUG is defined to disable assert macro
 #include <silkworm/execution/processor.cpp>
+#include <silkworm/consensus/trust/engine.hpp>
 
 #ifdef WITH_TEST_ACTIONS
 #include <evm_runtime/test/engine.hpp>
@@ -84,7 +84,7 @@ void evm_contract::push_trx( eosio::name ram_payer, Block& block, const bytes& r
     eosio::check(tx.from.has_value(), "unable to recover sender");
     LOGTIME("EVM RECOVER SENDER");
 
-    evm_runtime::engine engine;
+    silkworm::consensus::TrustEngine engine{*found_chain_config->second};
     evm_runtime::state state{get_self(), ram_payer};
     silkworm::ExecutionProcessor ep{block, engine, state, *found_chain_config->second};
 
