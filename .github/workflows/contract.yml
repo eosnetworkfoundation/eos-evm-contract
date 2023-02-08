@@ -59,7 +59,7 @@ jobs:
       - name: Upload Artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: contract.tar.gz
+          name: contract.test-actions-${{ matrix.DWITH_TEST_ACTIONS }}.tar.gz
           path: contract.tar.gz
           if-no-files-found: error
 
