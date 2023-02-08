@@ -153,7 +153,7 @@ try:
             "constantinopleBlock": 0,
             "petersburgBlock": 0,
             "istanbulBlock": 0,
-            "noproof": {}
+            "trust": {}
         },
         "difficulty": "0x01",
         "extraData": "TrustEVM",
