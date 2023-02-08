@@ -10,8 +10,11 @@ on:
 
 jobs:
   build:
-    name: TrustEVM Contract Build
     runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        DWITH_TEST_ACTIONS: ['On', 'Off']
+    name: TrustEVM Contract Build - Tests ${{ matrix.DWITH_TEST_ACTIONS }}
     env:
       CC: gcc-10
       CXX: g++-10
@@ -51,7 +54,7 @@ jobs:
       - name: Build TrustEVM Contract
         run: .github/workflows/build-contract.sh
         env:
-          DWITH_TEST_ACTIONS: 'On'
+          DWITH_TEST_ACTIONS: ${{ matrix.DWITH_TEST_ACTIONS }}
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v3
@@ -61,6 +64,7 @@ jobs:
           if-no-files-found: error
 
       - name: Download Leap - dev binary
+        if: matrix.DWITH_TEST_ACTIONS == 'On'
         uses: AntelopeIO/asset-artifact-download-action@v2
         with:
           owner: AntelopeIO
@@ -72,12 +76,15 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install Leap
+        if: matrix.DWITH_TEST_ACTIONS == 'On'
         run: sudo apt-get install -y ./leap*.deb
 
       - name: Build TrustEVM Contract Tests
+        if: matrix.DWITH_TEST_ACTIONS == 'On'
         run: .github/workflows/build-contract-test.sh
 
       - name: Upload Artifacts
+        if: matrix.DWITH_TEST_ACTIONS == 'On'
         uses: actions/upload-artifact@v3
         with:
           name: contract-test.tar.gz
