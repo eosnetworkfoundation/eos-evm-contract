@@ -106,6 +106,7 @@ jobs:
         run: .github/workflows/test-contract.sh
 
       - name: Upload Test Metrics
+        if: matrix.DWITH_TEST_ACTIONS == 'on' || matrix.DWITH_TEST_ACTIONS == 'true'
         uses: actions/upload-artifact@v3
         with:
           name: test-results.xml
