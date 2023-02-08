@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-20.04
     strategy:
       matrix:
-        DWITH_TEST_ACTIONS: ['On', 'Off']
+        DWITH_TEST_ACTIONS: ['on', 'off']
     name: TrustEVM Contract Build - Tests ${{ matrix.DWITH_TEST_ACTIONS }}
     env:
       CC: gcc-10
