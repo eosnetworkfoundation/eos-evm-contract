@@ -49,6 +49,8 @@ jobs:
 
       - name: Build TrustEVM Contract
         run: .github/workflows/build-contract.sh
+        env:
+          DWITH_TEST_ACTIONS: 'On'
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v3
