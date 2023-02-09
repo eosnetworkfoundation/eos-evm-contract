@@ -6,6 +6,7 @@
 
 #include <evm_runtime/types.hpp>
 
+#include <silkworm/types/block.hpp>
 #ifdef WITH_TEST_ACTIONS
 #include <evm_runtime/test/block_info.hpp>
 #endif
