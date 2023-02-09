@@ -8,9 +8,9 @@
 #include <evm_runtime/intrinsics.hpp>
 #include <evm_runtime/eosio.token.hpp>
 
+#include <silkworm/consensus/trust/engine.hpp>
 // included here so NDEBUG is defined to disable assert macro
 #include <silkworm/execution/processor.cpp>
-#include <silkworm/consensus/trust/engine.hpp>
 
 #ifdef WITH_TEST_ACTIONS
 #include <evm_runtime/test/engine.hpp>
