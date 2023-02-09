@@ -1025,8 +1025,8 @@ boost::asio::awaitable<std::vector<Trace>> TraceCallExecutor<WorldState, VM>::tr
 
     const auto chain_config{co_await silkrpc::core::rawdb::read_chain_config(database_reader_)};
     silkrpc::ethash::BlockReward block_rewards{0,{}};
-    if(chain_config.config.count("trust") == 0) {
-         block_rewards = ethash::compute_reward(chain_config, block_with_hash.block);
+    if (chain_config.config.count("ethash") != 0) {
+        block_rewards = ethash::compute_reward(chain_config, block_with_hash.block);
     }
 
     RewardAction action;
