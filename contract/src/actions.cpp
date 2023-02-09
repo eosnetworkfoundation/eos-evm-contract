@@ -1,16 +1,12 @@
-#define NDEBUG 1 // make sure assert is no-op in processor.cpp
-
 #include <eosio/system.hpp>
 #include <eosio/transaction.hpp>
 #include <evm_runtime/evm_contract.hpp>
 #include <evm_runtime/tables.hpp>
+#include <evm_runtime/processor.hpp>
 #include <evm_runtime/state.hpp>
 #include <evm_runtime/engine.hpp>
 #include <evm_runtime/intrinsics.hpp>
 #include <evm_runtime/eosio.token.hpp>
-
-// included here so NDEBUG is defined to disable assert macro
-#include <silkworm/execution/processor.cpp>
 
 #ifdef WITH_TEST_ACTIONS
 #include <evm_runtime/test/engine.hpp>
@@ -21,13 +17,6 @@
 #else
 #define LOGTIME(MSG)
 #endif
-
-namespace silkworm {
-    // provide no-op bloom
-    Bloom logs_bloom(const std::vector<Log>& logs) {
-        return {};
-    }
-}
 
 static constexpr eosio::name token_account("eosio.token"_n);
 static constexpr eosio::symbol token_symbol("EOS", 4u);
@@ -49,30 +38,20 @@ void evm_contract::init(const uint64_t chainid) {
     }, get_self());
 }
 
-void check_result( ValidationResult r, const Transaction& txn, const char* desc ) {
-    if( r == ValidationResult::kOk )
-        return;
+void evm_contract::pushtx( eosio::name ram_payer, const bytes& rlptx ) {
+    assert_inited();
 
-    if( r == ValidationResult::kMissingSender ) {
-        eosio::print("txn.from.has_value is empty\n");
-    } else if ( r == ValidationResult::kSenderNoEOA ) {
-        eosio::print("get_code_hash is empty\n");
-    } else if ( r == ValidationResult::kWrongNonce ) {
-        eosio::print("invalid nonce:", txn.nonce, "\n");
-    } else if ( r == ValidationResult::kInsufficientFunds ) {
-        eosio::print("get_balance of from insufficient\n");
-    } else if ( r == ValidationResult::kBlockGasLimitExceeded ) {
-        eosio::print("available_gas\n");
-    }
-
-    eosio::print( "ERR: ", uint64_t(r), "\n" );
-    eosio::check( false, desc );
-}
-
-void evm_contract::push_trx( eosio::name ram_payer, Block& block, const bytes& rlptx ) {
+    LOGTIME("EVM START");
+    eosio::require_auth(ram_payer);
 
     std::optional<std::pair<const std::string, const ChainConfig*>> found_chain_config = lookup_known_chain(_config.get().chainid);
     check( found_chain_config.has_value(), "failed to find expected chain config" );
+
+    Block block;
+    block.header.difficulty  = 1;
+    block.header.gas_limit   = 0x7ffffffffff;
+    block.header.timestamp   = eosio::current_time_point().sec_since_epoch();
+    block.header.number = 1 + (block.header.timestamp - _config.get().genesis_time.sec_since_epoch()); // same logic with block_mapping in TrustEVM
 
     Transaction tx;
     ByteView bv{(const uint8_t*)rlptx.data(), rlptx.size()};
@@ -86,36 +65,12 @@ void evm_contract::push_trx( eosio::name ram_payer, Block& block, const bytes& r
 
     evm_runtime::engine engine;
     evm_runtime::state state{get_self(), ram_payer};
-    silkworm::ExecutionProcessor ep{block, engine, state, *found_chain_config->second};
-
-    ValidationResult r = consensus::pre_validate_transaction(tx, ep.evm().block().header.number, ep.evm().config(),
-                                                             ep.evm().block().header.base_fee_per_gas);
-    check_result( r, tx, "pre_validate_transaction error" );
-    r = ep.validate_transaction(tx);
-    check_result( r, tx, "validate_transaction error" );
+    evm_runtime::ExecutionProcessor ep{block, engine, state, *found_chain_config->second};
 
     Receipt receipt;
     ep.execute_transaction(tx, receipt);
-
-    engine.finalize(ep.state(), ep.evm().block(), ep.evm().revision());
-    ep.state().write_to_db(ep.evm().block().header.number);
-
+    
     LOGTIME("EVM EXECUTE");
-}
-
-void evm_contract::pushtx( eosio::name ram_payer, const bytes& rlptx ) {
-    assert_inited();
-
-    LOGTIME("EVM START");
-    eosio::require_auth(ram_payer);
-
-    Block block;
-    block.header.difficulty  = 1;
-    block.header.gas_limit   = 0x7ffffffffff;
-    block.header.timestamp   = eosio::current_time_point().sec_since_epoch();
-    block.header.number = 1 + (block.header.timestamp - _config.get().genesis_time.sec_since_epoch()); // same logic with block_mapping in TrustEVM
-
-    push_trx( ram_payer, block, rlptx );
 }
 
 void evm_contract::open(eosio::name owner, eosio::name ram_payer) {
@@ -189,10 +144,26 @@ ACTION evm_contract::testtx( const bytes& rlptx, const evm_runtime::test::block_
 
     eosio::require_auth(get_self());
 
+    std::optional<std::pair<const std::string, const ChainConfig*>> found_chain_config = lookup_known_chain(_config.get().chainid);
+    check( found_chain_config.has_value(), "failed to find expected chain config" );
+    
     Block block;
     block.header = bi.get_block_header();
 
-    push_trx( get_self(), block, rlptx );
+    Transaction tx;
+    ByteView bv{(const uint8_t *)rlptx.data(), rlptx.size()};
+    eosio::check(rlp::decode(bv,tx) == DecodingResult::kOk && bv.empty(), "unable to decode transaction");
+
+    tx.from.reset();
+    tx.recover_sender();
+    eosio::check(tx.from.has_value(), "unable to recover sender");
+
+    evm_runtime::test::engine engine;
+    evm_runtime::state state{get_self(), get_self()};
+    evm_runtime::ExecutionProcessor ep{block, engine, state, *found_chain_config->second};
+
+    Receipt receipt;
+    ep.execute_transaction(tx, receipt);
 }
 
 ACTION evm_contract::dumpstorage(const bytes& addy) {

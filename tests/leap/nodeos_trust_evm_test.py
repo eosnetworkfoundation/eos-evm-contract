@@ -76,7 +76,7 @@ pnodes=1
 total_nodes=pnodes + 2
 
 def generate_evm_transactions(nonce):
-    for i in range(1, 5): # execute a few
+    while True:
         Utils.Print("Execute ETH contract")
         nonce += 1
         toAdd = "2787b98fc4e731d0456b3941f0b3fe2e01430000"
@@ -93,6 +93,7 @@ def generate_evm_transactions(nonce):
         actData = {"ram_payer":"evmevmevmevm", "rlptx":rlptx.hex()}
         retValue = prodNode.pushMessage(evmAcc.name, "pushtx", json.dumps(actData), '-p evmevmevmevm')
         assert retValue[0], "pushtx to ETH contract failed."
+        Utils.Print("\tReturn value:", retValue[1]["processed"]["action_traces"][0]["return_value_data"])
         Utils.Print("\tBlock#", retValue[1]["processed"]["block_num"])
         row0=prodNode.getTableRow(evmAcc.name, 3, "storage", 0)
         Utils.Print("\tTable row:", row0)
@@ -153,17 +154,15 @@ try:
     wasmFile="evm_runtime.wasm"
     abiFile="evm_runtime.abi"
     Utils.Print("Publish evm_runtime contract")
-    prodNode.publishContract(evmAcc, contractDir, wasmFile, abiFile, waitForTransBlock=True)
-    trans = prodNode.pushMessage(evmAcc.name, "init", '{"chainid":15555}', '-p evmevmevmevm')
-    prodNode.waitForTransBlockIfNeeded(trans[1], True)
-    transId=prodNode.getTransId(trans[1])
+    trans = prodNode.publishContract(evmAcc, contractDir, wasmFile, abiFile, waitForTransBlock=True)
+    transId=prodNode.getTransId(trans)
     blockNum = prodNode.getBlockNumByTransId(transId)
     block = prodNode.getBlock(blockNum)
     Utils.Print("Block Id: ", block["id"])
     Utils.Print("Block timestamp: ", block["timestamp"])
 
     Utils.Print("Set balance")
-    trans = prodNode.pushMessage(evmAcc.name, "setbal", '{"addy":"2787b98fc4e731d0456b3941f0b3fe2e01439961", "bal":"0000000000000000000000000000000000100000000000000000000000000000"}', '-p evmevmevmevm')
+    trans = prodNode.pushMessage(evmAcc.name, "setbal", '{"addy":"2787b98fc4e731d0456b3941f0b3fe2e01439961", "bal":"0000000000000000000000000000000100000000000000000000000000000000"}', '-p evmevmevmevm')
 
     prodNode.waitForTransBlockIfNeeded(trans[1], True)
 
@@ -187,51 +186,9 @@ try:
     trans = prodNode.pushMessage(evmAcc.name, "pushtx", json.dumps(actData), '-p evmevmevmevm')
     prodNode.waitForTransBlockIfNeeded(trans[1], True)
 
-    #
-    # Test some failure cases
-    #
-
-    # incorrect nonce
     Utils.Print("Send balance again, should fail with wrong nonce")
     retValue = prodNode.pushMessage(evmAcc.name, "pushtx", json.dumps(actData), '-p evmevmevmevm', silentErrors=True, force=True)
     assert not retValue[0], f"push trx should have failed: {retValue}"
-
-    # correct nonce
-    nonce += 1
-    unsignedTrx = transactions.Transaction(
-        nonce,
-        150000000000, #150 GWei
-        100000,       #100k Gas
-        toAdd,
-        amount,
-        b''
-    )
-    rlptx = rlp.encode(unsignedTrx.sign(evmSendKey, evmChainId), transactions.Transaction)
-    actData = {"ram_payer":"evmevmevmevm", "rlptx":rlptx.hex()}
-    Utils.Print("Send balance again, with correct nonce")
-    retValue = prodNode.pushMessage(evmAcc.name, "pushtx", json.dumps(actData), '-p evmevmevmevm', silentErrors=True, force=True)
-    assert retValue[0], f"push trx should have succeeded: {retValue}"
-
-    # incorrect chainid
-    nonce += 1
-    unsignedTrx = transactions.Transaction(
-        nonce,
-        150000000000, #150 GWei
-        100000,       #100k Gas
-        toAdd,
-        amount,
-        b''
-    )
-    evmChainId = 8888
-    rlptx = rlp.encode(unsignedTrx.sign(evmSendKey, evmChainId), transactions.Transaction)
-    actData = {"ram_payer":"evmevmevmevm", "rlptx":rlptx.hex()}
-    Utils.Print("Send balance again, with invalid chainid")
-    retValue = prodNode.pushMessage(evmAcc.name, "pushtx", json.dumps(actData), '-p evmevmevmevm', silentErrors=True, force=True)
-    assert not retValue[0], f"push trx should have failed: {retValue}"
-
-    # correct values for continuing
-    nonce -= 1
-    evmChainId = 15555
 
     Utils.Print("Simple Solidity contract")
     # // SPDX-License-Identifier: GPL-3.0
