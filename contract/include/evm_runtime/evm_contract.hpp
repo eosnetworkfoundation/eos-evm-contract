@@ -2,6 +2,8 @@
 #include <eosio/asset.hpp>
 #include <eosio/singleton.hpp>
 
+#include <silkworm/types/block.hpp>
+
 #include <evm_runtime/types.hpp>
 
 #ifdef WITH_TEST_ACTIONS
