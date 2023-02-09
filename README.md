@@ -115,3 +115,11 @@ https://github.com/eosnetworkfoundation/TrustEVM/blob/main/docs/local_testnet_de
 
 For public testnet deployment, please refer to 
 https://github.com/eosnetworkfoundation/TrustEVM/blob/main/docs/public_testnet_deployment_plan.md
+
+## CI
+This repo contains the following GitHub Actions workflows for CI:
+- TrustEVM Contract CI - build the TrustEVM contract and its associated tests
+    - [Pipeline](https://github.com/eosnetworkfoundation/TrustEVM/actions/workflows/contract.yml)
+    - [Documentation](./.github/workflows/contract.md)
+
+See the pipeline documentation for more information.

@@ -1,0 +1,102 @@
+name: TrustEVM Contract CI
+
+on:
+  push:
+    branches:
+      - main
+      - release/*
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  documentation:
+    name: Attach Documentation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 1
+          submodules: 'false'
+
+      - name: Attach Documentation
+        run: cat .github/workflows/contract.md >> $GITHUB_STEP_SUMMARY
+
+  build:
+    runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        DWITH_TEST_ACTIONS: ['on', 'off']
+    name: TrustEVM Contract Build - Tests ${{ matrix.DWITH_TEST_ACTIONS }}
+    env:
+      CC: gcc-10
+      CXX: g++-10
+      DCMAKE_BUILD_TYPE: 'Release'
+
+    steps:
+      - name: Authenticate
+        id: auth
+        uses: AntelopeIO/github-app-token-action@v1
+        with:
+          app_id: ${{ secrets.TRUSTEVM_CI_APP_ID }}
+          private_key: ${{ secrets.TRUSTEVM_CI_APP_KEY }}
+
+      - name: Checkout Repo
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          submodules: 'recursive'
+          token: ${{ steps.auth.outputs.token }}
+
+      - name: Download CDT
+        uses: AntelopeIO/asset-artifact-download-action@v2
+        with:
+          owner: AntelopeIO
+          repo: cdt
+          target: 'v3.1.0'
+          prereleases: false
+          file: 'cdt_.*amd64.deb'
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install CDT
+        run: sudo apt-get install -y ./cdt*.deb
+
+      - name: Build TrustEVM Contract
+        run: .github/workflows/build-contract.sh
+        env:
+          DWITH_TEST_ACTIONS: ${{ matrix.DWITH_TEST_ACTIONS }}
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: contract.test-actions-${{ matrix.DWITH_TEST_ACTIONS }}.tar.gz
+          path: contract.tar.gz
+          if-no-files-found: error
+
+      - name: Download Leap - dev binary
+        if: matrix.DWITH_TEST_ACTIONS == 'on' || matrix.DWITH_TEST_ACTIONS == 'true'
+        uses: AntelopeIO/asset-artifact-download-action@v2
+        with:
+          owner: AntelopeIO
+          repo: leap
+          target: 'v3.1.3'
+          prereleases: false
+          file: 'leap-dev.*(x86_64|amd64).deb'
+          container-package: experimental-binaries
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install Leap
+        if: matrix.DWITH_TEST_ACTIONS == 'on' || matrix.DWITH_TEST_ACTIONS == 'true'
+        run: sudo apt-get install -y ./leap*.deb
+
+      - name: Build TrustEVM Contract Tests
+        if: matrix.DWITH_TEST_ACTIONS == 'on' || matrix.DWITH_TEST_ACTIONS == 'true'
+        run: .github/workflows/build-contract-test.sh
+
+      - name: Upload Artifacts
+        if: matrix.DWITH_TEST_ACTIONS == 'on' || matrix.DWITH_TEST_ACTIONS == 'true'
+        uses: actions/upload-artifact@v3
+        with:
+          name: contract-test.tar.gz
+          path: contract-test.tar.gz
+          if-no-files-found: error
