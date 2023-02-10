@@ -1024,7 +1024,10 @@ boost::asio::awaitable<std::vector<Trace>> TraceCallExecutor<WorldState, VM>::tr
     }
 
     const auto chain_config{co_await silkrpc::core::rawdb::read_chain_config(database_reader_)};
-    const auto block_rewards = ethash::compute_reward(chain_config, block_with_hash.block);
+    silkrpc::ethash::BlockReward block_rewards{0,{}};
+    if (chain_config.config.count("ethash") != 0) {
+        block_rewards = ethash::compute_reward(chain_config, block_with_hash.block);
+    }
 
     RewardAction action;
     action.author = block_with_hash.block.header.beneficiary;
