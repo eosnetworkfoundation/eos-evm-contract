@@ -1,6 +1,13 @@
 name: TrustEVM Node CI
 
-on: [push, workflow_dispatch]
+on:
+  push:
+  workflow_dispatch:
+    inputs:
+      upload-artifacts:
+        description: 'Upload artifacts, including the build.tar.gz, for debugging.'
+        type: boolean
+        default: false
 
 jobs:
   build:
@@ -30,6 +37,7 @@ jobs:
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v3
+        if: inputs.upload-artifacts || false
         with:
           name: build.tar.gz
           path: build.tar.gz
