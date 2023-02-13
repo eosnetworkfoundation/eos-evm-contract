@@ -25,6 +25,15 @@ CONTRACT evm_contract : public contract {
       void freeze(bool value);
 
       [[eosio::action]]
+      void setingressfee(asset ingress_bridge_fee);
+
+      [[eosio::action]]
+      void addegress(const std::vector<name>& accounts);
+
+      [[eosio::action]]
+      void removeegress(const std::vector<name>& accounts);
+
+      [[eosio::action]]
       void pushtx(eosio::name ram_payer, const bytes& rlptx);
 
       [[eosio::action]]
@@ -33,7 +42,7 @@ CONTRACT evm_contract : public contract {
       [[eosio::action]]
       void close(eosio::name owner);
 
-      [[eosio::on_notify("eosio.token::transfer")]]
+      [[eosio::on_notify(TOKEN_ACCOUNT_NAME "::transfer")]]
       void transfer(eosio::name from, eosio::name to, eosio::asset quantity, std::string memo);
 
       [[eosio::action]]
@@ -54,27 +63,20 @@ CONTRACT evm_contract : public contract {
       ACTION setbal(const bytes& addy, const bytes& bal);
 #endif
    private:
-      struct [[eosio::table]] [[eosio::contract("evm_contract")]] account {
-         name     owner;
-         asset    balance;
-         uint64_t dust = 0;
-
-         uint64_t primary_key() const { return owner.value; }
-      };
-
-      typedef eosio::multi_index<"accounts"_n, account> accounts;
 
       enum class status_flags : uint32_t {
          frozen = 0x1
       };
 
       struct [[eosio::table]] [[eosio::contract("evm_contract")]] config {
-         eosio::unsigned_int version; //placeholder for future variant index
-         uint64_t chainid = 0;
+         unsigned_int   version;     //placeholder for future variant index
+         uint64_t       chainid = 0;
          time_point_sec genesis_time;
+         asset          ingress_bridge_fee = asset(0, token_symbol);
          uint32_t status = 0; // <- bit mask values from status_flags
+	 
+         EOSLIB_SERIALIZE(config, (version)(chainid)(genesis_time)(ingress_bridge_fee)(status));
       };
-      EOSLIB_SERIALIZE(config, (version)(chainid)(genesis_time)(status));
 
       eosio::singleton<"config"_n, config> _config{get_self(), get_self().value};
 
@@ -89,6 +91,14 @@ CONTRACT evm_contract : public contract {
       }
 
       silkworm::Receipt execute_tx( silkworm::Block& block, const bytes& rlptx, silkworm::ExecutionProcessor& ep );
+
+      uint64_t get_and_increment_nonce(const name owner);
+
+      checksum256 get_code_hash(name account) const;
+
+      void handle_account_transfer(const eosio::asset& quantity, const std::string& memo);
+      void handle_evm_transfer(const eosio::asset& quantity, const std::string& memo);
+
 };
 
 

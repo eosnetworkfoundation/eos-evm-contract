@@ -33,17 +33,17 @@ struct native_token_evm_tester : basic_evm_tester {
       return get_currency_balance("eosio.token"_n, native_symbol, owner).get_amount();
    }
 
-   std::tuple<asset, uint64_t> evm_balance(name owner) const {
-      const vector<char> d = get_row_by_account("evm"_n, "evm"_n, "accounts"_n, owner);
+   std::tuple<asset, uint64_t> vault_balance(name owner) const {
+      const vector<char> d = get_row_by_account("evm"_n, "evm"_n, "balances"_n, owner);
       FC_ASSERT(d.size(), "EVM not open");
-      auto [_, amount, dust] = fc::raw::unpack<evm_account_row>(d);
+      auto [_, amount, dust] = fc::raw::unpack<vault_balance_row>(d);
       return std::make_tuple(amount, dust);
    }
-   int64_t evm_balance_token(name owner) const {
-      return std::get<0>(evm_balance(owner)).get_amount();
+   int64_t vault_balance_token(name owner) const {
+      return std::get<0>(vault_balance(owner)).get_amount();
    }
-   int64_t evm_balance_dust(name owner) const {
-      return std::get<1>(evm_balance(owner));
+   int64_t vault_balance_dust(name owner) const {
+      return std::get<1>(vault_balance(owner));
    }
 
    transaction_trace_ptr open(name owner, name ram_payer) {
@@ -61,13 +61,13 @@ struct native_token_evm_tester : basic_evm_tester {
       return asset(amount, native_symbol);
    }
 
-   struct evm_account_row {
+   struct vault_balance_row {
       name     owner;
       asset    balance;
       uint64_t dust = 0;
    };
 };
-FC_REFLECT(native_token_evm_tester::evm_account_row, (owner)(balance)(dust))
+FC_REFLECT(native_token_evm_tester::vault_balance_row, (owner)(balance)(dust))
 
 struct native_token_evm_tester_EOS : native_token_evm_tester {
    native_token_evm_tester_EOS() : native_token_evm_tester("4,EOS", true) {}
@@ -93,22 +93,22 @@ BOOST_FIXTURE_TEST_CASE(basic_deposit_withdraw, native_token_evm_tester_EOS) try
    {
       const int64_t to_transfer = 1'0000;
       const int64_t alice_native_before = native_balance("alice"_n);
-      const int64_t alice_evm_before = evm_balance_token("alice"_n);
+      const int64_t alice_evm_before = vault_balance_token("alice"_n);
       transfer_token("alice"_n, "evm"_n, make_asset(to_transfer), "alice");
 
       BOOST_REQUIRE_EQUAL(alice_native_before - native_balance("alice"_n), to_transfer);
-      BOOST_REQUIRE_EQUAL(evm_balance_token("alice"_n), to_transfer);
+      BOOST_REQUIRE_EQUAL(vault_balance_token("alice"_n), to_transfer);
    }
 
    //bob sends his tokens in to alice's EVM balance
    {
       const int64_t to_transfer = 1'0000;
       const int64_t bob_native_before = native_balance("bob"_n);
-      const int64_t alice_evm_before = evm_balance_token("alice"_n);
+      const int64_t alice_evm_before = vault_balance_token("alice"_n);
       transfer_token("bob"_n, "evm"_n, make_asset(to_transfer), "alice");
 
       BOOST_REQUIRE_EQUAL(bob_native_before - native_balance("bob"_n), to_transfer);
-      BOOST_REQUIRE_EQUAL(evm_balance_token("alice"_n) - alice_evm_before, to_transfer);
+      BOOST_REQUIRE_EQUAL(vault_balance_token("alice"_n) - alice_evm_before, to_transfer);
    }
 
    //carol can't send tokens to bob's balance because bob isn't open
@@ -126,17 +126,17 @@ BOOST_FIXTURE_TEST_CASE(basic_deposit_withdraw, native_token_evm_tester_EOS) try
    {
       const int64_t to_withdraw = 5000;
       const int64_t alice_native_before = native_balance("alice"_n);
-      const int64_t alice_evm_before = evm_balance_token("alice"_n);
+      const int64_t alice_evm_before = vault_balance_token("alice"_n);
       withdraw("alice"_n, make_asset(to_withdraw));
 
       BOOST_REQUIRE_EQUAL(native_balance("alice"_n) - alice_native_before, to_withdraw);
-      BOOST_REQUIRE_EQUAL(alice_evm_before - evm_balance_token("alice"_n), to_withdraw);
+      BOOST_REQUIRE_EQUAL(alice_evm_before - vault_balance_token("alice"_n), to_withdraw);
    }
 
    //try and withdraw more than alice has
    {
       const int64_t to_withdraw = 2'0000;
-      BOOST_REQUIRE_GT(to_withdraw, evm_balance_token("alice"_n));
+      BOOST_REQUIRE_GT(to_withdraw, vault_balance_token("alice"_n));
       BOOST_REQUIRE_EXCEPTION(withdraw("alice"_n, make_asset(to_withdraw)),
                               eosio_assert_message_exception, eosio_assert_message_is("overdrawn balance"));
    }
@@ -152,18 +152,18 @@ BOOST_FIXTURE_TEST_CASE(basic_deposit_withdraw, native_token_evm_tester_EOS) try
    {
       const int64_t to_withdraw = 1'5000;
       const int64_t alice_native_before = native_balance("alice"_n);
-      const int64_t alice_evm_before = evm_balance_token("alice"_n);
+      const int64_t alice_evm_before = vault_balance_token("alice"_n);
       withdraw("alice"_n, make_asset(to_withdraw));
 
       BOOST_REQUIRE_EQUAL(native_balance("alice"_n) - alice_native_before, to_withdraw);
-      BOOST_REQUIRE_EQUAL(alice_evm_before - evm_balance_token("alice"_n), to_withdraw);
+      BOOST_REQUIRE_EQUAL(alice_evm_before - vault_balance_token("alice"_n), to_withdraw);
    }
 
    produce_block();
 
    //now alice can close out
    close("alice"_n);
-   BOOST_REQUIRE_EXCEPTION(evm_balance_token("alice"_n),
+   BOOST_REQUIRE_EXCEPTION(vault_balance_token("alice"_n),
                            fc::assert_exception, fc_assert_exception_message_is("EVM not open"));
 
    //make sure alice can't deposit any more   
@@ -179,13 +179,13 @@ BOOST_FIXTURE_TEST_CASE(weird_names, native_token_evm_tester_EOS) try {
                            eosio_assert_message_exception, eosio_assert_message_is("character is not in allowed character set for names"));
 
    BOOST_REQUIRE_EXCEPTION(transfer_token("alice"_n, "evm"_n, make_asset(1'0000), "loooooooooooooooooong"),
-                           eosio_assert_message_exception, eosio_assert_message_is("string is too long to be a valid name"));
+                           eosio_assert_message_exception, eosio_assert_message_is("memo must be either 0x EVM address or already opened account name to credit deposit to"));
 
    BOOST_REQUIRE_EXCEPTION(transfer_token("alice"_n, "evm"_n, make_asset(1'0000), "   "),
                            eosio_assert_message_exception, eosio_assert_message_is("character is not in allowed character set for names"));
 
    BOOST_REQUIRE_EXCEPTION(transfer_token("alice"_n, "evm"_n, make_asset(1'0000), ""),
-                           eosio_assert_message_exception, eosio_assert_message_is("memo must be already opened account name to credit deposit to"));
+                           eosio_assert_message_exception, eosio_assert_message_is("memo must be either 0x EVM address or already opened account name to credit deposit to"));
 
 } FC_LOG_AND_RETHROW()
 
@@ -203,7 +203,7 @@ BOOST_FIXTURE_TEST_CASE(non_standard_native_symbol, native_token_evm_tester_SPOO
    open("alice"_n, "alice"_n);
 
    BOOST_REQUIRE_EXCEPTION(transfer_token("alice"_n, "evm"_n, make_asset(1'0000), "alice"),
-                           eosio_assert_message_exception, eosio_assert_message_is("attempt to add asset with different symbol"));
+                           eosio_assert_message_exception, eosio_assert_message_is("received unexpected token"));
 
 } FC_LOG_AND_RETHROW()
 
