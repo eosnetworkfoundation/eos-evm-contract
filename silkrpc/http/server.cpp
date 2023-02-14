@@ -75,23 +75,8 @@ boost::asio::awaitable<void> Server::run() {
 
             SILKRPC_DEBUG << "Server::run accepting using io_context " << io_context << "...\n" << std::flush;
 
-            std::shared_ptr<Connection> new_connection;
-
-            do {
-                try {
-                    new_connection = std::make_shared<Connection>(context_, workers_, handler_table_);
-                    co_await acceptor_.async_accept(new_connection->socket(), boost::asio::use_awaitable);
-                    break;
-                } catch (const boost::system::system_error& se) {
-                    if (se.code() == boost::asio::error::no_descriptors) {
-                        SILKRPC_WARN << "Server::run can not accept new connection for now, no descriptor\n" << std::flush;
-                        continue;
-                    } else {
-                        throw;
-                    }
-                }
-            } while (true);
-
+            auto new_connection = std::make_shared<Connection>(context_, workers_, handler_table_);
+            co_await acceptor_.async_accept(new_connection->socket(), boost::asio::use_awaitable);
             if (!acceptor_.is_open()) {
                 SILKRPC_TRACE << "Server::run returning...\n";
                 co_return;
@@ -108,7 +93,7 @@ boost::asio::awaitable<void> Server::run() {
         }
     } catch (const boost::system::system_error& se) {
         if (se.code() != boost::asio::error::operation_aborted) {
-            SILKRPC_ERROR << "Server::run system_error: " << se.code() << " " << se.what() << "\n" << std::flush;
+            SILKRPC_ERROR << "Server::run system_error: " << se.what() << "\n" << std::flush;
             std::rethrow_exception(std::make_exception_ptr(se));
         } else {
             SILKRPC_DEBUG << "Server::run operation_aborted: " << se.what() << "\n" << std::flush;
