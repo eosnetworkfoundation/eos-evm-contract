@@ -107,8 +107,8 @@ protected:
     boost::asio::awaitable<void> handle_eth_submit_work(const nlohmann::json& request, nlohmann::json& reply);
     boost::asio::awaitable<void> handle_eth_subscribe(const nlohmann::json& request, nlohmann::json& reply);
     boost::asio::awaitable<void> handle_eth_unsubscribe(const nlohmann::json& request, nlohmann::json& reply);
-    boost::asio::awaitable<roaring::Roaring> get_topics_bitmap(core::rawdb::DatabaseReader& db_reader, FilterTopics& topics, uint64_t start, uint64_t end);
-    boost::asio::awaitable<roaring::Roaring> get_addresses_bitmap(core::rawdb::DatabaseReader& db_reader, FilterAddresses& addresses, uint64_t start, uint64_t end);
+    boost::asio::awaitable<roaring::Roaring64Map> get_topics_bitmap(core::rawdb::DatabaseReader& db_reader, FilterTopics& topics, uint64_t start, uint64_t end);
+    boost::asio::awaitable<roaring::Roaring64Map> get_addresses_bitmap(core::rawdb::DatabaseReader& db_reader, FilterAddresses& addresses, uint64_t start, uint64_t end);
 
     std::vector<Log> filter_logs(std::vector<Log>& logs, const Filter& filter);
 

@@ -1379,14 +1379,13 @@ boost::asio::awaitable<void> EthereumRpcApi::handle_eth_get_logs(const nlohmann:
     }
 
     auto filter = params[0].get<Filter>();
-    SILKRPC_DEBUG << "filter: " << filter << "\n";
-
+    SILKRPC_LOG << "filter: " << filter << "\n";
     std::vector<Log> logs;
 
     auto tx = co_await database_->begin();
 
     try {
-        ethdb::TransactionDatabase tx_database{*tx};
+       ethdb::TransactionDatabase tx_database{*tx};
 
         uint64_t start{}, end{};
         if (filter.block_hash.has_value()) {
@@ -1408,8 +1407,7 @@ boost::asio::awaitable<void> EthereumRpcApi::handle_eth_get_logs(const nlohmann:
         }
         SILKRPC_INFO << "start block: " << start << " end block: " << end << "\n";
 
-        roaring::Roaring block_numbers;
-        block_numbers.addRange(start, end + 1); // [min, max)
+        roaring::Roaring64Map block_numbers(roaring::api::roaring_bitmap_from_range(start, end+1, 1));
 
         SILKRPC_DEBUG << "block_numbers.cardinality(): " << block_numbers.cardinality() << "\n";
 
@@ -1824,12 +1822,12 @@ boost::asio::awaitable<void> EthereumRpcApi::handle_eth_unsubscribe(const nlohma
     co_return;
 }
 
-boost::asio::awaitable<roaring::Roaring> EthereumRpcApi::get_topics_bitmap(core::rawdb::DatabaseReader& db_reader, FilterTopics& topics, uint64_t start, uint64_t end) {
+boost::asio::awaitable<roaring::Roaring64Map> EthereumRpcApi::get_topics_bitmap(core::rawdb::DatabaseReader& db_reader, FilterTopics& topics, uint64_t start, uint64_t end) {
     SILKRPC_DEBUG << "#topics: " << topics.size() << " start: " << start << " end: " << end << "\n";
-    roaring::Roaring result_bitmap;
+    roaring::Roaring64Map result_bitmap;
     for (auto subtopics : topics) {
         SILKRPC_DEBUG << "#subtopics: " << subtopics.size() << "\n";
-        roaring::Roaring subtopic_bitmap;
+        roaring::Roaring64Map subtopic_bitmap;
         for (auto topic : subtopics) {
             silkworm::Bytes topic_key{std::begin(topic.bytes), std::end(topic.bytes)};
             SILKRPC_TRACE << "topic: " << topic << " topic_key: " << silkworm::to_hex(topic) <<"\n";
@@ -1850,9 +1848,9 @@ boost::asio::awaitable<roaring::Roaring> EthereumRpcApi::get_topics_bitmap(core:
     co_return result_bitmap;
 }
 
-boost::asio::awaitable<roaring::Roaring> EthereumRpcApi::get_addresses_bitmap(core::rawdb::DatabaseReader& db_reader, FilterAddresses& addresses, uint64_t start, uint64_t end) {
+boost::asio::awaitable<roaring::Roaring64Map> EthereumRpcApi::get_addresses_bitmap(core::rawdb::DatabaseReader& db_reader, FilterAddresses& addresses, uint64_t start, uint64_t end) {
     SILKRPC_TRACE << "#addresses: " << addresses.size() << " start: " << start << " end: " << end << "\n";
-    roaring::Roaring result_bitmap;
+    roaring::Roaring64Map result_bitmap;
     for (auto address : addresses) {
         silkworm::Bytes address_key{std::begin(address.bytes), std::end(address.bytes)};
         auto bitmap = co_await ethdb::bitmap::get(db_reader, db::table::kLogAddressIndex, address_key, start, end);
