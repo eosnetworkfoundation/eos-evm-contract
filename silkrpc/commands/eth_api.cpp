@@ -1370,6 +1370,14 @@ boost::asio::awaitable<void> EthereumRpcApi::handle_eth_get_logs(const nlohmann:
         reply = make_json_error(request["id"], 100, error_msg);
         co_return;
     }
+
+    if (params[0].contains("topics") && !params[0]["topics"].is_array()) {
+        auto error_msg = "invalid eth_getLogs params. topics should be an array.";
+        SILKRPC_ERROR << error_msg << "\n";
+        reply = make_json_error(request["id"], 100, error_msg);
+        co_return;
+    }
+
     auto filter = params[0].get<Filter>();
     SILKRPC_DEBUG << "filter: " << filter << "\n";
 
