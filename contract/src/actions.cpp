@@ -14,6 +14,7 @@
 
 #ifdef WITH_TEST_ACTIONS
 #include <evm_runtime/test/engine.hpp>
+#include <evm_runtime/test/config.hpp>
 #endif
 
 #ifdef WITH_LOGTIME
@@ -69,10 +70,7 @@ void check_result( ValidationResult r, const Transaction& txn, const char* desc 
     eosio::check( false, desc );
 }
 
-void evm_contract::push_trx( eosio::name ram_payer, Block& block, const bytes& rlptx ) {
-
-    std::optional<std::pair<const std::string, const ChainConfig*>> found_chain_config = lookup_known_chain(_config.get().chainid);
-    check( found_chain_config.has_value(), "failed to find expected chain config" );
+void evm_contract::push_trx( eosio::name ram_payer, Block& block, const bytes& rlptx, silkworm::consensus::IEngine& engine, const silkworm::ChainConfig& chain_config ) {
 
     Transaction tx;
     ByteView bv{(const uint8_t*)rlptx.data(), rlptx.size()};
@@ -84,9 +82,8 @@ void evm_contract::push_trx( eosio::name ram_payer, Block& block, const bytes& r
     eosio::check(tx.from.has_value(), "unable to recover sender");
     LOGTIME("EVM RECOVER SENDER");
 
-    silkworm::consensus::TrustEngine engine{*found_chain_config->second};
     evm_runtime::state state{get_self(), ram_payer};
-    silkworm::ExecutionProcessor ep{block, engine, state, *found_chain_config->second};
+    silkworm::ExecutionProcessor ep{block, engine, state, chain_config};
 
     ValidationResult r = consensus::pre_validate_transaction(tx, ep.evm().block().header.number, ep.evm().config(),
                                                              ep.evm().block().header.base_fee_per_gas);
@@ -104,9 +101,11 @@ void evm_contract::push_trx( eosio::name ram_payer, Block& block, const bytes& r
 }
 
 void evm_contract::pushtx( eosio::name ram_payer, const bytes& rlptx ) {
-    assert_inited();
-
     LOGTIME("EVM START");
+
+    assert_inited();
+    std::optional<std::pair<const std::string, const ChainConfig*>> found_chain_config = lookup_known_chain(_config.get().chainid);
+    check( found_chain_config.has_value(), "failed to find expected chain config" );
     eosio::require_auth(ram_payer);
 
     Block block;
@@ -115,7 +114,8 @@ void evm_contract::pushtx( eosio::name ram_payer, const bytes& rlptx ) {
     block.header.timestamp   = eosio::current_time_point().sec_since_epoch();
     block.header.number = 1 + (block.header.timestamp - _config.get().genesis_time.sec_since_epoch()); // same logic with block_mapping in TrustEVM
 
-    push_trx( ram_payer, block, rlptx );
+    silkworm::consensus::TrustEngine engine{*found_chain_config->second};
+    push_trx( ram_payer, block, rlptx, engine, *found_chain_config->second );
 }
 
 void evm_contract::open(eosio::name owner, eosio::name ram_payer) {
@@ -192,7 +192,8 @@ ACTION evm_contract::testtx( const bytes& rlptx, const evm_runtime::test::block_
     Block block;
     block.header = bi.get_block_header();
 
-    push_trx( get_self(), block, rlptx );
+    evm_runtime::test::engine engine;
+    push_trx( get_self(), block, rlptx, engine, evm_runtime::test::kTestNetwork );
 }
 
 ACTION evm_contract::dumpstorage(const bytes& addy) {
