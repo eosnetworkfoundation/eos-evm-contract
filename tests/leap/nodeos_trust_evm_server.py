@@ -25,7 +25,7 @@ from core_symbol import CORE_SYMBOL
 
 
 ###############################################################
-# nodeos_trust_evm_fork_server
+# nodeos_trust_evm_server
 #
 # Set up a TrustEVM env
 #
@@ -43,7 +43,7 @@ from core_symbol import CORE_SYMBOL
 #
 # Example:
 #  cd ~/ext/leap/build
-#  ~/ext/TrustEVM/tests/leap/nodeos_trust_evm_test.py --trust-evm-contract-root ~/ext/TrustEVM/contract/build --leave-running
+#  ~/ext/TrustEVM/tests/leap/nodeos_trust_evm_server.py --trust-evm-contract-root ~/ext/TrustEVM/contract/build --leave-running
 #
 #  Launches wallet at port: 9899
 #    Example: bin/cleos --wallet-url http://127.0.0.1:9899 ...
