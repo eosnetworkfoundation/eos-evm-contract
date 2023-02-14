@@ -30,6 +30,8 @@
 #include <boost/asio/co_spawn.hpp>
 #include <boost/asio/dispatch.hpp>
 #include <boost/asio/use_awaitable.hpp>
+#include <boost/asio/steady_timer.hpp>
+#include <boost/chrono.hpp>
 
 #include <silkrpc/common/constants.hpp>
 #include <silkrpc/common/log.hpp>
@@ -75,8 +77,23 @@ boost::asio::awaitable<void> Server::run() {
 
             SILKRPC_DEBUG << "Server::run accepting using io_context " << io_context << "...\n" << std::flush;
 
-            auto new_connection = std::make_shared<Connection>(context_, workers_, handler_table_);
-            co_await acceptor_.async_accept(new_connection->socket(), boost::asio::use_awaitable);
+            std::shared_ptr<Connection> new_connection;
+
+            try {
+                new_connection = std::make_shared<Connection>(context_, workers_, handler_table_);
+                co_await acceptor_.async_accept(new_connection->socket(), boost::asio::use_awaitable);
+            } catch (const boost::system::system_error& se) {
+                if (se.code() == boost::asio::error::no_descriptors) {
+                    SILKRPC_WARN << "Server::run too many open connections\n" << std::flush;
+                    boost::asio::steady_timer timer(acceptor_.get_executor());
+                    timer.expires_after(boost::asio::chrono::milliseconds(1000));
+                    co_await timer.async_wait(boost::asio::use_awaitable);
+                    continue;
+                } else {
+                    throw;
+                }
+            }
+
             if (!acceptor_.is_open()) {
                 SILKRPC_TRACE << "Server::run returning...\n";
                 co_return;
