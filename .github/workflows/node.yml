@@ -9,6 +9,10 @@ on:
         type: boolean
         default: false
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   documentation:
     name: Attach Documentation
