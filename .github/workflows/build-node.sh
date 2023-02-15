@@ -10,7 +10,7 @@ function ee()
 
 # install dependencies for self-hosted runners
 ee apt-get update -q
-ee apt-get install -yq cmake g++-10
+ee apt-get install -yq cmake gcc-10 g++-10
 
 # debug code
 ee cmake --version
