@@ -37,6 +37,8 @@ This workflow performs the following steps:
 This workflow produces the following outputs:
 1. Build Artifacts - `build.tar.gz` containing the built artifacts of TrustEVM Node, if the `upload-artifacts` input is set to `true`.
 
+> 💾️ Build artifacts are only attached on-demand for this pipeline because they are >117 MB each, but we only get 2 GB of cumulative artifact storage in GitHub Actions while TrustEVM is a private repo.
+
 ## See Also
 - [github-app-token-action](https://github.com/AntelopeIO/github-app-token-action) GitHub action
 - [TrustEVM Documentation](../../README.md)
