@@ -50,14 +50,18 @@ boost::asio::awaitable<Roaring64Map> get(core::rawdb::DatabaseReader& db_reader,
 
     core::rawdb::Walker walker = [&](const silkworm::Bytes& k, const silkworm::Bytes& v) {
         SILKRPC_TRACE << "k: " << k << " v: " << v << "\n";
+        auto same_key = k.starts_with(key);
+        if (!same_key) {
+            return false;
+        }
+        
         auto chunck = std::make_unique<Roaring64Map>(silkworm::db::bitmap::parse(v));
         SILKRPC_TRACE << "chunck: " << chunck->toString() << "\n";
         
-        auto block = chunck->maximum();
-        if (block >= from_block && chunck->minimum() <= to_block) {
+        if (chunck->maximum() >= from_block && chunck->minimum() <= to_block) {
             chuncks.push_back(std::move(chunck));
         }
-        return block < to_block;
+        return true;
     };
     co_await db_reader.walk(table, from_key, key.size() * CHAR_BIT, walker);
 
