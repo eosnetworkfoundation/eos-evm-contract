@@ -25,47 +25,43 @@
 
 #include <silkrpc/common/log.hpp>
 #include <silkrpc/common/util.hpp>
+#include <silkworm/node/silkworm/db/bitmap.hpp>
 
 namespace silkrpc::ethdb::bitmap {
 
-using roaring_bitmap_t = roaring::api::roaring_bitmap_t;
-using Roaring = roaring::Roaring;
+using Roaring64Map = roaring::Roaring64Map;
 
-static Roaring fast_or(size_t n, const std::vector<std::unique_ptr<Roaring>>& inputs) {
-    const roaring_bitmap_t **x = (const roaring_bitmap_t **)malloc(n * sizeof(roaring_bitmap_t *));
-    if (x == NULL) {
-        throw std::runtime_error("failed memory alloc in fast_or");
-    }
+// Implement the Roaring64Map::fastunion for vector of unique_ptr
+static Roaring64Map fast_or(size_t n, const std::vector<std::unique_ptr<Roaring64Map>>& inputs) {
+    Roaring64Map result;
     for (size_t k = 0; k < n; ++k) {
-        x[k] = &inputs[k]->roaring;
+        result |= *inputs[k];
     }
-
-    roaring_bitmap_t *c_ans = roaring_bitmap_or_many(n, x);
-    if (c_ans == NULL) {
-        free(x);
-        throw std::runtime_error("failed memory alloc in fast_or");
-    }
-    Roaring ans(c_ans);
-    free(x);
-    return ans;
+    return result;
 }
 
-boost::asio::awaitable<Roaring> get(core::rawdb::DatabaseReader& db_reader, const std::string& table, silkworm::Bytes& key, uint32_t from_block, uint32_t to_block) {
-    std::vector<std::unique_ptr<Roaring>> chuncks;
+boost::asio::awaitable<Roaring64Map> get(core::rawdb::DatabaseReader& db_reader, const std::string& table, silkworm::Bytes& key, uint32_t from_block, uint32_t to_block) {
+    std::vector<std::unique_ptr<Roaring64Map>> chuncks;
 
     silkworm::Bytes from_key{key.begin(), key.end()};
-    from_key.resize(key.size() + sizeof(uint32_t));
-    boost::endian::store_big_u32(&from_key[key.size()], from_block);
+    from_key.resize(key.size() + sizeof(uint16_t));
+    boost::endian::store_big_u16(&from_key[key.size()], 0);
     SILKRPC_DEBUG << "table: " << table << " key: " << key << " from_key: " << from_key << "\n";
 
-    Roaring chunck{};
     core::rawdb::Walker walker = [&](const silkworm::Bytes& k, const silkworm::Bytes& v) {
         SILKRPC_TRACE << "k: " << k << " v: " << v << "\n";
-        auto chunck = std::make_unique<Roaring>(Roaring::readSafe(reinterpret_cast<const char*>(v.data()), v.size()));
+        auto same_key = k.starts_with(key);
+        if (!same_key) {
+            return false;
+        }
+        
+        auto chunck = std::make_unique<Roaring64Map>(silkworm::db::bitmap::parse(v));
         SILKRPC_TRACE << "chunck: " << chunck->toString() << "\n";
-        chuncks.push_back(std::move(chunck));
-        auto block = boost::endian::load_big_u32(&k[k.size() - sizeof(uint32_t)]);
-        return block < to_block;
+        
+        if (chunck->maximum() >= from_block && chunck->minimum() <= to_block) {
+            chuncks.push_back(std::move(chunck));
+        }
+        return true;
     };
     co_await db_reader.walk(table, from_key, key.size() * CHAR_BIT, walker);
 
