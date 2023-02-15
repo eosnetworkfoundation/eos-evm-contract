@@ -1385,7 +1385,7 @@ boost::asio::awaitable<void> EthereumRpcApi::handle_eth_get_logs(const nlohmann:
     auto tx = co_await database_->begin();
 
     try {
-       ethdb::TransactionDatabase tx_database{*tx};
+        ethdb::TransactionDatabase tx_database{*tx};
 
         uint64_t start{}, end{};
         if (filter.block_hash.has_value()) {
