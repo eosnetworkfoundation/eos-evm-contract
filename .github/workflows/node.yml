@@ -47,7 +47,7 @@ jobs:
           token: ${{ steps.auth.outputs.token }}
 
       - name: Build TrustEVM Node
-        run: docker run --rm -v "$(pwd):/TrustEVM" -w '/TrustEVM' 'ubuntu:20.04' '/TrustEVM/.github/workflows/build-node.sh'
+        run: docker run --rm -v "$(pwd):/TrustEVM" -w '/TrustEVM' -e 'CC' -e 'CXX' 'ubuntu:20.04' '/TrustEVM/.github/workflows/build-node.sh'
         env:
           CC: gcc-10
           CXX: g++-10
