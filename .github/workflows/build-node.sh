@@ -17,6 +17,9 @@ ee apt-get install -yqq build-essential cmake gcc-10 g++-10 git
 echo "CC='${CC}'"
 echo "CXX='${CXX}'"
 ee cmake --version
+ee nproc
+ee free -h
+ee lscpu
 
 # build
 ee mkdir build
