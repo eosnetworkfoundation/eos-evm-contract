@@ -119,26 +119,26 @@ void engine_plugin::set_program_options( appbase::options_description& cli, appb
         "chain data path as a string")
       ("engine-port", boost::program_options::value<std::string>()->default_value("127.0.0.1:8080"),
         "engine address of the form <address>:<port>")
-      ("contexts", boost::program_options::value<std::uint32_t>()->default_value(std::thread::hardware_concurrency() / 3),
-        "number of I/O contexts")
       ("threads", boost::program_options::value<std::uint32_t>()->default_value(16),
         "number of worker threads")
       ("genesis-json", boost::program_options::value<std::string>(),
         "file to read EVM genesis state from")
+      ("max-readers", boost::program_options::value<std::uint32_t>()->default_value(1024),
+        "maximum number of database readers")
    ;
 }
 
 void engine_plugin::plugin_initialize( const appbase::variables_map& options ) {
    const auto& chain_data = options.at("chain-data").as<std::string>();
    const auto& address    = options.at("engine-port").as<std::string>();
-   const auto& contexts   = options.at("contexts").as<uint32_t>();
    const auto& threads    = options.at("threads").as<uint32_t>();
+   const auto& max_readers = options.at("max-readers").as<uint32_t>();
 
    std::optional<std::string> genesis_json;
    if(options.count("genesis-json"))
       genesis_json = options.at("genesis-json").as<std::string>();
 
-   my.reset(new engine_plugin_impl(chain_data, contexts, threads, address, genesis_json));
+   my.reset(new engine_plugin_impl(chain_data, threads, max_readers, address, genesis_json));
    SILK_INFO << "Initializing Engine Plugin";
 }
 
