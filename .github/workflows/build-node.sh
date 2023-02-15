@@ -13,6 +13,8 @@ ee apt-get update -q
 ee apt-get install -yq cmake gcc-10 g++-10
 
 # debug code
+echo "CC='${CC}'"
+echo "CXX='${CXX}'"
 ee cmake --version
 ee gcc --version
 
