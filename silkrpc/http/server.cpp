@@ -86,7 +86,7 @@ boost::asio::awaitable<void> Server::run() {
                 if (se.code() == boost::asio::error::no_descriptors) {
                     SILKRPC_WARN << "Server::run too many open connections\n" << std::flush;
                     boost::asio::steady_timer timer(acceptor_.get_executor());
-                    timer.expires_after(boost::asio::chrono::milliseconds(1000));
+                    timer.expires_after(boost::asio::chrono::milliseconds(100));
                     co_await timer.async_wait(boost::asio::use_awaitable);
                     continue;
                 } else {
