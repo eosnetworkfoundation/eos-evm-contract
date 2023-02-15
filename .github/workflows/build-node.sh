@@ -8,6 +8,10 @@ function ee()
     eval "$@"
 }
 
+# install dependencies for self-hosted runners
+ee apt-get update -q
+ee apt-get install -yq cmake g++-10
+
 # debug code
 ee cmake --version
 ee gcc --version
