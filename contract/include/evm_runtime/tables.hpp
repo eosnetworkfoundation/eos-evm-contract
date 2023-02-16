@@ -88,7 +88,7 @@ struct balance_with_dust {
         return !(*this == o);
     }
 
-    void accumulate(const intx::uint256& amount) {
+    balance_with_dust& operator+=(const intx::uint256& amount) {
         //asset::max_amount is conservative at 2^62-1, this means two amounts of (2^62-1)+(2^62-1) cannot
         // overflow an int64_t which can represent up to 2^63-1. In other words, asset::max_amount+asset::max_amount
         // are guaranteed greater than asset::max_amount without need to worry about int64_t overflow
@@ -103,9 +103,11 @@ struct balance_with_dust {
             balance.amount++;
             dust -= min_asset;
         }
+
+        return *this;
     }
 
-    void decrement(const intx::uint256& amount) {
+    balance_with_dust& operator-=(const intx::uint256& amount) {
         check(amount/min_asset_bn <= balance.amount, "decrementing more than available");
         balance.amount -= (amount/min_asset_bn)[0];
         dust -= (amount%min_asset_bn)[0];
@@ -115,6 +117,8 @@ struct balance_with_dust {
             dust += min_asset;
             check(balance.amount >= 0, "decrementing more than available");
         }
+
+        return *this;
     }
 
     static constexpr intx::uint256 min_asset_bn = intx::exp(10_u256, intx::uint256(evm_precision - token_symbol.precision()));
