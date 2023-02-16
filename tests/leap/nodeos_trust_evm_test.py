@@ -5,10 +5,9 @@ import os
 import json
 import time
 
-import rlp
 import sys
-from ethereum import transactions
 from binascii import unhexlify
+from web3 import Web3
 
 sys.path.append(os.getcwd())
 sys.path.append(os.path.join(os.getcwd(), "tests"))
@@ -24,19 +23,11 @@ from core_symbol import CORE_SYMBOL
 # Set up a TrustEVM env and run simple tests.
 #
 # Need to install:
-#   rlp       - pip install rlp
-#   ethereum  - pip install ethereum
-#          venv/lib/python3.6/site-packages/ethereum/transactions.py
-#          /home/account/.local/lib/python3.8/site-packages/ethereum/transactions.py
-#          Line 135
-#
-#          135c135
-#          <             self.v += 8 + network_id * 2
-#          ---
-#          >             v += 8 + network_id * 2
+#   web3      - pip install web3
 #
 # --turst-evm-root should point to the root of TrustEVM build dir
 # --trust-evm-contract-root should point to root of TrustEVM contract build dir
+#                           contracts should be built with -DWITH_TEST_ACTIONS=On
 #
 # Example:
 #  cd ~/ext/leap/build
@@ -81,16 +72,18 @@ def generate_evm_transactions(nonce):
         nonce += 1
         toAdd = "2787b98fc4e731d0456b3941f0b3fe2e01430000"
         amount = 0
-        unsignedTrx = transactions.Transaction(
-            nonce,
-            150000000000, #150 GWei
-            100000,       #100k Gas
-            toAdd,
-            amount,
-            unhexlify("6057361d000000000000000000000000000000000000000000000000000000000000007b")
-        )
-        rlptx = rlp.encode(unsignedTrx.sign(evmSendKey, evmChainId), transactions.Transaction)
-        actData = {"ram_payer":"evmevmevmevm", "rlptx":rlptx.hex()}
+        signed_trx = w3.eth.account.sign_transaction(dict(
+            nonce=nonce,
+            #        maxFeePerGas=150000000000, #150 GWei
+            gas=100000,       #100k Gas
+            gasPrice=1,
+            to=Web3.toChecksumAddress(toAdd),
+            value=amount,
+            data=unhexlify("6057361d000000000000000000000000000000000000000000000000000000000000007b"),
+            chainId=evmChainId
+        ), evmSendKey)
+
+        actData = {"ram_payer":"evmevmevmevm", "rlptx":Web3.toHex(signed_trx.rawTransaction)[2:]}
         retValue = prodNode.pushMessage(evmAcc.name, "pushtx", json.dumps(actData), '-p evmevmevmevm')
         assert retValue[0], "pushtx to ETH contract failed."
         Utils.Print("\tBlock#", retValue[1]["processed"]["block_num"])
@@ -101,6 +94,8 @@ def generate_evm_transactions(nonce):
 
 try:
     TestHelper.printSystemInfo("BEGIN")
+
+    w3 = Web3()
 
     cluster.setWalletMgr(walletMgr)
 
@@ -174,16 +169,21 @@ try:
     amount = 100
     nonce = 0
     evmSendKey = "a3f1b69da92a0233ce29485d3049a4ace39e8d384bbc2557e3fc60940ce4e954"
-    unsignedTrx = transactions.Transaction(
-        nonce,
-        150000000000, #150 GWei
-        100000,       #100k Gas
-        toAdd,
-        amount,
-        b''
-    )
-    rlptx = rlp.encode(unsignedTrx.sign(evmSendKey, evmChainId), transactions.Transaction)
-    actData = {"ram_payer":"evmevmevmevm", "rlptx":rlptx.hex()}
+
+    signed_trx = w3.eth.account.sign_transaction(dict(
+        nonce=nonce,
+#        maxFeePerGas=150000000000, #150 GWei
+        gas=100000,       #100k Gas
+        gasPrice=1,
+        to=Web3.toChecksumAddress(toAdd),
+        value=amount,
+        data=b'',
+        chainId=evmChainId
+    ), evmSendKey)
+
+    Utils.Print("raw: ", signed_trx.rawTransaction)
+
+    actData = {"ram_payer":"evmevmevmevm", "rlptx":Web3.toHex(signed_trx.rawTransaction)[2:]}
     trans = prodNode.pushMessage(evmAcc.name, "pushtx", json.dumps(actData), '-p evmevmevmevm')
     prodNode.waitForTransBlockIfNeeded(trans[1], True)
 
@@ -198,33 +198,37 @@ try:
 
     # correct nonce
     nonce += 1
-    unsignedTrx = transactions.Transaction(
-        nonce,
-        150000000000, #150 GWei
-        100000,       #100k Gas
-        toAdd,
-        amount,
-        b''
-    )
-    rlptx = rlp.encode(unsignedTrx.sign(evmSendKey, evmChainId), transactions.Transaction)
-    actData = {"ram_payer":"evmevmevmevm", "rlptx":rlptx.hex()}
+    signed_trx = w3.eth.account.sign_transaction(dict(
+        nonce=nonce,
+        #        maxFeePerGas=150000000000, #150 GWei
+        gas=100000,       #100k Gas
+        gasPrice=1,
+        to=Web3.toChecksumAddress(toAdd),
+        value=amount,
+        data=b'',
+        chainId=evmChainId
+    ), evmSendKey)
+
+    actData = {"ram_payer":"evmevmevmevm", "rlptx":Web3.toHex(signed_trx.rawTransaction)[2:]}
     Utils.Print("Send balance again, with correct nonce")
     retValue = prodNode.pushMessage(evmAcc.name, "pushtx", json.dumps(actData), '-p evmevmevmevm', silentErrors=True, force=True)
     assert retValue[0], f"push trx should have succeeded: {retValue}"
 
     # incorrect chainid
     nonce += 1
-    unsignedTrx = transactions.Transaction(
-        nonce,
-        150000000000, #150 GWei
-        100000,       #100k Gas
-        toAdd,
-        amount,
-        b''
-    )
     evmChainId = 8888
-    rlptx = rlp.encode(unsignedTrx.sign(evmSendKey, evmChainId), transactions.Transaction)
-    actData = {"ram_payer":"evmevmevmevm", "rlptx":rlptx.hex()}
+    signed_trx = w3.eth.account.sign_transaction(dict(
+        nonce=nonce,
+        #        maxFeePerGas=150000000000, #150 GWei
+        gas=100000,       #100k Gas
+        gasPrice=1,
+        to=Web3.toChecksumAddress(toAdd),
+        value=amount,
+        data=b'',
+        chainId=evmChainId
+    ), evmSendKey)
+
+    actData = {"ram_payer":"evmevmevmevm", "rlptx":Web3.toHex(signed_trx.rawTransaction)[2:]}
     Utils.Print("Send balance again, with invalid chainid")
     retValue = prodNode.pushMessage(evmAcc.name, "pushtx", json.dumps(actData), '-p evmevmevmevm', silentErrors=True, force=True)
     assert not retValue[0], f"push trx should have failed: {retValue}"

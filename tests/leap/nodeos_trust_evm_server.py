@@ -4,6 +4,7 @@ import os
 import sys
 import json
 import time
+import signal
 import calendar
 from datetime import datetime
 
@@ -28,6 +29,14 @@ from core_symbol import CORE_SYMBOL
 #
 # Set up a TrustEVM env
 #
+# This test sets up 2 producing nodes and one "bridge" node using test_control_api_plugin.
+#   One producing node has 3 of the elected producers and the other has 1 of the elected producers.
+#   All the producers are named in alphabetical order, so that the 3 producers, in the one production node, are
+#       scheduled first, followed by the 1 producer in the other producer node. Each producing node is only connected
+#       to the other producing node via the "bridge" node.
+#   The bridge node has the test_control_api_plugin, which exposes a restful interface that the test script uses to kill
+#       the "bridge" node when /fork endpoint called.
+#
 # --trust-evm-contract-root should point to root of TrustEVM contract build dir
 # --genesis-json file to save generated EVM genesis json
 # --read-endpoint trustnode-rpc endpoint (read endpoint)
@@ -38,6 +47,11 @@ from core_symbol import CORE_SYMBOL
 #
 #  Launches wallet at port: 9899
 #    Example: bin/cleos --wallet-url http://127.0.0.1:9899 ...
+#
+#  Sets up endpoint on port 5000
+#    /            - for req['method'] == "eth_sendRawTransaction"
+#    /fork        - create forked chain, does not return until a fork has started
+#    /restore     - resolve fork and stabilize chain
 #
 # Dependencies:
 #    pip install eth-hash requests flask flask-cors
@@ -63,6 +77,12 @@ readEndpoint=args.read_endpoint
 
 assert trustEvmContractRoot is not None, "--trust-evm-contract-root is required"
 
+totalProducerNodes=2
+totalNonProducerNodes=1
+totalNodes=totalProducerNodes+totalNonProducerNodes
+maxActiveProducers=21
+totalProducers=maxActiveProducers
+
 seed=1
 Utils.Debug=debug
 testSuccessful=False
@@ -71,30 +91,37 @@ random.seed(seed) # Use a fixed seed for repeatability.
 cluster=Cluster(walletd=True)
 walletMgr=WalletMgr(True)
 
-pnodes=1
-total_nodes=pnodes + 2
 
 try:
     TestHelper.printSystemInfo("BEGIN")
 
     cluster.setWalletMgr(walletMgr)
-
     cluster.killall(allInstances=killAll)
     cluster.cleanup()
     walletMgr.killall(allInstances=killAll)
     walletMgr.cleanup()
 
-    specificExtraNodeosArgs={}
-    shipNodeNum = total_nodes - 1
-    specificExtraNodeosArgs[shipNodeNum]="--plugin eosio::state_history_plugin --state-history-endpoint 127.0.0.1:8999 --trace-history --chain-state-history --disable-replay-opts  "
+    # ***   setup topogrophy   ***
 
-    extraNodeosArgs=""
-    if not Utils.Debug: # added by launch when debug set
-        extraNodeosArgs="--contracts-console"
+    # "bridge" shape connects defprocera through defproducerc (3 in node0) to each other and defproduceru (1 in node01)
+    # and the only connection between those 2 groups is through the bridge node
+
+    specificExtraNodeosArgs={}
+    # Connect SHiP to node01 so it will switch forks as they are resolved
+    specificExtraNodeosArgs[1]="--plugin eosio::state_history_plugin --state-history-endpoint 127.0.0.1:8999 --trace-history --chain-state-history --disable-replay-opts  "
+    # producer nodes will be mapped to 0 through totalProducerNodes-1, so the number totalProducerNodes will be the non-producing node
+    specificExtraNodeosArgs[totalProducerNodes]="--plugin eosio::test_control_api_plugin  "
+    extraNodeosArgs="--contracts-console"
 
     Print("Stand up cluster")
-    if cluster.launch(pnodes=pnodes, totalNodes=total_nodes, extraNodeosArgs=extraNodeosArgs, specificExtraNodeosArgs=specificExtraNodeosArgs) is False:
-        errorExit("Failed to stand up eos cluster.")
+    if cluster.launch(topo="bridge", pnodes=totalProducerNodes,
+                      totalNodes=totalNodes, totalProducers=totalProducers,
+                      useBiosBootFile=False, extraNodeosArgs=extraNodeosArgs, specificExtraNodeosArgs=specificExtraNodeosArgs) is False:
+        Utils.cmdError("launcher")
+        Utils.errorExit("Failed to stand up eos cluster.")
+
+    Print("Validating system accounts after bootstrap")
+    cluster.validateAccounts(None)
 
     Print ("Wait for Cluster stabilization")
     # wait for cluster to start producing blocks
@@ -103,9 +130,11 @@ try:
     Print ("Cluster stabilized")
 
     prodNode = cluster.getNode(0)
-    nonProdNode = cluster.getNode(1)
+    prodNode0 = prodNode
+    prodNode1 = cluster.getNode(1)
+    nonProdNode = cluster.getNode(2)
 
-    accounts=cluster.createAccountKeys(1)
+    accounts=cluster.createAccountKeys(6)
     if accounts is None:
         Utils.errorExit("FAILURE - create keys")
 
@@ -113,11 +142,29 @@ try:
     evmAcc.name = "evmevmevmevm"
     evmAcc.activePrivateKey="5KQwrPbwdL6PhXujxW37FSSQZ1JiwsST4cqQzDeyXtP79zkvFD3"
     evmAcc.activePublicKey="EOS6MRyAjQq8ud7hVNYcfnVPJqcVpscN5So8BhtHuGYqET5GDW5CV"
+    accounts[1].name="tester111111" # needed for voting
+    accounts[2].name="tester222222" # needed for voting
+    accounts[3].name="tester333333" # needed for voting
+    accounts[4].name="tester444444" # needed for voting
+    accounts[5].name="tester555555" # needed for voting
 
     testWalletName="test"
 
     Print("Creating wallet \"%s\"." % (testWalletName))
-    testWallet=walletMgr.create(testWalletName, [cluster.eosioAccount,accounts[0]])
+    testWallet=walletMgr.create(testWalletName, [cluster.eosioAccount,accounts[0],accounts[1],accounts[2],accounts[3],accounts[4],accounts[5]])
+
+    for _, account in cluster.defProducerAccounts.items():
+        walletMgr.importKey(account, testWallet, ignoreDupKeyWarning=True)
+
+    for i in range(0, totalNodes):
+        node=cluster.getNode(i)
+        node.producers=Cluster.parseProducers(i)
+        numProducers=len(node.producers)
+        for prod in node.producers:
+            prodName = cluster.defProducerAccounts[prod].name
+            if prodName == "defproducera" or prodName == "defproducerb" or prodName == "defproducerc" or prodName == "defproduceru":
+                Print("Register producer %s" % cluster.defProducerAccounts[prod].name)
+                trans=node.regproducer(cluster.defProducerAccounts[prod], "http::/mysite.com", 0, waitForTransBlock=False, exitOnError=True)
 
     # create accounts via eosio as otherwise a bid is needed
     for account in accounts:
@@ -126,15 +173,38 @@ try:
         transferAmount="100000000.0000 {0}".format(CORE_SYMBOL)
         Print("Transfer funds %s from account %s to %s" % (transferAmount, cluster.eosioAccount.name, account.name))
         nonProdNode.transferFunds(cluster.eosioAccount, account, transferAmount, "test transfer", waitForTransBlock=True)
-        trans=nonProdNode.delegatebw(account, 20000000.0000, 20000000.0000, waitForTransBlock=True, exitOnError=True)
+        trans=nonProdNode.delegatebw(account, 20000000.0000, 20000000.0000, waitForTransBlock=False, exitOnError=True)
+
+    # ***   vote using accounts   ***
+
+    cluster.waitOnClusterSync(blockAdvancing=3)
+
+    # vote a,b,c  u
+    voteProducers=[]
+    voteProducers.append("defproducera")
+    voteProducers.append("defproducerb")
+    voteProducers.append("defproducerc")
+    voteProducers.append("defproduceru")
+    for account in accounts:
+        Print("Account %s vote for producers=%s" % (account.name, voteProducers))
+        trans=prodNode.vote(account, voteProducers, exitOnError=True, waitForTransBlock=False)
+
+    #verify nodes are in sync and advancing
+    cluster.waitOnClusterSync(blockAdvancing=3)
+    Print("Shutdown unneeded bios node")
+    cluster.biosNode.kill(signal.SIGTERM)
+
+    # setup evm
 
     contractDir=trustEvmContractRoot + "/evm_runtime"
     wasmFile="evm_runtime.wasm"
     abiFile="evm_runtime.abi"
     Utils.Print("Publish evm_runtime contract")
     prodNode.publishContract(evmAcc, contractDir, wasmFile, abiFile, waitForTransBlock=True)
+    
     trans = prodNode.pushMessage(evmAcc.name, "init", '{"chainid":15555}', '-p evmevmevmevm')
     prodNode.waitForTransBlockIfNeeded(trans[1], True)
+
     transId=prodNode.getTransId(trans[1])
     blockNum = prodNode.getBlockNumByTransId(transId)
     block = prodNode.getBlock(blockNum)
@@ -191,12 +261,74 @@ try:
         "0x2546BcD3c84621e976D8185a91A922aE77ECEc30":"0x0364c1c85d9aa8081a8ef94c35379fa7532942b2d8cbbd1e3ea71c0e3609b96cc0,0xea6c44ac03bff858b476bba40716402b03e41b8e97e276d1baec7c37d42484a0",
         "0xbDA5747bFD65F08deb54cb465eB87D40e51B197E":"0x02c216848622dfc38a2ad2a921f524103cf654a22b8679736ecedc4901453ea3f7,0x689af8efa8c651a91ad287602527f3af2fe9f6501a7ac4b061667b5a93e037fd",
         "0xdD2FD4581271e230360230F9337D5c0430Bf44C0":"0x02302a94bd084ff317493db7c2fe07e0935c0f6d3e6772d6af3c58e92abebfb402,0xde9be858da4a475276426320d5e9262ecfc3ba460bfac56360bfa6c4c28b4ee0",
-        "0x8626f6940E2eb28930eFb4CeF49B2d1F2C9C1199":"0x027bf824b28c4bf11ce553fa746a18754949ab4959e2ea73465778d14179211f8c,0xdf57089febbacf7ba0bc227dafbffa9fc08a93fdc68e1e42411a14efcf23656e"
+        "0x8626f6940E2eb28930eFb4CeF49B2d1F2C9C1199":"0x027bf824b28c4bf11ce553fa746a18754949ab4959e2ea73465778d14179211f8c,0xdf57089febbacf7ba0bc227dafbffa9fc08a93fdc68e1e42411a14efcf23656e",
+        "0x09DB0a93B389bEF724429898f539AEB7ac2Dd55f":"0x02ecc9c3f6303fddcd44f5c9ecaa225eafaa18b8464a022389a4c4be474e4557a9,0xeaa861a9a01391ed3d587d8a5a84ca56ee277629a8b02c22093a419bf240e65d",
+        "0x02484cb50AAC86Eae85610D6f4Bf026f30f6627D":"0x031a7044a0e2549a114c92dfa83a25bfc17f4b7c2db4a7e7e48d35ed67c285de3b,0xc511b2aa70776d4ff1d376e8537903dae36896132c90b91d52c1dfbae267cd8b",
+        "0x08135Da0A343E492FA2d4282F2AE34c6c5CC1BbE":"0x02abca850bc9472d92402203e9cbafc2e8dedb19f1103911a62b11ba2a4370e635,0x224b7eb7449992aac96d631d9677f7bf5888245eef6d6eeda31e62d2f29a83e4",
+        "0x5E661B79FE2D3F6cE70F5AAC07d8Cd9abb2743F1":"0x02092a3ba818f25a71a947d3daa7f9d501c3f18296057c928bc5feffa8b61d54f3,0x4624e0802698b9769f5bdb260a3777fbd4941ad2901f5966b854f953497eec1b",
+        "0x61097BA76cD906d2ba4FD106E757f7Eb455fc295":"0x030b1d683d363d0704f04e4fb59a33b6e22bd0187303f9cce881d0809d3a535f28,0x375ad145df13ed97f8ca8e27bb21ebf2a3819e9e0a06509a812db377e533def7",
+        "0xDf37F81dAAD2b0327A0A50003740e1C935C70913":"0x02da995e8954b8c4681db2986bc3004f403c8f5600d1d33a949a63045c50abf41d,0x18743e59419b01d1d846d97ea070b5a3368a3e7f6f0242cf497e1baac6972427",
+        "0x553BC17A05702530097c3677091C5BB47a3a7931":"0x027bc620a41c572668c4d7b508e020cd8f4e9e50074016c461370e7995838b5dbd,0xe383b226df7c8282489889170b0f68f66af6459261f4833a781acd0804fafe7a",
+        "0x87BdCE72c06C21cd96219BD8521bDF1F42C78b5e":"0x0335aafbd21e02e958638c90c562dc048df89452b743dd7c3c7eadb8a223925895,0xf3a6b71b94f5cd909fb2dbb287da47badaa6d8bcdc45d595e2884835d8749001",
+        "0x40Fc963A729c542424cD800349a7E4Ecc4896624":"0x032cd2af66ea588191488e7a647190584a3999630e2db8d5abba0ac290fbd291ab,0x4e249d317253b9641e477aba8dd5d8f1f7cf5250a5acadd1229693e262720a19",
+        "0x9DCCe783B6464611f38631e6C851bf441907c710":"0x0329fdd393d57616eafdf67ebb6272a8ddb2ebf1eaa9b95b9e0702de79bf90da02,0x233c86e887ac435d7f7dc64979d7758d69320906a0d340d2b6518b0fd20aa998",
+        "0x1BcB8e569EedAb4668e55145Cfeaf190902d3CF2":"0x02a3b615dcceb0b919884b12fed0d3125c5324dd01e95fd0e5dfbee1fc51cbbe15,0x85a74ca11529e215137ccffd9c95b2c72c5fb0295c973eb21032e823329b3d2d",
+        "0x8263Fce86B1b78F95Ab4dae11907d8AF88f841e7":"0x02352c8ff139eb4b92f0b24d60e434c365ee202acc25aaa4f438852fce49eb41c8,0xac8698a440d33b866b6ffe8775621ce1a4e6ebd04ab7980deb97b3d997fc64fb",
+        "0xcF2d5b3cBb4D7bF04e3F7bFa8e27081B52191f91":"0x02eb8d75ab6953483cb4df4fae49e0199a220b3cd204852960e55e1f1dbb3cfa21,0xf076539fbce50f0513c488f32bf81524d30ca7a29f400d68378cc5b1b17bc8f2",
+        "0x86c53Eb85D0B7548fea5C4B4F82b4205C8f6Ac18":"0x0353db5e250d783f4368322de94bab64276c80a7284b9db0eae18bcae1f3eb0e28,0x5544b8b2010dbdbef382d254802d856629156aba578f453a76af01b81a80104e",
+        "0x1aac82773CB722166D7dA0d5b0FA35B0307dD99D":"0x02e749e4fb83ae7afc7d19acdfc6a97ec5ae677019decf2c46758096a679021c6c,0x47003709a0a9a4431899d4e014c1fd01c5aad19e873172538a02370a119bae11",
+        "0x2f4f06d218E426344CFE1A83D53dAd806994D325":"0x022a04ffd79e7334daa2724d9227d11ecf8124f0f2e2ae82b78cbfba14bca47577,0x9644b39377553a920edc79a275f45fa5399cbcf030972f771d0bca8097f9aad3",
+        "0x1003ff39d25F2Ab16dBCc18EcE05a9B6154f65F4":"0x023f1e0c738f9604febf39304f7a8c918da05a7d0fc574cca239893b1f24e10639,0xcaa7b4a2d30d1d565716199f068f69ba5df586cf32ce396744858924fdf827f0",
+        "0x9eAF5590f2c84912A08de97FA28d0529361Deb9E":"0x0354d2c78f37e8efe3014735fcca95cabae6a1e7901262a3f4e71355b1b406e555,0xfc5a028670e1b6381ea876dd444d3faaee96cffae6db8d93ca6141130259247c",
+        "0x11e8F3eA3C6FcF12EcfF2722d75CEFC539c51a1C":"0x023e21c805452630d51c2116c0be5d78586f09f0239e5e0c78c1301bca129dd60a,0x5b92c5fe82d4fabee0bc6d95b4b8a3f9680a0ed7801f631035528f32c9eb2ad5",
+        "0x7D86687F980A56b832e9378952B738b614A99dc6":"0x03cae5771b32d2b0639db908805738158abd3943623f23eaf875cc7e7eaefa9662,0xb68ac4aa2137dd31fd0732436d8e59e959bb62b4db2e6107b15f594caf0f405f",
+        "0x9eF6c02FB2ECc446146E05F1fF687a788a8BF76d":"0x036fa7e0bea88907ab4753030c9e2bde73f1740ade3e134eba7414729be25eddbf,0xc95eaed402c8bd203ba04d81b35509f17d0719e3f71f40061a2ec2889bc4caa7",
+        "0x08A2DE6F3528319123b25935C92888B16db8913E":"0x033f52ffb1962b253b7b62f5a3a6e68b71f25fa8f5e3eeeeeb666c3fb73eac90f2,0x55afe0ab59c1f7bbd00d5531ddb834c3c0d289a4ff8f318e498cb3f004db0b53",
+        "0xe141C82D99D85098e03E1a1cC1CdE676556fDdE0":"0x0389b4c6ccde6226f5efdaad52831601004334d110e5eceb8060143a8adf234a12,0xc3f9b30f83d660231203f8395762fa4257fa7db32039f739630f87b8836552cc",
+        "0x4b23D303D9e3719D6CDf8d172Ea030F80509ea15":"0x039141c8858729dd0c6849821158bce66f986cc07c8f02915798b559b0bfd54d4f,0x3db34a7bcc6424e7eadb8e290ce6b3e1423c6e3ef482dd890a812cd3c12bbede",
+        "0xC004e69C5C04A223463Ff32042dd36DabF63A25a":"0x03a4c793122ddb400993b158b5fc2c49537892aca278a78800d901ced771af1b49,0xae2daaa1ce8a70e510243a77187d2bc8da63f0186074e4a4e3a7bfae7fa0d639",
+        "0x5eb15C0992734B5e77c888D713b4FC67b3D679A2":"0x02a634ff1801b05722f7c5d1f90c49a9647bbb1687ff78f6def5aa37b3fe99e4f3,0x5ea5c783b615eb12be1afd2bdd9d96fae56dda0efe894da77286501fd56bac64",
+        "0x7Ebb637fd68c523613bE51aad27C35C4DB199B9c":"0x02f339bf0e15d6b2fff7b2770bca8b08204cde82272e8c86116996aba7ac9f86aa,0xf702e0ff916a5a76aaf953de7583d128c013e7f13ecee5d701b49917361c5e90",
+        "0x3c3E2E178C69D4baD964568415a0f0c84fd6320A":"0x02a7dbabe4d7d8ce4b97b2a6d35d7e3258f02cc961d2c83477dbaeadbc04627c9b,0x7ec49efc632757533404c2139a55b4d60d565105ca930a58709a1c52d86cf5d3",
+        "0x35304262b9E87C00c430149f28dD154995d01207":"0x03e719f368cc8eb4573b9d22e88141ae459d886145219064923ff564afb432c9ac,0x755e273950f5ae64f02096ae99fe7d4f478a28afd39ef2422068ee7304c636c0",
+        "0xD4A1E660C916855229e1712090CcfD8a424A2E33":"0x021a7791080bafa8601bb57bd37697f6791b525476b97289b71da04ab3a4a2b30c,0xaf6ecabcdbbfb2aefa8248b19d811234cd95caa51b8e59b6ffd3d4bbc2a6be4c",
+        "0xEe7f6A930B29d7350498Af97f0F9672EaecbeeFf":"0x03d41afe51df3bc945686fc68692bbf1b842625d237f37fc6be7e7f48b12dd179a,0x70c2bd1b41084c2e2238551eace483321f8c1a413a471c3b49c8a5d1d6b3d0c4",
+        "0x145e2dc5C8238d1bE628F87076A37d4a26a78544":"0x024982335a4f5adc6a12deb2e993b4a3a758c934cfd7f039f9b7f2da9bba3584e5,0xcb8e373c93609268cdcec93450f3578b92bb20c3ac2e77968d106025005f97b5",
+        "0xD6A098EbCc5f8Bd4e174D915C54486B077a34A51":"0x03a3d9eb25c55ec1b2f806bf74467179ba5dafc0b60a71df8584186bb5e00d33e9,0x6f29f6e0b750bcdd31c3403f48f11d72215990375b6d23380b39c9bbf854a7d3",
+        "0x042a63149117602129B6922ecFe3111168C2C323":"0x0324b9bda0e580b02d781560fd0e0cbfd2eaeba437385f8cdef34be6ec9bd8a3e5,0xff249f7eba6d8d3a65794995d724400a23d3b0bd1714265c965870ef47808be8",
+        "0xa0EC9eE47802CeB56eb58ce80F3E41630B771b04":"0x02293160c8d9443c5005f079f69c8d6ccd300bb6ca602047d441cadd34fce69e6a,0x5599a7be5589682da3e0094806840e8510dae6493665a701b06c59cbe9d97968",
+        "0xe8B1ff302A740fD2C6e76B620d45508dAEc2DDFf":"0x02e9c73d939eca4abac1a04ae265b74ff31cdd24be067aae13dcd54128e649161f,0x93de2205919f5b472723722fedb992e962c34d29c4caaedd82cd33e16f1fd3cf",
+        "0xAb707cb80e7de7C75d815B1A653433F3EEc44c74":"0x026d93cfa091c70da11e27ee30dbcca537002ed21b19e05ac93e7d851a96138046,0xd20ecf81c6c3ad87a4e8dbeb7ceef41dd0eebc7a1657efb9d34e47217694b5cb",
+        "0x0d803cdeEe5990f22C2a8DF10A695D2312dA26CC":"0x026af2062598d0630cc1c6f5353e66932434d1eb575bafab8da38741e34e82e281,0xe4058704ed240d68a94b6fb226824734ddabd4b1fe37bc85ce22f5b17f98830e",
+        "0x1c87Bb9234aeC6aDc580EaE6C8B59558A4502220":"0x02505ad7c2117c6a2eef85f5b70fb590a8f13f9f37b01f7e5b10139186bef06f2a,0x4ae4408221b5042c0ee36f6e9e6b586a00d0452aa89df2e7f4f5aec42152ec43",
+        "0x4779d18931B35540F84b0cd0e9633855B84df7b8":"0x03dd485c6f4db4f3978db121fba82550acef94eaf7f5ab88ecc3f6715b903c7184,0x0e7c38ba429fa5081692121c4fcf6304ca5895c6c86d31ed155b0493c516107f",
+        "0xC0543b0b980D8c834CBdF023b2d2A75b5f9D1909":"0x0270f7e08d92e184babc782d65b155a9b7dfbc0b671cc7b1a8c164e279df10524c,0xd5df67c2e4da3ff9c8c6045d9b7c41581efeb2a3660921ad4ba863cc4b8c211c",
+        "0x73B3074ac649A8dc31c2C90a124469456301a30F":"0x02f8660f6999a86ebe5cd7a3d70406e9a40b91b2adb9f5a4c0bc417d9782fdda90,0x92456ac1fa1ef65a04fb4689580ad5e4cda7369f3620ef3a02fa4015725f460a",
+        "0x265188114EB5d5536BC8654d8e9710FE72C28c4d":"0x037e2b32c6115bd151f79cb03a02eda9a8e358fb6be1eaec990ea5a60edc5371dc,0x65b10e7d7315bb8b7f7c6eefcbd87b36ad4007c4ade9c032354f016e84ad9c5e",
+        "0x924Ba5Ce9f91ddED37b4ebf8c0dc82A40202fc0A":"0x02744c74fdfbaf21ce24cb7b8b388cbdbb5d5f6cb17cbd8947937c101b5ddabd72,0x365820b3376c77dab008476d49f7cd7af87fc7bbd57dc490378106c3353b2b33",
+        "0x64492E25C30031EDAD55E57cEA599CDB1F06dad1":"0x027aba8dcc8f89805a671b6f5c9cb045bbdffcc34be8d67c08676834be4e05108e,0xb07579b9864bb8e69e8b6e716284ab5b5f39fe5bb57ae4c83af795a242390202",
+        "0x262595fa2a3A86adACDe208589614d483e3eF1C0":"0x03d886c44c0449efb2b3e8786b84526b145312be2218b0df7e9cd36acfab8a7906,0xbf071d2b017426fcbf763cce3b3efe3ffc9663a42c77a431df521ef6c79cacad",
+        "0xDFd99099Fa13541a64AEe9AAd61c0dbf3D32D492":"0x02261caf03c748989a5d7d540b2fbf31f1a7e073a79f44b970ab2eb6de8aefe618,0x8bbffff1588b3c4eb8d415382546f6f6d5f0f61087c3be7c7c4d9e0d41d97258",
+        "0x63c3686EF31C03a641e2Ea8993A91Ea351e5891a":"0x03ed764675312dedf399f1bc201d3793228ccf560d0af20ea647362c82232838be,0xb658f0575a14a7ac05075cb0f8727f0aae168a091dfb32d92514d1a7c11cf498",
+        "0x9394cb5f737Bd3aCea7dcE90CA48DBd42801EE5d":"0x02317b1f8a1fbe4fe6f797c699557e934c32ba84124b84d96c5169739aea200aee,0x228330af91fa515d7514cf5ac6594ab90b296cbd8ff7bc4567306aa66cacd79f",
+        "0x344dca30F5c5f74F2f13Dc1d48Ad3A9069d13Ad9":"0x033faa1f92cfcc003fb2881ebc43ec06afb7e827affb98e31ee4322730351cc422,0xe6f80f9618311c0cd58f6a3fc6621cdbf6da4a72cc42e2974c98829343e7927b",
+        "0xF23E054D8b4D0BECFa22DeEF5632F27f781f8bf5":"0x0364c2c11140a075eb0091cf670323d36e13befec4e8a10cba171a9a2de9f1ab45,0x36d0435aa9a2c24d72a0aa69673b3acc2649969c38a581103df491aac6c33dd4",
+        "0x6d69F301d1Da5C7818B5e61EECc745b30179C68b":"0x03c550d4a3aaabcf2489acc382f8f8809b1e1601115564e39b239348690ae701bc,0xf3ed98f9148171cfed177aef647e8ac0e2579075f640d05d37df28e6e0551083",
+        "0xF0cE7BaB13C99bA0565f426508a7CD8f4C247E5a":"0x03a5d94447bc763e337e2dd4a88a4d5be5bda78f7ebb891ed9ed9cdf9d49a01ec4,0x8fc20c439fd7cf4f36217471a5db7594188540cf9997a314520a018de27544dd",
+        "0x011bD5423C5F77b5a0789E27f922535fd76B688F":"0x0351ee10626b0a786de6055e2ae0d5425ba3f17059b40219fe8820946d16249e1e,0x549078aab3adafeff862b2d40b6b27756c5c4669475c3367edfb8dcf63ea1ae5",
+        "0xD9065f27e9b706E5F7628e067cC00B288dddbF19":"0x0229157c9e5a73e54e55a062cf19104f6061dbcb11a23e31f60913d0b12c553d3d,0xacf192decb2e4ddd8ad61693ab8edd67e3620b2ed79880ff4e1e04482c52c916",
+        "0x54ccCeB38251C29b628ef8B00b3cAB97e7cAc7D5":"0x03feca36c85fc354f47dfcc23f0e5baca85357c64bbe8616560675cd3333b8acbc,0x47dc59330fb8c356ef61c55c11f9bb49ee463df50cbfe59f389de7637037b029",
+        "0xA1196426b41627ae75Ea7f7409E074BE97367da2":"0x0352536b2204dc725b8b98c2931079fcb912bc702215da262e9d5cd444d226cc68,0xf0050439b33fd77f7183f44375bc43a869a9880dca82a187fab9be91e020d029",
+        "0xE74cEf90b6CF1a77FEfAd731713e6f53e575C183":"0x026ffa4ca4e8e4e9e9426f2b762e31a9b0b3586f8eafb470bb32aca6e5fd46ffcd,0xe995cc7ea38e5c2927b97607765c2a20f4a6052d6810a3a1102e84d77c0df13b",
+        "0x7Df8Efa6d6F1CB5C4f36315e0AcB82b02Ae8BA40":"0x03c85a8ab2a97379d1c3ff45e28815a7dc5485d2246362bd4823fceee257b7e798,0x8232e778c8e32eddb268e12aee5e82c7bb540cc176e150d64f35ee4ae2faf2b2",
+        "0x9E126C57330FA71556628e0aabd6B6B6783d99fA":"0x034d7b61c8dd53a761ab44d1e06be6b1338de4095c620112494b8830792c84f64b,0xba8c9ff38e4179748925335a9891b969214b37dc3723a1754b8b849d3eea9ac0"
     }
 
-    for k in addys:
+    for i,k in enumerate(addys):
+        print("addys: [{0}] [{1}] [{2}]".format(i,k[2:].lower(), len(k[2:])))
         trans = prodNode.pushMessage(evmAcc.name, "setbal", '{"addy":"' + k[2:].lower() + '", "bal":"0000000000000000000000000000000000100000000000000000000000000000"}', '-p evmevmevmevm')
-        genesis_info["alloc"][k.lower()] = {"balance":"0x10000000000000000000000000000000"}
+        genesis_info["alloc"][k.lower()] = {"balance":"0x100000000000000000000000000000"}
+        if not (i+1) % 20: time.sleep(1)
     prodNode.waitForTransBlockIfNeeded(trans[1], True)
 
     if gensisJson[0] != '/': gensisJson = os.path.realpath(gensisJson)
@@ -216,12 +348,46 @@ try:
     app = Flask(__name__)
     CORS(app)
 
+    @app.route("/fork", methods=["POST"])
+    def fork():
+        Print("Sending command to kill bridge node to separate the 2 producer groups.")
+        forkAtProducer="defproducera"
+        prodNode1Prod="defproduceru"
+        preKillBlockNum=nonProdNode.getBlockNum()
+        preKillBlockProducer=nonProdNode.getBlockProducerByNum(preKillBlockNum)
+        nonProdNode.killNodeOnProducer(producer=forkAtProducer, whereInSequence=1)
+        Print("Current block producer %s fork will be at producer %s" % (preKillBlockProducer, forkAtProducer))
+        prodNode0.waitForProducer(forkAtProducer)
+        prodNode1.waitForProducer(prodNode1Prod)
+        if nonProdNode.verifyAlive(): # if on defproducera, need to wait again
+            prodNode0.waitForProducer(forkAtProducer)
+            prodNode1.waitForProducer(prodNode1Prod)
+
+        if nonProdNode.verifyAlive():
+            Print("Bridge did not shutdown")
+            return "Bridge did not shutdown"
+
+        Print("Fork started")
+        return "Fork started"
+
+    @app.route("/restore", methods=["POST"])
+    def restore():
+        Print("Relaunching the non-producing bridge node to connect the producing nodes again")
+
+        if nonProdNode.verifyAlive():
+            return "bridge is already running"
+
+        if not nonProdNode.relaunch():
+            Utils.errorExit("Failure - (non-production) node %d should have restarted" % (nonProdNode.nodeNum))
+
+        return "restored fork should resolve"
+
     @app.route("/", methods=["POST"])
     def default():
         def forward_request(req):
             if req['method'] == "eth_sendRawTransaction":
                 actData = {"ram_payer":"evmevmevmevm", "rlptx":req['params'][0][2:]}
-                prodNode.pushMessage(evmAcc.name, "pushtx", json.dumps(actData), '-p evmevmevmevm')
+                prodNode1.pushMessage(evmAcc.name, "pushtx", json.dumps(actData), '-p evmevmevmevm')
                 return {
                     "id": req['id'],
                     "jsonrpc": "2.0",

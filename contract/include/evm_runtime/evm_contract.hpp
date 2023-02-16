@@ -2,11 +2,10 @@
 #include <eosio/asset.hpp>
 #include <eosio/singleton.hpp>
 
-#include <silkworm/types/block.hpp>
-
 #include <evm_runtime/types.hpp>
 
 #include <silkworm/types/block.hpp>
+#include <silkworm/consensus/engine.hpp>
 #ifdef WITH_TEST_ACTIONS
 #include <evm_runtime/test/block_info.hpp>
 #endif
@@ -77,7 +76,7 @@ CONTRACT evm_contract : public contract {
          check( _config.get().version == 0u, "unsupported configuration singleton" );
       }
 
-      void push_trx(eosio::name ram_payer, silkworm::Block& block, const bytes& rlptx);
+      void push_trx(eosio::name ram_payer, silkworm::Block& block, const bytes& rlptx, silkworm::consensus::IEngine& engine, const silkworm::ChainConfig& chain_config);
 
       uint64_t get_and_increment_nonce(const name owner);
 
