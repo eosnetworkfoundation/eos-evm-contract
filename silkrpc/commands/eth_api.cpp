@@ -1379,7 +1379,7 @@ boost::asio::awaitable<void> EthereumRpcApi::handle_eth_get_logs(const nlohmann:
     }
 
     auto filter = params[0].get<Filter>();
-    SILKRPC_LOG << "filter: " << filter << "\n";
+    SILKRPC_DEBUG << "filter: " << filter << "\n";
     std::vector<Log> logs;
 
     auto tx = co_await database_->begin();
