@@ -29,8 +29,6 @@ namespace silkworm {
     }
 }
 
-extern "C" __attribute__((eosio_wasm_import)) uint32_t get_code_hash(uint64_t account, uint32_t struct_version, char* data, uint32_t size);
-
 namespace evm_runtime {
 
 using namespace silkworm;
@@ -54,6 +52,7 @@ void evm_contract::init(const uint64_t chainid) {
 
 void evm_contract::setingressfee(asset ingress_bridge_fee) {
     assert_inited();
+    require_auth(get_self());
 
     check( ingress_bridge_fee.symbol == token_symbol, "unexpected bridge symbol" );
     check( ingress_bridge_fee.amount >= 0, "ingress bridge fee cannot be negative");
@@ -65,6 +64,7 @@ void evm_contract::setingressfee(asset ingress_bridge_fee) {
 
 void evm_contract::addegress(const std::vector<name>& accounts) {
     assert_inited();
+    require_auth(get_self());
 
     egresslist egresslist_table(get_self(), get_self().value);
 
@@ -77,6 +77,7 @@ void evm_contract::addegress(const std::vector<name>& accounts) {
 
 void evm_contract::removeegress(const std::vector<name>& accounts) {
     assert_inited();
+    require_auth(get_self());
 
     egresslist egresslist_table(get_self(), get_self().value);
 
@@ -219,7 +220,7 @@ uint64_t evm_contract::get_and_increment_nonce(const name owner) {
 checksum256 evm_contract::get_code_hash(name account) const {
     char buff[64];
 
-    eosio::check(::get_code_hash(account.value, 0, buff, sizeof(buff)) <= sizeof(buff), "get_code_hash() too big");
+    eosio::check(internal_use_do_not_use::get_code_hash(account.value, 0, buff, sizeof(buff)) <= sizeof(buff), "get_code_hash() too big");
     using start_of_code_hash_return = std::tuple<unsigned_int, uint64_t, checksum256>;
     const auto& [v, s, code_hash] = unpack<start_of_code_hash_return>(buff, sizeof(buff));
 
