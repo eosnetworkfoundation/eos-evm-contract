@@ -46,7 +46,7 @@ void evm_contract::init(const uint64_t chainid) {
         .genesis_time = current_time_point()
     }, get_self());
 
-    stats_singleton(get_self(), get_self().value).get_or_create(get_self());
+    inevm_singleton(get_self(), get_self().value).get_or_create(get_self());
 
     open(get_self(), get_self());
 }

@@ -138,13 +138,7 @@ struct [[eosio::table]] [[eosio::contract("evm_contract")]] balance {
 
 typedef eosio::multi_index<"balances"_n, balance> balances;
 
-struct [[eosio::table]] [[eosio::contract("evm_contract")]] stats {
-    balance_with_dust in_evm;
-
-    EOSLIB_SERIALIZE(stats, (in_evm));
-};
-
-typedef eosio::singleton<"stats"_n, stats> stats_singleton;
+typedef eosio::singleton<"inevm"_n, balance_with_dust> inevm_singleton;
 
 struct [[eosio::table]] [[eosio::contract("evm_contract")]] nextnonce {
     name     owner;
