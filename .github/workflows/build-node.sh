@@ -12,6 +12,7 @@ function ee()
 ee export DEBIAN_FRONTEND='noninteractive'
 ee apt-get update -q
 ee apt-get install -yqq build-essential cmake gcc-10 g++-10 git
+ee git config --global --add safe.directory '*' # silence all safe.directory git warnings inside container (causing "fatal: detected dubious ownership in repository")
 
 # debug code
 echo "CC='${CC}'"
