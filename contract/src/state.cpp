@@ -19,7 +19,6 @@ std::optional<Account> state::read_account(const evmc::address& address) const n
     
     auto code_hash = itr->get_code_hash();
     addr2id[address] = itr->id;
-    addr2code[code_hash] = itr->code;
 
     return Account{itr->nonce, intx::be::load<uint256>(itr->get_balance()), code_hash, 0};
 }
@@ -31,11 +30,10 @@ ByteView state::read_code(const evmc::bytes32& code_hash) const noexcept {
         return ByteView{(const uint8_t*)code.data(), code.size()};
     }
     
-    account_table accounts(_self, _self.value);
-    auto inx = accounts.get_index<"by.codehash"_n>();
+    codestore_table codes(_self, _self.value);
+    auto inx = codes.get_index<"by.codehash"_n>();
     auto itr = inx.find(make_key(code_hash));
-    ++stats.account.read;
-
+    
     if (itr == inx.end() || itr->code.size() == 0) {
         return ByteView{};
     }
@@ -141,13 +139,25 @@ bool state::gc(uint32_t max) {
 }
 
 void state::update_account_code(const evmc::address& address, uint64_t, const evmc::bytes32& code_hash, ByteView code) {
+    codestore_table codes(_self, _self.value);
+    auto inxc = codes.get_index<"by.codehash"_n>();
+    auto itrc = inxc.find(make_key(code_hash));
+    if(itrc == inxc.end()) {
+        codes.emplace(_ram_payer, [&](auto& row){
+            row.id = codes.available_primary_key();
+            row.code_hash = to_bytes(code_hash);
+            row.code = bytes{code.begin(), code.end()};
+        });
+    } else {
+        // code should be immutable
+    }
+    
     account_table accounts(_self, _self.value);
     auto inx = accounts.get_index<"by.address"_n>();
     auto itr = inx.find(make_key(address));
     ++stats.account.read;
     if( itr != inx.end() ) {
         accounts.modify(*itr, eosio::same_payer, [&](auto& row){
-            row.code = bytes{code.begin(), code.end()};
             row.code_hash = to_bytes(code_hash);
         });
         ++stats.account.update;
@@ -156,7 +166,6 @@ void state::update_account_code(const evmc::address& address, uint64_t, const ev
             row.id = accounts.available_primary_key();;
             row.eth_address = to_bytes(address);
             row.nonce = 0;
-            row.code = bytes{code.begin(), code.end()};
             row.code_hash = to_bytes(code_hash);
         });
         ++stats.account.create;

@@ -13,17 +13,12 @@ struct [[eosio::table]] [[eosio::contract("evm_contract")]] account {
     bytes       eth_address;
     uint64_t    nonce;
     bytes       balance;
-    bytes       code;
     bytes       code_hash;
 
     uint64_t primary_key()const { return id; }
 
     checksum256 by_eth_address()const { 
         return make_key(eth_address);
-    }
-
-    checksum256 by_code_hash()const { 
-        return make_key(code_hash);
     }
 
     uint256be get_balance()const {
@@ -38,13 +33,36 @@ struct [[eosio::table]] [[eosio::contract("evm_contract")]] account {
         return res;
     }
 
-    EOSLIB_SERIALIZE(account, (id)(eth_address)(nonce)(balance)(code)(code_hash));
+    EOSLIB_SERIALIZE(account, (id)(eth_address)(nonce)(balance)(code_hash));
 };
 
 typedef multi_index< "account"_n, account,
-    indexed_by<"by.address"_n, const_mem_fun<account, checksum256, &account::by_eth_address>>,
-    indexed_by<"by.codehash"_n, const_mem_fun<account, checksum256, &account::by_code_hash>>
+    indexed_by<"by.address"_n, const_mem_fun<account, checksum256, &account::by_eth_address>>
 > account_table;
+
+struct [[eosio::table]] [[eosio::contract("evm_contract")]] codestore {
+    uint64_t    id;
+    bytes       code;
+    bytes       code_hash;
+
+    uint64_t primary_key()const { return id; }
+
+    checksum256 by_code_hash()const { 
+        return make_key(code_hash);
+    }
+
+    bytes32 get_code_hash()const {
+        bytes32 res;
+        std::copy(code_hash.begin(), code_hash.end(), res.bytes);
+        return res;
+    }
+
+    EOSLIB_SERIALIZE(codestore, (id)(code)(code_hash));
+};
+
+typedef multi_index< "codestore"_n, codestore,
+    indexed_by<"by.codehash"_n, const_mem_fun<codestore, checksum256, &codestore::by_code_hash>>
+> codestore_table;
 
 struct [[eosio::table]] [[eosio::contract("evm_contract")]] storage {
     uint64_t id;

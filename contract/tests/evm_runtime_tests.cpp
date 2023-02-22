@@ -237,7 +237,6 @@ struct account {
    bytes       eth_address;
    uint64_t    nonce;
    bytes       balance;
-   bytes       code;
    bytes       code_hash;
 
    bytes       old_code_hash;
@@ -246,13 +245,6 @@ struct account {
       typedef index256_object index_object;
       static name index_name() {
          return account::index_name("by.address"_n);
-      }
-   };
-
-   struct by_codehash {
-      typedef index256_object index_object;
-      static name index_name() {
-         return account::index_name("by.codehash"_n);
       }
    };
 
@@ -272,16 +264,7 @@ struct account {
    static name index_name(const name& n) {
       uint64_t index_table_name = table_name().to_uint64_t() & 0xFFFFFFFFFFFFFFF0ULL;
 
-      //0=>by.address, 1=>by.codehash
-      if( n == "by.address"_n ) {
-         return name{index_table_name | 0};
-      } else if( n == "by.codehash"_n ) {
-         return name{index_table_name | 1};
-      }
-
-      dlog("index name not found: ${a}", ("a",n.to_string()));
-      BOOST_REQUIRE(false);
-      return name{0};
+      return name{index_table_name | 0};
    }
 
    static name index_name(uint64_t n) {
@@ -290,12 +273,6 @@ struct account {
 
    static std::optional<account> get_by_address(chainbase::database& db, const evmc::address& address) {
       auto r = get_by_index<evmc::address, account>(db, "evm"_n, "by.address"_n, address);
-      if(r) r->old_code_hash = r->code_hash;
-      return r;
-   }
-
-   static std::optional<account> get_by_code_hash(chainbase::database& db, const evmc::bytes32& code_hash) {
-      auto r = get_by_index<evmc::bytes32, account>(db, "evm"_n, "by.codehash"_n, code_hash);
       if(r) r->old_code_hash = r->code_hash;
       return r;
    }
@@ -310,7 +287,48 @@ struct account {
    }
 
 };
-FC_REFLECT(account, (id)(eth_address)(nonce)(balance)(code)(code_hash));
+FC_REFLECT(account, (id)(eth_address)(nonce)(balance)(code_hash));
+
+struct codestore {
+   uint64_t    id;
+   bytes       code;
+   bytes       code_hash;
+
+   bytes       old_code_hash;
+
+
+   struct by_codehash {
+      typedef index256_object index_object;
+      static name index_name() {
+         return account::index_name("by.codehash"_n);
+      }
+   };
+
+   evmc::bytes32 get_code_hash()const {
+      evmc::bytes32 res;
+      std::copy(code_hash.begin(), code_hash.end(), res.bytes);
+      return res;
+   }
+
+   static name table_name() { return "codestore"_n; }
+   static name index_name(const name& n) {
+      uint64_t index_table_name = table_name().to_uint64_t() & 0xFFFFFFFFFFFFFFF0ULL;
+
+     return name{index_table_name | 0};
+   }
+
+   static name index_name(uint64_t n) {
+      return index_name(name{n});
+   }
+
+   static std::optional<codestore> get_by_code_hash(chainbase::database& db, const evmc::bytes32& code_hash) {
+      auto r = get_by_index<evmc::bytes32, codestore>(db, "evm"_n, "by.codehash"_n, code_hash);
+      if(r) r->old_code_hash = r->code_hash;
+      return r;
+   }
+
+};
+FC_REFLECT(codestore, (id)(code)(code_hash));
 
 struct storage {
    uint64_t id;
@@ -407,7 +425,7 @@ struct evm_runtime_tester : eosio_system_tester, silkworm::State {
       }
 
       BOOST_REQUIRE_EQUAL( success(), push_action(eosio::chain::config::system_account_name, "wasmcfg"_n, mvo()("settings", "high")) );
-      create_account_with_resources(ME, system_account_name, 5000000);
+      create_account_with_resources(ME, system_account_name, 50000000);
       set_authority( ME, "active"_n, {1, {{get_public_key(ME,"active"),1}}, {{{ME,"eosio.code"_n},1}}} );
 
       set_code(ME, contracts::evm_runtime_wasm());
@@ -568,13 +586,13 @@ struct evm_runtime_tester : eosio_system_tester, silkworm::State {
    mutable bytes read_code_buffer;
    ByteView read_code(const evmc::bytes32& code_hash) const noexcept {
       auto& db = const_cast<chainbase::database&>(control->db());
-      auto accnt = account::get_by_code_hash(db, code_hash);
-      if(!accnt) {
+      auto accntcode = codestore::get_by_code_hash(db, code_hash);
+      if(!accntcode) {
          dlog("no code for hash ${ch}", ("ch",to_bytes(code_hash)));
          return ByteView{};
       }
       //dlog("${a} ${c} ${ch} ${ch2}", ("a",accnt->eth_address)("c",accnt->code)("ch2",accnt->code_hash)("ch",to_bytes(code_hash)));
-      read_code_buffer = accnt->code;
+      read_code_buffer = accntcode->code;
       return ByteView{(const uint8_t*)read_code_buffer.data(), read_code_buffer.size()};
    }
 
