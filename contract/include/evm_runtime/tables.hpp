@@ -7,13 +7,14 @@
 namespace evm_runtime {
 
 using namespace eosio;
-
+// c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470
+inline constexpr char kEmptyHashBytes[32] = {-59, -46, 70, 1, -122, -9, 35, 60, -110, 126, 125, -78, -36, -57, 3, -64, -27, 0, -74, 83, -54, -126, 39, 59, 123, -6, -40, 4, 93,-123, -92, 112};
 struct [[eosio::table]] [[eosio::contract("evm_contract")]] account {
     uint64_t    id;
     bytes       eth_address;
     uint64_t    nonce;
     bytes       balance;
-    bytes       code_hash;
+    std::optional<bytes>       code_hash;
 
     uint64_t primary_key()const { return id; }
 
@@ -29,7 +30,12 @@ struct [[eosio::table]] [[eosio::contract("evm_contract")]] account {
 
     bytes32 get_code_hash()const {
         bytes32 res;
-        std::copy(code_hash.begin(), code_hash.end(), res.bytes);
+        if (code_hash.has_value()) {
+            std::copy(code_hash.value().begin(), code_hash.value().end(), res.bytes);
+        }
+        else {
+            std::copy(kEmptyHashBytes, &kEmptyHashBytes[32], res.bytes);
+        }
         return res;
     }
 

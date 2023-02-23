@@ -231,15 +231,18 @@ struct block_info {
 };
 //FC_REFLECT(block_info, (coinbase)(difficulty)(gasLimit)(number)(timestamp)(base_fee_per_gas));
 FC_REFLECT(block_info, (coinbase)(difficulty)(gasLimit)(number)(timestamp));
+inline constexpr char kEmptyHashBytes[32] = {(char)-59, (char)-46, (char)70, (char)1, (char)-122, (char)-9, (char)35, (char)60,
+ (char)-110, (char)126, (char)125, (char)-78, (char)-36, (char)-57, (char)3, (char)-64, (char)-27, (char)0, 
+ (char)-74, (char)83, (char)-54, (char)-126, (char)39, (char)59, (char)123, (char)-6, 
+ (char)-40, (char)4, (char)93,(char)-123, (char)-92, (char)112};
 
 struct account {
    uint64_t    id;
    bytes       eth_address;
    uint64_t    nonce;
    bytes       balance;
-   bytes       code_hash;
+   std::optional<bytes>       code_hash;
 
-   bytes       old_code_hash;
 
    struct by_address {
       typedef index256_object index_object;
@@ -256,7 +259,12 @@ struct account {
 
    evmc::bytes32 get_code_hash()const {
       evmc::bytes32 res;
-      std::copy(code_hash.begin(), code_hash.end(), res.bytes);
+      if (code_hash.has_value()) {
+         std::copy(code_hash.value().begin(), code_hash.value().end(), res.bytes);
+      }
+      else {
+         std::copy(kEmptyHashBytes, &kEmptyHashBytes[32], res.bytes);
+      }
       return res;
    }
 
@@ -273,7 +281,6 @@ struct account {
 
    static std::optional<account> get_by_address(chainbase::database& db, const evmc::address& address) {
       auto r = get_by_index<evmc::address, account>(db, "evm"_n, "by.address"_n, address);
-      if(r) r->old_code_hash = r->code_hash;
       return r;
    }
 
@@ -293,8 +300,6 @@ struct codestore {
    uint64_t    id;
    bytes       code;
    bytes       code_hash;
-
-   bytes       old_code_hash;
 
 
    struct by_codehash {
@@ -323,7 +328,6 @@ struct codestore {
 
    static std::optional<codestore> get_by_code_hash(chainbase::database& db, const evmc::bytes32& code_hash) {
       auto r = get_by_index<evmc::bytes32, codestore>(db, "evm"_n, "by.codehash"_n, code_hash);
-      if(r) r->old_code_hash = r->code_hash;
       return r;
    }
 

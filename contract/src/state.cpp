@@ -82,26 +82,29 @@ void state::update_account(const evmc::address& address, std::optional<Account> 
 
     const bool equal{current == initial};
     if(equal) return;
-
+    
     account_table accounts(_self, _self.value);
     auto inx = accounts.get_index<"by.address"_n>();
     auto itr = inx.find(make_key(address));
     ++stats.account.read;
 
     if (current.has_value()) {
+        const bool zero_code = (std::memcmp(evmc::bytes_view(current->code_hash).data(), 
+                                    kEmptyHashBytes, sizeof(kEmptyHashBytes)) == 0);
+
         if (itr == inx.end()) {
             accounts.emplace(_ram_payer, [&](auto& row){
                 row.id = accounts.available_primary_key();
                 row.eth_address = to_bytes(address);
                 row.nonce = current->nonce;
                 row.balance = to_bytes(current->balance);
-                row.code_hash = to_bytes(current->code_hash);
+                row.code_hash = zero_code ? std::nullopt : std::optional<bytes>(to_bytes(current->code_hash));
             });
             ++stats.account.create;
         } else {
             accounts.modify(*itr, eosio::same_payer, [&](auto& row){
                 row.nonce = current->nonce;
-                row.code_hash = to_bytes(current->code_hash);
+                row.code_hash = zero_code ? std::nullopt : std::optional<bytes>(to_bytes(current->code_hash));
                 row.balance = to_bytes(current->balance);
             });
             ++stats.account.update;
