@@ -97,8 +97,11 @@ CONTRACT evm_contract : public contract {
       checksum256 get_code_hash(name account) const;
 
       void handle_account_transfer(const eosio::asset& quantity, const std::string& memo);
-      void handle_evm_transfer(const eosio::asset& quantity, const std::string& memo);
+      void handle_evm_transfer(eosio::asset quantity, const std::string& memo);
 
+      //to allow sending through a Bytes (basic_string<uint8_t>) w/o copying over to a std::vector<char>
+      void pushtx_bytes(eosio::name ram_payer, const std::basic_string<uint8_t>& rlptx);
+      using pushtx_action = eosio::action_wrapper<"pushtx"_n, &evm_contract::pushtx_bytes>;
 };
 
 
