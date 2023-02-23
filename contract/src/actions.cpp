@@ -108,6 +108,17 @@ void check_result( ValidationResult r, const Transaction& txn, const char* desc 
 }
 
 void evm_contract::push_trx( eosio::name ram_payer, Block& block, const bytes& rlptx, silkworm::consensus::IEngine& engine, const silkworm::ChainConfig& chain_config ) {
+    //when being called as an inline action, clutch in allowance for reserved addresses & signatures by setting from_my_self=true
+    const bool from_self = get_sender() == get_self();
+
+    std::optional<balances> balance_table;
+    std::optional<inevm_singleton> inevm;
+    auto populate_bridge_accessors = [&]() {
+        if(balance_table)
+            return;
+        balance_table.emplace(get_self(), get_self().value);
+        inevm.emplace(get_self(), get_self().value);
+    };
 
     Transaction tx;
     ByteView bv{(const uint8_t*)rlptx.data(), rlptx.size()};
@@ -122,6 +133,26 @@ void evm_contract::push_trx( eosio::name ram_payer, Block& block, const bytes& r
     evm_runtime::state state{get_self(), ram_payer};
     silkworm::ExecutionProcessor ep{block, engine, state, chain_config};
 
+    if(from_self) {
+        check(is_reserved_address(*tx.from), "actions from self without a reserved from address are unexpected");
+        const name ingress_account(*extract_reserved_address(*tx.from) ?: get_self().value); //reserved-0 used for from-contract
+
+        const intx::uint512 max_gas_cost = intx::uint256(tx.gas_limit) * tx.max_fee_per_gas;
+        check(max_gas_cost + tx.value < std::numeric_limits<intx::uint256>::max(), "too much gas");
+        const intx::uint256 value_with_max_gas = tx.value + (intx::uint256)max_gas_cost;
+
+        populate_bridge_accessors();
+        balance_table->modify(balance_table->get(ingress_account.value), eosio::same_payer, [&](balance& b){
+            b.balance -= value_with_max_gas;
+        });
+        inevm->set(inevm->get() += value_with_max_gas, eosio::same_payer);
+
+        ep.state().set_balance(*tx.from, value_with_max_gas);
+        ep.state().set_nonce(*tx.from, tx.nonce);
+    }
+    else if(is_reserved_address(*tx.from))
+        check(from_self, "bridge signature used outside of bridge transaction");
+
     ValidationResult r = consensus::pre_validate_transaction(tx, ep.evm().block().header.number, ep.evm().config(),
                                                              ep.evm().block().header.base_fee_per_gas);
     check_result( r, tx, "pre_validate_transaction error" );
@@ -133,6 +164,52 @@ void evm_contract::push_trx( eosio::name ram_payer, Block& block, const bytes& r
 
     engine.finalize(ep.state(), ep.evm().block(), ep.evm().revision());
     ep.state().write_to_db(ep.evm().block().header.number);
+
+    if(from_self)
+        eosio::check(receipt.success, "ingress bridge actions must succeed");
+
+    if(!ep.state().reserved_objects().empty()) {
+        bool non_open_account_sent = false;
+        intx::uint256 total_egress;
+        populate_bridge_accessors();
+
+        for(const auto& reserved_object : ep.state().reserved_objects()) {
+            const evmc::address& address = reserved_object.first;
+            const name egress_account(*extract_reserved_address(address) ?: get_self().value); //egress to reserved-0 goes to contract's bucket; TODO: needs more love w/ gas changes
+            const Account& reserved_account = *reserved_object.second.current;
+
+            check(reserved_account.code_hash == kEmptyHash, "contracts cannot be created in the reserved address space");
+
+            if(reserved_account.balance ==  0_u256)
+                continue;
+            total_egress += reserved_account.balance;
+
+            if(auto it = balance_table->find(egress_account.value); it != balance_table->end()) {
+                balance_table->modify(balance_table->get(egress_account.value), eosio::same_payer, [&](balance& b){
+                    b.balance += reserved_account.balance;
+                });
+            }
+            else {
+                check(!non_open_account_sent, "only one non-open account for egress bridging allowed in single transaction");
+                check(is_account(egress_account), "can only egress bridge to existing accounts");
+                if(get_code_hash(egress_account) != checksum256())
+                    egresslist(get_self(), get_self().value).get(egress_account.value, "non-open accounts containing contract code must be on allow list for egress bridging");
+
+                check(reserved_account.balance % minimum_natively_representable == 0_u256, "egress bridging to non-open accounts must not contain dust");
+
+                const bool was_to = tx.to && *tx.to == address;
+                const Bytes exit_memo = {'E', 'V', 'M', ' ', 'e', 'x', 'i', 't'}; //yikes
+
+                token::transfer_bytes_memo_action transfer_act(token_account, {{get_self(), "active"_n}});
+                transfer_act.send(get_self(), egress_account, asset((uint64_t)(reserved_account.balance / minimum_natively_representable), token_symbol), was_to ? tx.data : exit_memo);
+
+                non_open_account_sent = true;
+            }
+        }
+
+        if(total_egress != 0_u256)
+            inevm->set(inevm->get() -= total_egress, eosio::same_payer);
+    }
 
     LOGTIME("EVM EXECUTE");
 }
@@ -224,6 +301,40 @@ void evm_contract::handle_account_transfer(const eosio::asset& quantity, const s
     });
 }
 
+void evm_contract::handle_evm_transfer(eosio::asset quantity, const std::string& memo) {
+    //move all incoming quantity in to the contract's balance. the evm bridge trx will "pull" from this balance
+    balances balance_table(get_self(), get_self().value);
+    balance_table.modify(balance_table.get(get_self().value), eosio::same_payer, [&](balance& b){
+        b.balance.balance += quantity;
+    });
+
+    //substract off the ingress bridge fee from the quantity that will be bridged
+    quantity -= _config.get().ingress_bridge_fee;
+    eosio::check(quantity.amount > 0, "must bridge more than ingress bridge fee");
+
+    const std::optional<Bytes> address_bytes = from_hex(memo);
+    eosio::check(!!address_bytes, "unable to parse destination address");
+
+    intx::uint256 value((uint64_t)quantity.amount);
+    value *= minimum_natively_representable;
+
+    const Transaction txn {
+        .type = Transaction::Type::kLegacy,
+        .nonce = get_and_increment_nonce(get_self()),
+        .max_priority_fee_per_gas = 0,
+        .max_fee_per_gas = 0,
+        .gas_limit = 21000,
+        .to = to_evmc_address(*address_bytes),
+        .value = value
+    };
+    //txn's r == 0 && s == 0 which is a psuedo-signature from reserved address zero
+
+    Bytes rlp;
+    rlp::encode(rlp, txn);
+    pushtx_action pushtx_act(get_self(), {{get_self(), "active"_n}});
+    pushtx_act.send(get_self(), rlp);
+}
+
 void evm_contract::transfer(eosio::name from, eosio::name to, eosio::asset quantity, std::string memo) {
     assert_inited();
     eosio::check(quantity.symbol == token_symbol, "received unexpected token");
@@ -232,7 +343,7 @@ void evm_contract::transfer(eosio::name from, eosio::name to, eosio::asset quant
         return;
 
     if(memo.size() == 42 && memo[0] == '0' && memo[1] == 'x')
-        eosio::check(false, "unsupported");
+        handle_evm_transfer(quantity, memo);
     else if(!memo.empty() && memo.size() <= 13)
         handle_account_transfer(quantity, memo);
     else
