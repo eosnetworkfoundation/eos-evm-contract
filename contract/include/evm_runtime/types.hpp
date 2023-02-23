@@ -10,10 +10,13 @@
 #define TOKEN_ACCOUNT_NAME "eosio.token"
 
 namespace evm_runtime {
+   using intx::operator""_u256;
+
    constexpr unsigned evm_precision = 18;
    constexpr eosio::name token_account(eosio::name(TOKEN_ACCOUNT_NAME));
    constexpr eosio::symbol token_symbol("EOS", 4u);
    static_assert(token_symbol.precision() <= evm_precision);
+   constexpr intx::uint256 minimum_natively_representable = intx::exp(10_u256, intx::uint256(evm_precision - token_symbol.precision()));
 
    typedef intx::uint<256>         uint256;
    typedef intx::uint<512>         uint512;
@@ -34,8 +37,6 @@ namespace evm_runtime {
    evmc::address to_address(const bytes& addr);
    evmc::bytes32 to_bytes32(const bytes& data);
    uint256 to_uint256(const bytes& value);
-
-   using intx::operator""_u256;
 } //namespace evm_runtime
 
 namespace eosio {
