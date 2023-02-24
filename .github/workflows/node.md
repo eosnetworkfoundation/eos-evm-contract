@@ -24,13 +24,13 @@ These inputs are used in various steps of the workflow to perform actions such a
 
 ## Steps
 This workflow performs the following steps:
-1. Attach Documentation - GitHub runner
+1. Attach Documentation
     1. Checkout the repo with no submodules.
     1. Attach an annotation to the GitHub Actions build summary page containing CI documentation.
-1. TrustEVM Node Build - ENF runner
+1. TrustEVM Node Build
     1. Authenticate to the `trustevm-ci-submodule-checkout` GitHub app using the [AntelopeIO/github-app-token-action](https://github.com/AntelopeIO/github-app-token-action) action to obtain an ephemeral token.
     1. Checkout the repo and submodules using the ephemeral token.
-    1. Install dependencies, then build the TrustEVM node using `cmake` and `make`. - Ubuntu 20.04 docker container
+    1. Build the TrustEVM node using `cmake` and `make`.
     1. Upload the node build folder to GitHub Actions if the `upload-artifacts` input is set to `true`.
 
 ## Outputs
