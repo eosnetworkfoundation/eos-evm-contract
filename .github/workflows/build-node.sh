@@ -10,8 +10,8 @@ function ee()
 
 # install dependencies for self-hosted runners
 ee export DEBIAN_FRONTEND='noninteractive'
-ee apt-get update -q
-ee apt-get install -yqq cmake gcc-10 g++-10
+ee sudo apt-get update -q
+ee sudo apt-get install -yqq cmake gcc-10 g++-10
 
 # debug code
 echo "CC='${CC}'"
