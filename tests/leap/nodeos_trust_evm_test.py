@@ -4,6 +4,10 @@ import random
 import os
 import json
 import time
+import sys
+import signal
+import calendar
+from datetime import datetime
 
 import sys
 from binascii import unhexlify
@@ -14,6 +18,7 @@ sys.path.append(os.path.join(os.getcwd(), "tests"))
 
 from TestHarness import Cluster, TestHelper, Utils, WalletMgr
 from TestHarness.TestHelper import AppArgs
+from TestHarness.testUtils import ReturnType
 from core_symbol import CORE_SYMBOL
 
 
@@ -31,6 +36,7 @@ from core_symbol import CORE_SYMBOL
 #
 # Example:
 #  cd ~/ext/leap/build
+#  edit core_symbol.py to be EOS
 #  ~/ext/TrustEVM/tests/leap/nodeos_trust_evm_test.py --trust-evm-contract-root ~/ext/TrustEVM/contract/build --leave-running
 #
 #  Launches wallet at port: 9899
@@ -42,7 +48,8 @@ Print=Utils.Print
 errorExit=Utils.errorExit
 
 appArgs=AppArgs()
-extraArgs = appArgs.add(flag="--trust-evm-contract-root", type=str, help="TrustEVM contract build dir", default=None)
+appArgs.add(flag="--trust-evm-contract-root", type=str, help="TrustEVM contract build dir", default=None)
+appArgs.add(flag="--genesis-json", type=str, help="File to save generated genesis json", default="trust-evm-genesis.json")
 
 args=TestHelper.parse_args({"--keep-logs","--dump-error-details","-v","--leave-running","--clean-run" }, applicationSpecificArgs=appArgs)
 debug=args.v
@@ -51,6 +58,7 @@ dumpErrorDetails=args.dump_error_details
 keepLogs=args.keep_logs
 killAll=args.clean_run
 trustEvmContractRoot=args.trust_evm_contract_root
+gensisJson=args.genesis_json
 
 assert trustEvmContractRoot is not None, "--trust-evm-contract-root is required"
 
@@ -123,17 +131,18 @@ try:
     prodNode = cluster.getNode(0)
     nonProdNode = cluster.getNode(1)
 
-    accounts=cluster.createAccountKeys(1)
+    accounts=cluster.createAccountKeys(2)
     if accounts is None:
         Utils.errorExit("FAILURE - create keys")
 
     evmAcc = accounts[0]
     evmAcc.name = "evmevmevmevm"
+    testAcc = accounts[1]
 
     testWalletName="test"
 
     Print("Creating wallet \"%s\"." % (testWalletName))
-    testWallet=walletMgr.create(testWalletName, [cluster.eosioAccount,accounts[0]])
+    testWallet=walletMgr.create(testWalletName, [cluster.eosioAccount,accounts[0],accounts[1]])
 
     # create accounts via eosio as otherwise a bid is needed
     for account in accounts:
@@ -157,18 +166,51 @@ try:
     Utils.Print("Block Id: ", block["id"])
     Utils.Print("Block timestamp: ", block["timestamp"])
 
-    Utils.Print("Set balance")
-    trans = prodNode.pushMessage(evmAcc.name, "setbal", '{"addy":"2787b98fc4e731d0456b3941f0b3fe2e01439961", "bal":"0000000000000000000000000000000000100000000000000000000000000000"}', '-p evmevmevmevm')
+    genesis_info = {
+        "alloc": {},
+        "coinbase": "0x0000000000000000000000000000000000000000",
+        "config": {
+            "chainId": 15555,
+            "homesteadBlock": 0,
+            "eip150Block": 0,
+            "eip155Block": 0,
+            "byzantiumBlock": 0,
+            "constantinopleBlock": 0,
+            "petersburgBlock": 0,
+            "istanbulBlock": 0,
+            "trust": {}
+        },
+        "difficulty": "0x01",
+        "extraData": "TrustEVM",
+        "gasLimit": "0x7ffffffffff",
+        "mixHash": "0x"+block["id"],
+        "nonce": hex(1000),
+        "timestamp": hex(int(calendar.timegm(datetime.strptime(block["timestamp"].split(".")[0], '%Y-%m-%dT%H:%M:%S').timetuple())))
+    }
 
+    # add eosio.code permission
+    cmd="set account permission evmevmevmevm active --add-code -p evmevmevmevm@active"
+    prodNode.processCleosCmd(cmd, cmd, silentErrors=True, returnType=ReturnType.raw)
+
+    Utils.Print("Set balance")
+    addys = {
+        "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266":"0x038318535b54105d4a7aae60c08fc45f9687181b4fdfc625bd1a753fa7397fed75,0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+    }
+
+    for i,k in enumerate(addys):
+        print("addys: [{0}] [{1}] [{2}]".format(i,k[2:].lower(), len(k[2:])))
+        trans = prodNode.pushMessage(evmAcc.name, "setbal", '{"addy":"' + k[2:].lower() + '", "bal":"0000000000000000000000000000000000100000000000000000000000000000"}', '-p evmevmevmevm')
+        genesis_info["alloc"][k.lower()] = {"balance":"0x100000000000000000000000000000"}
+        if not (i+1) % 20: time.sleep(1)
     prodNode.waitForTransBlockIfNeeded(trans[1], True)
 
     Utils.Print("Send balance")
     evmChainId = 15555
-    fromAdd = "2787b98fc4e731d0456b3941f0b3fe2e01439961"
+    fromAdd = "f39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
     toAdd = '0x9edf022004846bc987799d552d1b8485b317b7ed'
     amount = 100
     nonce = 0
-    evmSendKey = "a3f1b69da92a0233ce29485d3049a4ace39e8d384bbc2557e3fc60940ce4e954"
+    evmSendKey = "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
 
     signed_trx = w3.eth.account.sign_transaction(dict(
         nonce=nonce,
@@ -251,9 +293,59 @@ try:
     # }
     retValue = prodNode.pushMessage(evmAcc.name, "updatecode", '{"address":"2787b98fc4e731d0456b3941f0b3fe2e01430000","incarnation":0,"code_hash":"286e3d498e2178afc91275f11d446e62a0d85b060ce66d6ca75f6ec9d874d560","code":"608060405234801561001057600080fd5b50600436106100365760003560e01c80632e64cec11461003b5780636057361d14610059575b600080fd5b610043610075565b60405161005091906100d9565b60405180910390f35b610073600480360381019061006e919061009d565b61007e565b005b60008054905090565b8060008190555050565b60008135905061009781610103565b92915050565b6000602082840312156100b3576100b26100fe565b5b60006100c184828501610088565b91505092915050565b6100d3816100f4565b82525050565b60006020820190506100ee60008301846100ca565b92915050565b6000819050919050565b600080fd5b61010c816100f4565b811461011757600080fd5b5056fea26469706673582212209a159a4f3847890f10bfb87871a61eba91c5dbf5ee3cf6398207e292eee22a1664736f6c63430008070033"}', '-p evmevmevmevm')
 
-    testSuccessful=True
-
     generate_evm_transactions(nonce)
+
+    if gensisJson[0] != '/': gensisJson = os.path.realpath(gensisJson)
+    f=open(gensisJson,"w")
+    f.write(json.dumps(genesis_info))
+    f.close()
+    Utils.Print("#####################################################")
+    Utils.Print("Generated EVM json genesis file in: %s" % gensisJson)
+    Utils.Print("")
+    Utils.Print("You can now run:")
+    Utils.Print("  trustevm-node --plugin=blockchain_plugin --ship-endpoint=127.0.0.1:8999 --genesis-json=%s --chain-data=/tmp --verbosity=4" % gensisJson)
+    Utils.Print("  trustevm-rpc --trust-evm-node=127.0.0.1:8080 --http-port=0.0.0.0:8881 --chaindata=/tmp --api-spec=eth,debug,net,trace")
+    Utils.Print("")
+
+    #
+    # Test EOS/EVM Bridge
+    #
+    Utils.Print("Test EOS/EVM Bridge")
+
+    expectedAmount="60000000.0000 {0}".format(CORE_SYMBOL)
+    evmAccAcutalAmount=prodNode.getAccountEosBalanceStr(evmAcc.name)
+    testAccActualAmount=prodNode.getAccountEosBalanceStr(testAcc.name)
+    Utils.Print("\tAccount balances: evm %s, test %s", (evmAccAcutalAmount,testAccActualAmount))
+    if expectedAmount != evmAccAcutalAmount or expectedAmount != testAccActualAmount:
+        Utils.errorExit("Unexpected starting conditions. Excepted %s, evm actual: %s, test actual" % (expectedAmount, evmAccAcutalAmount, testAccActualAmount))
+
+    # set ingress bridge fee
+    contract="currency1111"
+    action="create"
+    data="[\"0.0100 EOS\"]"
+    opts="--permission evmevmevmevm@active"
+    trans=prodNode.pushMessage("evmevmevmevm", "setingressfee", data, opts)
+
+    rows=prodNode.getTable(evmAcc.name, evmAcc.name, "balances")
+    Utils.Print("\tBefore transfer table rows:", rows)
+
+    transferAmount="97.5321 {0}".format(CORE_SYMBOL)
+    Print("Transfer funds %s from account %s to %s" % (transferAmount, testAcc.name, evmAcc.name))
+    prodNode.transferFunds(testAcc, evmAcc, transferAmount, "0xF0cE7BaB13C99bA0565f426508a7CD8f4C247E5a", waitForTransBlock=True)
+
+    row0=prodNode.getTableRow(evmAcc.name, evmAcc.name, "balances", 0)
+    Utils.Print("\tAfter transfer table row:", row0)
+    assert(row0["balance"]["balance"] == "0.0100 {0}".format(CORE_SYMBOL)) # should have fee at end of transaction
+
+    evmAccAcutalAmount=prodNode.getAccountEosBalanceStr(evmAcc.name)
+    Utils.Print("\tEVM Account balance %s", evmAccAcutalAmount)
+    expectedAmount="60000097.5321 {0}".format(CORE_SYMBOL)
+    if expectedAmount != evmAccAcutalAmount:
+        Utils.errorExit("Transfer verification failed. Excepted %s, actual: %s" % (expectedAmount, evmAccAcutalAmount))
+
+    row4=prodNode.getTableRow(evmAcc.name, evmAcc.name, "account", 4) # 4th balance of this integration test
+    assert(row4["balance"] == "000000000000000000000000000000000000000000000005496419417a1f4000") # 0x5496419417a1f4000 => 97522100000000000000 (97.5321 - 0.0100)
+
 
     testSuccessful=True
 finally:
