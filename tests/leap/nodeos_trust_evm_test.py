@@ -6,6 +6,7 @@ import json
 import time
 import sys
 import signal
+import shutil
 import calendar
 from datetime import datetime
 
@@ -37,7 +38,7 @@ from core_symbol import CORE_SYMBOL
 # Example:
 #  cd ~/ext/leap/build
 #  edit core_symbol.py to be EOS
-#  ~/ext/TrustEVM/tests/leap/nodeos_trust_evm_test.py --trust-evm-contract-root ~/ext/TrustEVM/contract/build --leave-running
+#  ~/ext/TrustEVM/tests/leap/nodeos_trust_evm_test.py --trust-evm-contract-root ~/ext/TrustEVM/contract/build --trust-evm-build-root ~/ext/TrustEVM/cmake-build-release-gcc  --leave-running
 #
 #  Launches wallet at port: 9899
 #    Example: bin/cleos --wallet-url http://127.0.0.1:9899 ...
@@ -49,6 +50,7 @@ errorExit=Utils.errorExit
 
 appArgs=AppArgs()
 appArgs.add(flag="--trust-evm-contract-root", type=str, help="TrustEVM contract build dir", default=None)
+appArgs.add(flag="--trust-evm-build-root", type=str, help="TrustEVM build dir", default=None)
 appArgs.add(flag="--genesis-json", type=str, help="File to save generated genesis json", default="trust-evm-genesis.json")
 
 args=TestHelper.parse_args({"--keep-logs","--dump-error-details","-v","--leave-running","--clean-run" }, applicationSpecificArgs=appArgs)
@@ -58,9 +60,11 @@ dumpErrorDetails=args.dump_error_details
 keepLogs=args.keep_logs
 killAll=args.clean_run
 trustEvmContractRoot=args.trust_evm_contract_root
+trustEvmBuildRoot=args.trust_evm_build_root
 gensisJson=args.genesis_json
 
 assert trustEvmContractRoot is not None, "--trust-evm-contract-root is required"
+assert trustEvmBuildRoot is not None, "--trust-evm-build-root is required"
 
 
 seed=1
@@ -299,12 +303,13 @@ try:
     f=open(gensisJson,"w")
     f.write(json.dumps(genesis_info))
     f.close()
+
     Utils.Print("#####################################################")
     Utils.Print("Generated EVM json genesis file in: %s" % gensisJson)
     Utils.Print("")
     Utils.Print("You can now run:")
-    Utils.Print("  trustevm-node --plugin=blockchain_plugin --ship-endpoint=127.0.0.1:8999 --genesis-json=%s --chain-data=/tmp --verbosity=4" % gensisJson)
-    Utils.Print("  trustevm-rpc --trust-evm-node=127.0.0.1:8080 --http-port=0.0.0.0:8881 --chaindata=/tmp --api-spec=eth,debug,net,trace")
+    Utils.Print("  trustevm-node --plugin=blockchain_plugin --ship-endpoint=127.0.0.1:8999 --genesis-json=%s --chain-data=/tmp/data --verbosity=5" % gensisJson)
+    Utils.Print("  trustevm-rpc --trust-evm-node=127.0.0.1:8080 --http-port=0.0.0.0:8881 --chaindata=/tmp/data --api-spec=eth,debug,net,trace")
     Utils.Print("")
 
     #
@@ -312,6 +317,7 @@ try:
     #
     Utils.Print("Test EOS/EVM Bridge")
 
+    # Verify starting values
     expectedAmount="60000000.0000 {0}".format(CORE_SYMBOL)
     evmAccAcutalAmount=prodNode.getAccountEosBalanceStr(evmAcc.name)
     testAccActualAmount=prodNode.getAccountEosBalanceStr(testAcc.name)
@@ -320,8 +326,6 @@ try:
         Utils.errorExit("Unexpected starting conditions. Excepted %s, evm actual: %s, test actual" % (expectedAmount, evmAccAcutalAmount, testAccActualAmount))
 
     # set ingress bridge fee
-    contract="currency1111"
-    action="create"
     data="[\"0.0100 EOS\"]"
     opts="--permission evmevmevmevm@active"
     trans=prodNode.pushMessage("evmevmevmevm", "setingressfee", data, opts)
@@ -329,6 +333,7 @@ try:
     rows=prodNode.getTable(evmAcc.name, evmAcc.name, "balances")
     Utils.Print("\tBefore transfer table rows:", rows)
 
+    # EOS -> EVM
     transferAmount="97.5321 {0}".format(CORE_SYMBOL)
     Print("Transfer funds %s from account %s to %s" % (transferAmount, testAcc.name, evmAcc.name))
     prodNode.transferFunds(testAcc, evmAcc, transferAmount, "0xF0cE7BaB13C99bA0565f426508a7CD8f4C247E5a", waitForTransBlock=True)
@@ -346,8 +351,60 @@ try:
     row4=prodNode.getTableRow(evmAcc.name, evmAcc.name, "account", 4) # 4th balance of this integration test
     assert(row4["balance"] == "000000000000000000000000000000000000000000000005496419417a1f4000") # 0x5496419417a1f4000 => 97522100000000000000 (97.5321 - 0.0100)
 
+    # EOS -> EVM to the same address
+    transferAmount="10.0000 {0}".format(CORE_SYMBOL)
+    Print("Transfer funds %s from account %s to %s" % (transferAmount, testAcc.name, evmAcc.name))
+    prodNode.transferFunds(testAcc, evmAcc, transferAmount, "0xF0cE7BaB13C99bA0565f426508a7CD8f4C247E5a", waitForTransBlock=True)
 
-    testSuccessful=True
+    row0=prodNode.getTableRow(evmAcc.name, evmAcc.name, "balances", 0)
+    Utils.Print("\tAfter transfer table row:", row0)
+    assert(row0["balance"]["balance"] == "0.0200 {0}".format(CORE_SYMBOL)) # should have fee from both transfers
+
+    evmAccAcutalAmount=prodNode.getAccountEosBalanceStr(evmAcc.name)
+    Utils.Print("\tEVM Account balance %s", evmAccAcutalAmount)
+    expectedAmount="60000107.5321 {0}".format(CORE_SYMBOL)
+    if expectedAmount != evmAccAcutalAmount:
+        Utils.errorExit("Transfer verification failed. Excepted %s, actual: %s" % (expectedAmount, evmAccAcutalAmount))
+
+    row4=prodNode.getTableRow(evmAcc.name, evmAcc.name, "account", 4) # 4th balance of this integration test
+    assert(row4["balance"] == "000000000000000000000000000000000000000000000005d407b55394464000") # 0x5D407B55394464000 => 107512100000000000000 (97.5321 + 10.000 - 0.0100 - 0.0100)
+
+    # Launch trustevm-node & trustevm-rpc
+    dataDir = Utils.DataDir + "/eos_evm"
+    nodeStdOutDir = dataDir + "/trustevm-node.stdout"
+    nodeStdErrDir = dataDir + "/trustevm-node.stderr"
+    nodeRPCStdOutDir = dataDir + "/trustevm-rpc.stdout"
+    nodeRPCStdErrDir = dataDir + "/trustevm-rpc.stderr"
+    shutil.rmtree(dataDir, ignore_errors=True)
+    os.makedirs(dataDir)
+    outFile = open(nodeStdOutDir, "w")
+    errFile = open(nodeStdErrDir, "w")
+    outRPCFile = open(nodeRPCStdOutDir, "w")
+    errRPCFile = open(nodeRPCStdErrDir, "w")
+    cmd = "%s/cmd/trustevm-node --plugin=blockchain_plugin --ship-endpoint=127.0.0.1:8999 --genesis-json=%s --chain-data=%s --verbosity=5 --nocolor=1" % (trustEvmBuildRoot, gensisJson, dataDir)
+    Utils.Print("Launching: %s", cmd)
+    popen=Utils.delayedCheckOutput(cmd, stdout=outFile, stderr=errFile)
+
+    cmdRPC = "%s/cmd/trustevm-rpc --trust-evm-node=127.0.0.1:8080 --http-port=0.0.0.0:8881 --chaindata=%s --api-spec=eth,debug,net,trace" % (trustEvmBuildRoot, dataDir)
+    Utils.Print("Launching: %s", cmdRPC)
+    popenRPC=Utils.delayedCheckOutput(cmdRPC, stdout=outRPCFile, stderr=errRPCFile)
+
+    time.sleep(5) # allow time to sync trxs
+
+    Utils.Print("\n")
+    foundErr = False
+    stdErrFile = open(nodeStdErrDir, "r")
+    lines = stdErrFile.readlines()
+    for line in lines:
+        if line.find("ERROR") != -1 or line.find("CRIT") != -1:
+            Utils.Print("  Found ERROR in trustevm log: ", line)
+            foundErr = True
+
+    if killEosInstances:
+        popenRPC.kill()
+        popen.kill()
+
+    testSuccessful= not foundErr
 finally:
     TestHelper.shutdown(cluster, walletMgr, testSuccessful=testSuccessful, killEosInstances=killEosInstances, killWallet=killEosInstances, keepLogs=keepLogs, cleanRun=killAll, dumpErrorDetails=dumpErrorDetails)
 
