@@ -355,11 +355,11 @@ try:
 
     # Verify starting values
     expectedAmount="60000000.0000 {0}".format(CORE_SYMBOL)
-    evmAccAcutalAmount=prodNode.getAccountEosBalanceStr(evmAcc.name)
+    evmAccActualAmount=prodNode.getAccountEosBalanceStr(evmAcc.name)
     testAccActualAmount=prodNode.getAccountEosBalanceStr(testAcc.name)
-    Utils.Print("\tAccount balances: evm %s, test %s", (evmAccAcutalAmount,testAccActualAmount))
-    if expectedAmount != evmAccAcutalAmount or expectedAmount != testAccActualAmount:
-        Utils.errorExit("Unexpected starting conditions. Excepted %s, evm actual: %s, test actual" % (expectedAmount, evmAccAcutalAmount, testAccActualAmount))
+    Utils.Print("\tAccount balances: EVM %s, Test %s" % (evmAccActualAmount, testAccActualAmount))
+    if expectedAmount != evmAccActualAmount or expectedAmount != testAccActualAmount:
+        Utils.errorExit("Unexpected starting conditions. Excepted %s, evm actual: %s, test actual" % (expectedAmount, evmAccActualAmount, testAccActualAmount))
 
     # set ingress bridge fee
     data="[\"0.0100 EOS\"]"
@@ -377,13 +377,16 @@ try:
     row0=prodNode.getTableRow(evmAcc.name, evmAcc.name, "balances", 0)
     Utils.Print("\tAfter transfer table row:", row0)
     assert(row0["balance"]["balance"] == "0.0100 {0}".format(CORE_SYMBOL)) # should have fee at end of transaction
-
-    evmAccAcutalAmount=prodNode.getAccountEosBalanceStr(evmAcc.name)
-    Utils.Print("\tEVM Account balance %s", evmAccAcutalAmount)
+    testAccActualAmount=prodNode.getAccountEosBalanceStr(evmAcc.name)
+    Utils.Print("\tEVM  Account balance %s" % testAccActualAmount)
     expectedAmount="60000097.5321 {0}".format(CORE_SYMBOL)
-    if expectedAmount != evmAccAcutalAmount:
-        Utils.errorExit("Transfer verification failed. Excepted %s, actual: %s" % (expectedAmount, evmAccAcutalAmount))
-
+    if expectedAmount != testAccActualAmount:
+        Utils.errorExit("Transfer verification failed. Excepted %s, actual: %s" % (expectedAmount, testAccActualAmount))
+    expectedAmount="59999902.4679 {0}".format(CORE_SYMBOL)
+    testAccActualAmount=prodNode.getAccountEosBalanceStr(testAcc.name)
+    Utils.Print("\tTest Account balance %s" % testAccActualAmount)
+    if testAccActualAmount != expectedAmount:
+        Utils.errorExit("Transfer verification failed. Excepted %s, actual: %s" % (expectedAmount, testAccActualAmount))
     row4=prodNode.getTableRow(evmAcc.name, evmAcc.name, "account", 4) # 4th balance of this integration test
     assert(row4["eth_address"] == "f0ce7bab13c99ba0565f426508a7cd8f4c247e5a")
     assert(row4["balance"] == "000000000000000000000000000000000000000000000005496419417a1f4000") # 0x5496419417a1f4000 => 97522100000000000000 (97.5321 - 0.0100)
@@ -392,17 +395,19 @@ try:
     transferAmount="10.0000 {0}".format(CORE_SYMBOL)
     Print("Transfer funds %s from account %s to %s" % (transferAmount, testAcc.name, evmAcc.name))
     prodNode.transferFunds(testAcc, evmAcc, transferAmount, "0xF0cE7BaB13C99bA0565f426508a7CD8f4C247E5a", waitForTransBlock=True)
-
     row0=prodNode.getTableRow(evmAcc.name, evmAcc.name, "balances", 0)
     Utils.Print("\tAfter transfer table row:", row0)
     assert(row0["balance"]["balance"] == "0.0200 {0}".format(CORE_SYMBOL)) # should have fee from both transfers
-
-    evmAccAcutalAmount=prodNode.getAccountEosBalanceStr(evmAcc.name)
-    Utils.Print("\tEVM Account balance %s", evmAccAcutalAmount)
+    evmAccActualAmount=prodNode.getAccountEosBalanceStr(evmAcc.name)
+    Utils.Print("\tEVM  Account balance %s" % evmAccActualAmount)
     expectedAmount="60000107.5321 {0}".format(CORE_SYMBOL)
-    if expectedAmount != evmAccAcutalAmount:
-        Utils.errorExit("Transfer verification failed. Excepted %s, actual: %s" % (expectedAmount, evmAccAcutalAmount))
-
+    if expectedAmount != evmAccActualAmount:
+        Utils.errorExit("Transfer verification failed. Excepted %s, actual: %s" % (expectedAmount, evmAccActualAmount))
+    expectedAmount="59999892.4679 {0}".format(CORE_SYMBOL)
+    testAccActualAmount=prodNode.getAccountEosBalanceStr(testAcc.name)
+    Utils.Print("\tTest Account balance %s" % testAccActualAmount)
+    if testAccActualAmount != expectedAmount:
+        Utils.errorExit("Transfer verification failed. Excepted %s, actual: %s" % (expectedAmount, testAccActualAmount))
     row4=prodNode.getTableRow(evmAcc.name, evmAcc.name, "account", 4) # 4th balance of this integration test
     assert(row4["eth_address"] == "f0ce7bab13c99ba0565f426508a7cd8f4c247e5a")
     assert(row4["balance"] == "000000000000000000000000000000000000000000000005d407b55394464000") # 0x5d407b55394464000 => 107512100000000000000 (97.5321 + 10.000 - 0.0100 - 0.0100)
@@ -411,17 +416,19 @@ try:
     transferAmount="42.4242 {0}".format(CORE_SYMBOL)
     Print("Transfer funds %s from account %s to %s" % (transferAmount, testAcc.name, evmAcc.name))
     prodNode.transferFunds(testAcc, evmAcc, transferAmount, "0x9E126C57330FA71556628e0aabd6B6B6783d99fA", waitForTransBlock=True)
-
     row0=prodNode.getTableRow(evmAcc.name, evmAcc.name, "balances", 0)
     Utils.Print("\tAfter transfer table row:", row0)
     assert(row0["balance"]["balance"] == "0.0300 {0}".format(CORE_SYMBOL)) # should have fee from all three transfers
-
-    evmAccAcutalAmount=prodNode.getAccountEosBalanceStr(evmAcc.name)
-    Utils.Print("\tEVM Account balance %s", evmAccAcutalAmount)
+    evmAccActualAmount=prodNode.getAccountEosBalanceStr(evmAcc.name)
+    Utils.Print("\tEVM  Account balance %s" % evmAccActualAmount)
     expectedAmount="60000149.9563 {0}".format(CORE_SYMBOL)
-    if expectedAmount != evmAccAcutalAmount:
-        Utils.errorExit("Transfer verification failed. Excepted %s, actual: %s" % (expectedAmount, evmAccAcutalAmount))
-
+    if expectedAmount != evmAccActualAmount:
+        Utils.errorExit("Transfer verification failed. Excepted %s, actual: %s" % (expectedAmount, evmAccActualAmount))
+    expectedAmount="59999850.0437 {0}".format(CORE_SYMBOL)
+    testAccActualAmount=prodNode.getAccountEosBalanceStr(testAcc.name)
+    Utils.Print("\tTest Account balance %s" % testAccActualAmount)
+    if testAccActualAmount != expectedAmount:
+        Utils.errorExit("Transfer verification failed. Excepted %s, actual: %s" % (expectedAmount, testAccActualAmount))
     row5=prodNode.getTableRow(evmAcc.name, evmAcc.name, "account", 5) # 5th balance of this integration test
     assert(row5["eth_address"] == "9e126c57330fa71556628e0aabd6b6b6783d99fa")
     assert(row5["balance"] == "0000000000000000000000000000000000000000000000024c9d822e105f8000") # 0x24c9d822e105f8000 => 42414200000000000000 (42.4242 - 0.0100)
@@ -430,7 +437,9 @@ try:
     #   0x9E126C57330FA71556628e0aabd6B6B6783d99fA private key: 0xba8c9ff38e4179748925335a9891b969214b37dc3723a1754b8b849d3eea9ac0
     toAdd = makeReservedEvmAddress(nameStrToInt(testAcc.name))
     evmSendKey = "ba8c9ff38e4179748925335a9891b969214b37dc3723a1754b8b849d3eea9ac0"
-    amount=13.1313 # 13.131313
+    amount=13.1313
+    transferAmount="13.1313 {0}".format(CORE_SYMBOL)
+    Print("Transfer EVM->EOS funds %s from account %s to %s" % (transferAmount, evmAcc.name, testAcc.name))
     nonce = 0
     signed_trx = w3.eth.account.sign_transaction(dict(
         nonce=nonce,
@@ -442,16 +451,57 @@ try:
         data=b'',
         chainId=evmChainId
     ), evmSendKey)
-
     actData = {"ram_payer":"evmevmevmevm", "rlptx":Web3.toHex(signed_trx.rawTransaction)[2:]}
-    Utils.Print("Send EVM->EOS")
     trans = prodNode.pushMessage(evmAcc.name, "pushtx", json.dumps(actData), '-p evmevmevmevm', silentErrors=True, force=True)
     prodNode.waitForTransBlockIfNeeded(trans[1], True)
-
     row5=prodNode.getTableRow(evmAcc.name, evmAcc.name, "account", 5) # 5th balance of this integration test
-    Utils.Print("row5: ", row5)
+    Utils.Print("\taccount row5: ", row5)
     assert(row5["eth_address"] == "9e126c57330fa71556628e0aabd6b6b6783d99fa")
     assert(row5["balance"] == "0000000000000000000000000000000000000000000000019661c2670d48edf8") # 0x19661c2670d48edf8 => 29282899999999979000 (42.4242 - 0.0100 - 13.131313 - gas 21000wei)
+    expectedAmount="60000136.8250 {0}".format(CORE_SYMBOL)
+    evmAccActualAmount=prodNode.getAccountEosBalanceStr(evmAcc.name)
+    Utils.Print("\tEVM  Account balance %s" % evmAccActualAmount)
+    if evmAccActualAmount != expectedAmount:
+        Utils.errorExit("Transfer verification failed. Excepted %s, actual: %s" % (expectedAmount, testAccActualAmount))
+    expectedAmount="59999863.1750 {0}".format(CORE_SYMBOL)
+    testAccActualAmount=prodNode.getAccountEosBalanceStr(testAcc.name)
+    Utils.Print("\tTest Account balance %s" % testAccActualAmount)
+    if testAccActualAmount != expectedAmount:
+        Utils.errorExit("Transfer verification failed. Excepted %s, actual: %s" % (expectedAmount, testAccActualAmount))
+
+    # EVM->EOS from same address
+    amount=1.0000
+    transferAmount="1.000 {0}".format(CORE_SYMBOL)
+    Print("Transfer EVM->EOS funds %s from account %s to %s" % (transferAmount, evmAcc.name, testAcc.name))
+    nonce = nonce + 1
+    signed_trx = w3.eth.account.sign_transaction(dict(
+        nonce=nonce,
+        #        maxFeePerGas=150000000000, #150 GWei
+        gas=100000,       #100k Gas
+        gasPrice=1,
+        to=Web3.toChecksumAddress(toAdd),
+        value=int(amount*10000*szabo*100),
+        data=b'',
+        chainId=evmChainId
+    ), evmSendKey)
+    actData = {"ram_payer":"evmevmevmevm", "rlptx":Web3.toHex(signed_trx.rawTransaction)[2:]}
+    trans = prodNode.pushMessage(evmAcc.name, "pushtx", json.dumps(actData), '-p evmevmevmevm', silentErrors=True, force=True)
+    prodNode.waitForTransBlockIfNeeded(trans[1], True)
+    row5=prodNode.getTableRow(evmAcc.name, evmAcc.name, "account", 5) # 5th balance of this integration test
+    Utils.Print("\taccount row5: ", row5)
+    assert(row5["eth_address"] == "9e126c57330fa71556628e0aabd6b6b6783d99fa")
+    assert(row5["balance"] == "00000000000000000000000000000000000000000000000188810bb365e49bf0") # 0x188810bb365e49bf0 => 28282899999999958000 (42.4242 - 0.0100 - 13.131313 - 1.0000 - 2*gas 21000wei)
+    expectedAmount="60000135.8250 {0}".format(CORE_SYMBOL)
+    evmAccActualAmount=prodNode.getAccountEosBalanceStr(evmAcc.name)
+    Utils.Print("\tEVM  Account balance %s" % evmAccActualAmount)
+    if evmAccActualAmount != expectedAmount:
+        Utils.errorExit("Transfer verification failed. Excepted %s, actual: %s" % (expectedAmount, testAccActualAmount))
+    expectedAmount="59999864.1750 {0}".format(CORE_SYMBOL)
+    testAccActualAmount=prodNode.getAccountEosBalanceStr(testAcc.name)
+    Utils.Print("\tTest Account balance %s" % testAccActualAmount)
+    if testAccActualAmount != expectedAmount:
+        Utils.errorExit("Transfer verification failed. Excepted %s, actual: %s" % (expectedAmount, testAccActualAmount))
+
 
     # Launch trustevm-node & trustevm-rpc
     dataDir = Utils.DataDir + "/eos_evm"
