@@ -89,8 +89,6 @@ void state::update_account(const evmc::address& address, std::optional<Account> 
     ++stats.account.read;
 
     if (current.has_value()) {
-        const bool zero_code = (std::memcmp(evmc::bytes_view(current->code_hash).data(), 
-                                    kEmptyHashBytes, sizeof(kEmptyHashBytes)) == 0);
 
         if (itr == inx.end()) {
             accounts.emplace(_ram_payer, [&](auto& row){
@@ -98,13 +96,13 @@ void state::update_account(const evmc::address& address, std::optional<Account> 
                 row.eth_address = to_bytes(address);
                 row.nonce = current->nonce;
                 row.balance = to_bytes(current->balance);
-                row.code_hash = zero_code ? std::nullopt : std::optional<bytes>(to_bytes(current->code_hash));
+                row.code_hash = current->code_hash == silkworm::kEmptyHash ? std::nullopt : std::optional<bytes>(to_bytes(current->code_hash));
             });
             ++stats.account.create;
         } else {
             accounts.modify(*itr, eosio::same_payer, [&](auto& row){
                 row.nonce = current->nonce;
-                row.code_hash = zero_code ? std::nullopt : std::optional<bytes>(to_bytes(current->code_hash));
+                row.code_hash = current->code_hash == silkworm::kEmptyHash ? std::nullopt : std::optional<bytes>(to_bytes(current->code_hash));
                 row.balance = to_bytes(current->balance);
             });
             ++stats.account.update;
@@ -200,7 +198,7 @@ void state::update_storage(const evmc::address& address, uint64_t incarnation, c
                 row.id = table_id;
                 row.eth_address = to_bytes(address);
                 row.nonce = 0;
-                row.code_hash = to_bytes(kEmptyHash);
+                row.code_hash = to_bytes(silkworm::kEmptyHash);
             });
             ++stats.account.read;
         } else {

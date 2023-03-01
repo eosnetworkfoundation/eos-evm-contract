@@ -231,10 +231,6 @@ struct block_info {
 };
 //FC_REFLECT(block_info, (coinbase)(difficulty)(gasLimit)(number)(timestamp)(base_fee_per_gas));
 FC_REFLECT(block_info, (coinbase)(difficulty)(gasLimit)(number)(timestamp));
-inline constexpr char kEmptyHashBytes[32] = {(char)-59, (char)-46, (char)70, (char)1, (char)-122, (char)-9, (char)35, (char)60,
- (char)-110, (char)126, (char)125, (char)-78, (char)-36, (char)-57, (char)3, (char)-64, (char)-27, (char)0, 
- (char)-74, (char)83, (char)-54, (char)-126, (char)39, (char)59, (char)123, (char)-6, 
- (char)-40, (char)4, (char)93,(char)-123, (char)-92, (char)112};
 
 struct account {
    uint64_t    id;
@@ -258,14 +254,14 @@ struct account {
    }
 
    evmc::bytes32 get_code_hash()const {
-      evmc::bytes32 res;
       if (code_hash.has_value()) {
+         evmc::bytes32 res;
          std::copy(code_hash.value().begin(), code_hash.value().end(), res.bytes);
+         return res;
       }
       else {
-         std::copy(kEmptyHashBytes, &kEmptyHashBytes[32], res.bytes);
+         return kEmptyHash;
       }
-      return res;
    }
 
    static name table_name() { return "account"_n; }
