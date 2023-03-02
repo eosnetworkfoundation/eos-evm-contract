@@ -292,7 +292,7 @@ struct account {
 };
 FC_REFLECT(account, (id)(eth_address)(nonce)(balance)(code_hash));
 
-struct codestore {
+struct account_code {
    uint64_t    id;
    bytes       code;
    bytes       code_hash;
@@ -311,7 +311,7 @@ struct codestore {
       return res;
    }
 
-   static name table_name() { return "codestore"_n; }
+   static name table_name() { return "accountcode"_n; }
    static name index_name(const name& n) {
       uint64_t index_table_name = table_name().to_uint64_t() & 0xFFFFFFFFFFFFFFF0ULL;
 
@@ -322,13 +322,13 @@ struct codestore {
       return index_name(name{n});
    }
 
-   static std::optional<codestore> get_by_code_hash(chainbase::database& db, const evmc::bytes32& code_hash) {
-      auto r = get_by_index<evmc::bytes32, codestore>(db, "evm"_n, "by.codehash"_n, code_hash);
+   static std::optional<account_code> get_by_code_hash(chainbase::database& db, const evmc::bytes32& code_hash) {
+      auto r = get_by_index<evmc::bytes32, account_code>(db, "evm"_n, "by.codehash"_n, code_hash);
       return r;
    }
 
 };
-FC_REFLECT(codestore, (id)(code)(code_hash));
+FC_REFLECT(account_code, (id)(code)(code_hash));
 
 struct storage {
    uint64_t id;
@@ -586,7 +586,7 @@ struct evm_runtime_tester : eosio_system_tester, silkworm::State {
    mutable bytes read_code_buffer;
    ByteView read_code(const evmc::bytes32& code_hash) const noexcept {
       auto& db = const_cast<chainbase::database&>(control->db());
-      auto accntcode = codestore::get_by_code_hash(db, code_hash);
+      auto accntcode = account_code::get_by_code_hash(db, code_hash);
       if(!accntcode) {
          dlog("no code for hash ${ch}", ("ch",to_bytes(code_hash)));
          return ByteView{};

@@ -37,7 +37,7 @@ typedef multi_index< "account"_n, account,
     indexed_by<"by.address"_n, const_mem_fun<account, checksum256, &account::by_eth_address>>
 > account_table;
 
-struct [[eosio::table]] [[eosio::contract("evm_contract")]] codestore {
+struct [[eosio::table]] [[eosio::contract("evm_contract")]] account_code {
     uint64_t    id;
     bytes       code;
     bytes       code_hash;
@@ -52,12 +52,12 @@ struct [[eosio::table]] [[eosio::contract("evm_contract")]] codestore {
         return to_bytes32(code_hash);
     }
 
-    EOSLIB_SERIALIZE(codestore, (id)(code)(code_hash));
+    EOSLIB_SERIALIZE(account_code, (id)(code)(code_hash));
 };
 
-typedef multi_index< "codestore"_n, codestore,
-    indexed_by<"by.codehash"_n, const_mem_fun<codestore, checksum256, &codestore::by_code_hash>>
-> codestore_table;
+typedef multi_index< "accountcode"_n, account_code,
+    indexed_by<"by.codehash"_n, const_mem_fun<account_code, checksum256, &account_code::by_code_hash>>
+> account_code_table;
 
 struct [[eosio::table]] [[eosio::contract("evm_contract")]] storage {
     uint64_t id;

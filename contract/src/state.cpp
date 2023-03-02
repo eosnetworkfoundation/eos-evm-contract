@@ -30,7 +30,7 @@ ByteView state::read_code(const evmc::bytes32& code_hash) const noexcept {
         return ByteView{(const uint8_t*)code.data(), code.size()};
     }
     
-    codestore_table codes(_self, _self.value);
+    account_code_table codes(_self, _self.value);
     auto inx = codes.get_index<"by.codehash"_n>();
     auto itr = inx.find(make_key(code_hash));
     
@@ -140,7 +140,7 @@ bool state::gc(uint32_t max) {
 }
 
 void state::update_account_code(const evmc::address& address, uint64_t, const evmc::bytes32& code_hash, ByteView code) {
-    codestore_table codes(_self, _self.value);
+    account_code_table codes(_self, _self.value);
     auto inxc = codes.get_index<"by.codehash"_n>();
     auto itrc = inxc.find(make_key(code_hash));
     if(itrc == inxc.end()) {
