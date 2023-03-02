@@ -31,6 +31,9 @@ CONTRACT evm_contract : public contract {
       void removeegress(const std::vector<name>& accounts);
 
       [[eosio::action]]
+      void freeze(bool value);
+
+      [[eosio::action]]
       void pushtx(eosio::name ram_payer, const bytes& rlptx);
 
       [[eosio::action]]
@@ -60,14 +63,29 @@ CONTRACT evm_contract : public contract {
       ACTION setbal(const bytes& addy, const bytes& bal);
 #endif
    private:
+      struct [[eosio::table]] [[eosio::contract("evm_contract")]] account {
+         name     owner;
+         asset    balance;
+         uint64_t dust = 0;
+
+         uint64_t primary_key() const { return owner.value; }
+      };
+
+      typedef eosio::multi_index<"accounts"_n, account> accounts;
+
+      enum class status_flags : uint32_t {
+         frozen = 0x1
+      };
+
       struct [[eosio::table]] [[eosio::contract("evm_contract")]] config {
-         unsigned_int   version;     //placeholder for future variant index
+         unsigned_int   version; //placeholder for future variant index
          uint64_t       chainid = 0;
          time_point_sec genesis_time;
+         uint32_t       status = 0; // <- bit mask values from status_flags
          asset          ingress_bridge_fee = asset(0, token_symbol);
          uint64_t       gas_price = 10000000000;
 
-         EOSLIB_SERIALIZE(config, (version)(chainid)(genesis_time)(ingress_bridge_fee)(gas_price));
+         EOSLIB_SERIALIZE(config, (version)(chainid)(genesis_time)(status)(ingress_bridge_fee)(gas_price));
       };
 
       eosio::singleton<"config"_n, config> _config{get_self(), get_self().value};
@@ -75,6 +93,11 @@ CONTRACT evm_contract : public contract {
       void assert_inited() {
          check( _config.exists(), "contract not initialized" );
          check( _config.get().version == 0u, "unsupported configuration singleton" );
+      }
+
+      void assert_unfrozen() {
+         assert_inited();
+         check((_config.get().status & static_cast<uint32_t>(status_flags::frozen)) == 0, "contract is frozen");
       }
 
       void push_trx(eosio::name ram_payer, silkworm::Block& block, const bytes& rlptx, silkworm::consensus::IEngine& engine, const silkworm::ChainConfig& chain_config);
@@ -89,17 +112,8 @@ CONTRACT evm_contract : public contract {
       //to allow sending through a Bytes (basic_string<uint8_t>) w/o copying over to a std::vector<char>
       void pushtx_bytes(eosio::name ram_payer, const std::basic_string<uint8_t>& rlptx);
       using pushtx_action = eosio::action_wrapper<"pushtx"_n, &evm_contract::pushtx_bytes>;
+
 };
 
 
 } //evm_runtime
-
-namespace std {
-template<typename DataStream>
-DataStream& operator<<(DataStream& ds, const std::basic_string<uint8_t>& bs) {
-   ds << (unsigned_int)bs.size();
-   if(bs.size())
-      ds.write((const char*)bs.data(), bs.size());
-   return ds;
-}
-}

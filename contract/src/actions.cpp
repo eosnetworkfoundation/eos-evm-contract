@@ -30,6 +30,9 @@ namespace silkworm {
     }
 }
 
+static constexpr eosio::name token_account("eosio.token"_n);
+static constexpr eosio::symbol token_symbol("EOS", 4u);
+
 namespace evm_runtime {
 
 using namespace silkworm;
@@ -50,6 +53,20 @@ void evm_contract::init(const uint64_t chainid) {
 
     open(get_self(), get_self());
 }
+
+void evm_contract::freeze(bool value) {
+    eosio::require_auth(get_self());
+
+    assert_inited();
+    config config2 = _config.get();
+    if (value) {
+        config2.status |= static_cast<uint32_t>(status_flags::frozen);
+    } else {
+        config2.status &= ~static_cast<uint32_t>(status_flags::frozen);
+    }
+    _config.set(config2, get_self());
+}
+
 
 void evm_contract::setingressfee(asset ingress_bridge_fee) {
     assert_inited();
@@ -165,59 +182,13 @@ void evm_contract::push_trx( eosio::name ram_payer, Block& block, const bytes& r
     engine.finalize(ep.state(), ep.evm().block(), ep.evm().revision());
     ep.state().write_to_db(ep.evm().block().header.number);
 
-    if(from_self)
-        eosio::check(receipt.success, "ingress bridge actions must succeed");
-
-    if(!ep.state().reserved_objects().empty()) {
-        bool non_open_account_sent = false;
-        intx::uint256 total_egress;
-        populate_bridge_accessors();
-
-        for(const auto& reserved_object : ep.state().reserved_objects()) {
-            const evmc::address& address = reserved_object.first;
-            const name egress_account(*extract_reserved_address(address) ?: get_self().value); //egress to reserved-0 goes to contract's bucket; TODO: needs more love w/ gas changes
-            const Account& reserved_account = *reserved_object.second.current;
-
-            check(reserved_account.code_hash == kEmptyHash, "contracts cannot be created in the reserved address space");
-
-            if(reserved_account.balance ==  0_u256)
-                continue;
-            total_egress += reserved_account.balance;
-
-            if(auto it = balance_table->find(egress_account.value); it != balance_table->end()) {
-                balance_table->modify(balance_table->get(egress_account.value), eosio::same_payer, [&](balance& b){
-                    b.balance += reserved_account.balance;
-                });
-            }
-            else {
-                check(!non_open_account_sent, "only one non-open account for egress bridging allowed in single transaction");
-                check(is_account(egress_account), "can only egress bridge to existing accounts");
-                if(get_code_hash(egress_account) != checksum256())
-                    egresslist(get_self(), get_self().value).get(egress_account.value, "non-open accounts containing contract code must be on allow list for egress bridging");
-
-                check(reserved_account.balance % minimum_natively_representable == 0_u256, "egress bridging to non-open accounts must not contain dust");
-
-                const bool was_to = tx.to && *tx.to == address;
-                const Bytes exit_memo = {'E', 'V', 'M', ' ', 'e', 'x', 'i', 't'}; //yikes
-
-                token::transfer_bytes_memo_action transfer_act(token_account, {{get_self(), "active"_n}});
-                transfer_act.send(get_self(), egress_account, asset((uint64_t)(reserved_account.balance / minimum_natively_representable), token_symbol), was_to ? tx.data : exit_memo);
-
-                non_open_account_sent = true;
-            }
-        }
-
-        if(total_egress != 0_u256)
-            inevm->set(inevm->get() -= total_egress, eosio::same_payer);
-    }
-
     LOGTIME("EVM EXECUTE");
 }
 
 void evm_contract::pushtx( eosio::name ram_payer, const bytes& rlptx ) {
     LOGTIME("EVM START");
 
-    assert_inited();
+    assert_unfrozen();
     std::optional<std::pair<const std::string, const ChainConfig*>> found_chain_config = lookup_known_chain(_config.get().chainid);
     check( found_chain_config.has_value(), "failed to find expected chain config" );
     eosio::require_auth(ram_payer);
@@ -233,7 +204,7 @@ void evm_contract::pushtx( eosio::name ram_payer, const bytes& rlptx ) {
 }
 
 void evm_contract::open(eosio::name owner, eosio::name ram_payer) {
-    assert_inited();
+    assert_unfrozen();
     require_auth(ram_payer);
     check(is_account(owner), "owner account does not exist");
 
@@ -251,7 +222,7 @@ void evm_contract::open(eosio::name owner, eosio::name ram_payer) {
 }
 
 void evm_contract::close(eosio::name owner) {
-    assert_inited();
+    assert_unfrozen();
     require_auth(owner);
 
     eosio::check(owner != get_self(), "Cannot close self");
@@ -336,7 +307,7 @@ void evm_contract::handle_evm_transfer(eosio::asset quantity, const std::string&
 }
 
 void evm_contract::transfer(eosio::name from, eosio::name to, eosio::asset quantity, std::string memo) {
-    assert_inited();
+    assert_unfrozen();
     eosio::check(quantity.symbol == token_symbol, "received unexpected token");
 
     if(to != get_self() || from == get_self())
@@ -351,7 +322,7 @@ void evm_contract::transfer(eosio::name from, eosio::name to, eosio::asset quant
 }
 
 void evm_contract::withdraw(eosio::name owner, eosio::asset quantity) {
-    assert_inited();
+    assert_unfrozen();
     require_auth(owner);
 
     balances balance_table(get_self(), get_self().value);
@@ -367,7 +338,7 @@ void evm_contract::withdraw(eosio::name owner, eosio::asset quantity) {
 }
 
 bool evm_contract::gc(uint32_t max) {
-    assert_inited();
+    assert_unfrozen();
 
     evm_runtime::state state{get_self(), eosio::same_payer};
     return state.gc(max);
@@ -375,7 +346,7 @@ bool evm_contract::gc(uint32_t max) {
 
 #ifdef WITH_TEST_ACTIONS
 ACTION evm_contract::testtx( const bytes& rlptx, const evm_runtime::test::block_info& bi ) {
-    assert_inited();
+    assert_unfrozen();
 
     eosio::require_auth(get_self());
 
@@ -471,7 +442,7 @@ ACTION evm_contract::dumpall() {
 
 
 ACTION evm_contract::clearall() {
-    assert_inited();
+    assert_unfrozen();
 
     eosio::require_auth(get_self());
 
@@ -506,7 +477,7 @@ ACTION evm_contract::clearall() {
 }
 
 ACTION evm_contract::updatecode( const bytes& address, uint64_t incarnation, const bytes& code_hash, const bytes& code) {
-    assert_inited();
+    assert_unfrozen();
 
     eosio::require_auth(get_self());
 
@@ -516,7 +487,7 @@ ACTION evm_contract::updatecode( const bytes& address, uint64_t incarnation, con
 }
 
 ACTION evm_contract::updatestore(const bytes& address, uint64_t incarnation, const bytes& location, const bytes& initial, const bytes& current) {
-    assert_inited();
+    assert_unfrozen();
 
     eosio::require_auth(get_self());
 
@@ -533,7 +504,7 @@ ACTION evm_contract::updatestore(const bytes& address, uint64_t incarnation, con
 }
 
 ACTION evm_contract::updateaccnt(const bytes& address, const bytes& initial, const bytes& current) {
-    assert_inited();
+    assert_unfrozen();
 
     eosio::require_auth(get_self());
 
@@ -557,7 +528,7 @@ ACTION evm_contract::updateaccnt(const bytes& address, const bytes& initial, con
 }
 
 ACTION evm_contract::setbal(const bytes& addy, const bytes& bal) {
-    assert_inited();
+    assert_unfrozen();
 
     eosio::require_auth(get_self());
 
