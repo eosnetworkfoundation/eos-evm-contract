@@ -447,7 +447,7 @@ try:
         gas=100000,       #100k Gas
         gasPrice=1,
         to=Web3.toChecksumAddress(toAdd),
-        value=int(amount*10000*szabo*100),
+        value=int(amount*10000*szabo*100), # .0001 EOS is 100 szabos
         data=b'',
         chainId=evmChainId
     ), evmSendKey)
@@ -535,7 +535,7 @@ try:
             foundErr = True
 
     if killEosInstances:
-        popenRPC.kill()
+        popenRPC.terminate()
         popen.kill()
 
     testSuccessful= not foundErr
