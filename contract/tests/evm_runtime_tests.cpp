@@ -294,6 +294,7 @@ FC_REFLECT(account, (id)(eth_address)(nonce)(balance)(code_hash));
 
 struct account_code {
    uint64_t    id;
+   uint64_t    ref_count;
    bytes       code;
    bytes       code_hash;
 
@@ -328,7 +329,7 @@ struct account_code {
    }
 
 };
-FC_REFLECT(account_code, (id)(code)(code_hash));
+FC_REFLECT(account_code, (id)(ref_count)(code)(code_hash));
 
 struct storage {
    uint64_t id;
@@ -387,6 +388,22 @@ struct gcstore {
    }
 };
 FC_REFLECT(gcstore, (id)(storage_id));
+
+struct gc_code {
+   uint64_t id;
+   uint64_t code_id;
+
+   static name table_name() { return "gccode"_n; }
+   static name index_name(const name& n) {
+      BOOST_REQUIRE(false);
+      return name{0};
+   }
+
+   static name index_name(uint64_t n) {
+      return index_name(name{n});
+   }
+};
+FC_REFLECT(gc_code, (id)(code_id));
 
 struct assert_message_check {
    string _expected;
@@ -709,6 +726,25 @@ struct evm_runtime_tester : eosio_system_tester, silkworm::State {
       return count;
    }
 
+   size_t gc_code_size() {
+      auto& db = const_cast<chainbase::database&>(control->db());
+
+      const auto* tid = db.find<table_id_object, by_code_scope_table>(
+         boost::make_tuple("evm"_n, "evm"_n,"gccode"_n)
+      );
+
+      if(tid == nullptr) return 0;
+
+      const auto& idx = db.get_index<key_value_index, by_scope_primary>();
+      auto itr = idx.lower_bound( boost::make_tuple( tid->id) );
+      size_t count=0;
+      while ( itr != idx.end() && itr->t_id == tid->id ) {
+         ++itr;
+         ++count;
+      }
+      return count;
+   }
+
    size_t state_storage_size(const evmc::address& address, uint64_t incarnation) {
       auto& db = const_cast<chainbase::database&>(control->db());
       auto accnt = account::get_by_address(db, address);
@@ -965,6 +1001,11 @@ struct evm_runtime_tester : eosio_system_tester, silkworm::State {
 
       if( gc_size() != 0 ) {
          std::cout << "gcstore is not empty: " << gc_size() << std::endl;
+         return false;
+      }
+
+      if( gc_code_size() != 0 ) {
+         std::cout << "gc_code is not empty: " << gc_code_size() << std::endl;
          return false;
       }
 

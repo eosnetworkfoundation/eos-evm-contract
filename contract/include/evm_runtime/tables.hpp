@@ -39,6 +39,7 @@ typedef multi_index< "account"_n, account,
 
 struct [[eosio::table]] [[eosio::contract("evm_contract")]] account_code {
     uint64_t    id;
+    uint64_t    ref_count;
     bytes       code;
     bytes       code_hash;
 
@@ -52,7 +53,7 @@ struct [[eosio::table]] [[eosio::contract("evm_contract")]] account_code {
         return to_bytes32(code_hash);
     }
 
-    EOSLIB_SERIALIZE(account_code, (id)(code)(code_hash));
+    EOSLIB_SERIALIZE(account_code, (id)(ref_count)(code)(code_hash));
 };
 
 typedef multi_index< "accountcode"_n, account_code,
@@ -87,5 +88,16 @@ struct [[eosio::table]] [[eosio::contract("evm_contract")]] gcstore {
 };
 
 typedef multi_index< "gcstore"_n, gcstore> gc_store_table;
+
+struct [[eosio::table]] [[eosio::contract("evm_contract")]] gc_code {
+    uint64_t id;
+    uint64_t code_id;
+
+    uint64_t primary_key()const { return id; }
+
+    EOSLIB_SERIALIZE(gc_code, (id)(code_id));
+};
+
+typedef multi_index< "gccode"_n, gc_code> gc_code_table;
 
 } //namespace evm_runtime

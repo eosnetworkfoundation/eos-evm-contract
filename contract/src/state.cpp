@@ -116,6 +116,28 @@ void state::update_account(const evmc::address& address, std::optional<Account> 
                 row.id = gc.available_primary_key();
                 row.storage_id = itr->id;
             });
+            // Decrease ref_count for code
+            if (itr->code_hash ) {
+                account_code_table codes(_self, _self.value);
+                auto inxc = codes.get_index<"by.codehash"_n>();
+                auto itrc = inxc.find(make_key(itr->code_hash.value()));
+                if(itrc == inxc.end()) {
+                    // SHOULD NOT REACH HERE! 
+                    // But we ignore this for robustness.
+                } else {
+                    if (itrc->ref_count <= 1) {
+                        gc_code_table gccode(_self, _self.value);
+                        gccode.emplace(_ram_payer, [&](auto& row){
+                            row.id = gccode.available_primary_key();
+                            row.code_id = itrc->id;
+                        });
+                    }
+                    codes.modify(*itrc, eosio::same_payer, [&](auto& row){
+                        if (row.ref_count > 0)
+                            row.ref_count --;
+                    });
+                }
+            }
             accounts.erase(*itr);
             ++stats.account.remove;
         }
@@ -136,7 +158,21 @@ bool state::gc(uint32_t max) {
         i = gc.erase(i);
         --max;
     }
-    return gc.begin() == gc.end();
+
+    gc_code_table gccode(_self, _self.value);
+    auto j = gccode.begin();
+    while( max && j != gccode.end() ) {
+        account_code_table codes(_self, _self.value);
+        auto citr = codes.find(j->code_id);
+        if ( max && citr != codes.end() && citr->ref_count == 0) {
+            citr = codes.erase(citr);
+            --max;
+        }
+        if( !max ) break;
+        j = gccode.erase(j);
+        --max;
+    }
+    return gc.begin() == gc.end() && gccode.begin() == gccode.end();
 }
 
 void state::update_account_code(const evmc::address& address, uint64_t, const evmc::bytes32& code_hash, ByteView code) {
@@ -148,9 +184,13 @@ void state::update_account_code(const evmc::address& address, uint64_t, const ev
             row.id = codes.available_primary_key();
             row.code_hash = to_bytes(code_hash);
             row.code = bytes{code.begin(), code.end()};
+            row.ref_count = 1;
         });
     } else {
         // code should be immutable
+        codes.modify(*itrc, eosio::same_payer, [&](auto& row){
+            row.ref_count ++;
+        });
     }
     
     account_table accounts(_self, _self.value);
