@@ -32,7 +32,7 @@ from core_symbol import CORE_SYMBOL
 # Need to install:
 #   web3      - pip install web3
 #
-# --turst-evm-root should point to the root of TrustEVM build dir
+# --trust-evm-build-root should point to the root of TrustEVM build dir
 # --trust-evm-contract-root should point to root of TrustEVM contract build dir
 #                           contracts should be built with -DWITH_TEST_ACTIONS=On
 #
