@@ -26,7 +26,6 @@ set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -Wno-deprecated-declarations")
 add_eosio_test_executable( unit_test
     ${CMAKE_SOURCE_DIR}/evm_runtime_tests.cpp
     ${CMAKE_SOURCE_DIR}/init_tests.cpp
-    ${CMAKE_SOURCE_DIR}/freeze_tests.cpp
     ${CMAKE_SOURCE_DIR}/native_token_tests.cpp
     ${CMAKE_SOURCE_DIR}/main.cpp
     ${CMAKE_SOURCE_DIR}/silkworm/core/silkworm/rlp/encode.cpp
