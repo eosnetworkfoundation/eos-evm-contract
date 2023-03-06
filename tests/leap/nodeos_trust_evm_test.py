@@ -38,7 +38,7 @@ from core_symbol import CORE_SYMBOL
 #
 # Example:
 #  cd ~/ext/leap/build
-#  edit core_symbol.py to be EOS
+#  edit tests/core_symbol.py to be EOS
 #  ~/ext/TrustEVM/tests/leap/nodeos_trust_evm_test.py --trust-evm-contract-root ~/ext/TrustEVM/contract/build --trust-evm-build-root ~/ext/TrustEVM/cmake-build-release-gcc  --leave-running
 #
 #  Launches wallet at port: 9899
