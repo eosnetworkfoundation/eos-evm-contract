@@ -46,6 +46,9 @@ BOOST_FIXTURE_TEST_CASE(check_init, basic_evm_tester) try {
    BOOST_REQUIRE_EXCEPTION(push_action("evm"_n, "gc"_n, "evm"_n, mvo()("max", 42)),
                            eosio_assert_message_exception,
                            [](const eosio_assert_message_exception& e) {return testing::expect_assert_message(e, "assertion failure with message: contract not initialized");});
+   BOOST_REQUIRE_EXCEPTION(push_action("evm"_n, "freeze"_n, "evm"_n, mvo()("value", true)),
+                           eosio_assert_message_exception,
+                           [](const eosio_assert_message_exception& e) {return testing::expect_assert_message(e, "assertion failure with message: contract not initialized");});
 
    BOOST_REQUIRE_EXCEPTION(init(42),
                            eosio_assert_message_exception,
