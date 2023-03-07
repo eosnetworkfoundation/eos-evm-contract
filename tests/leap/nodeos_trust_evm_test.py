@@ -362,7 +362,7 @@ try:
         Utils.errorExit("Unexpected starting conditions. Excepted %s, evm actual: %s, test actual" % (expectedAmount, evmAccActualAmount, testAccActualAmount))
 
     # set ingress bridge fee
-    data="[\"0.0100 EOS\"]"
+    data="[\"0.0100 {0}\"]".format(CORE_SYMBOL)
     opts="--permission evmevmevmevm@active"
     trans=prodNode.pushMessage("evmevmevmevm", "setingressfee", data, opts)
 
