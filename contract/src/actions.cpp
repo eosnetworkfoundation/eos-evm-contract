@@ -50,6 +50,19 @@ void evm_contract::init(const uint64_t chainid) {
     }, get_self());
 }
 
+void evm_contract::freeze(bool value) {
+    eosio::require_auth(get_self());
+
+    assert_inited();
+    config config2 = _config.get();
+    if (value) {
+        config2.status |= static_cast<uint32_t>(status_flags::frozen);
+    } else {
+        config2.status &= ~static_cast<uint32_t>(status_flags::frozen);
+    }
+    _config.set(config2, get_self());
+}
+
 void check_result( ValidationResult r, const Transaction& txn, const char* desc ) {
     if( r == ValidationResult::kOk )
         return;
@@ -103,7 +116,7 @@ void evm_contract::push_trx( eosio::name ram_payer, Block& block, const bytes& r
 void evm_contract::pushtx( eosio::name ram_payer, const bytes& rlptx ) {
     LOGTIME("EVM START");
 
-    assert_inited();
+    assert_unfrozen();
     std::optional<std::pair<const std::string, const ChainConfig*>> found_chain_config = lookup_known_chain(_config.get().chainid);
     check( found_chain_config.has_value(), "failed to find expected chain config" );
     eosio::require_auth(ram_payer);
@@ -119,7 +132,7 @@ void evm_contract::pushtx( eosio::name ram_payer, const bytes& rlptx ) {
 }
 
 void evm_contract::open(eosio::name owner, eosio::name ram_payer) {
-    assert_inited();
+    assert_unfrozen();
     require_auth(ram_payer);
     check(is_account(owner), "owner account does not exist");
 
@@ -132,7 +145,7 @@ void evm_contract::open(eosio::name owner, eosio::name ram_payer) {
 }
 
 void evm_contract::close(eosio::name owner) {
-    assert_inited();
+    assert_unfrozen();
     require_auth(owner);
 
     accounts account_table(get_self(), get_self().value);
@@ -143,7 +156,7 @@ void evm_contract::close(eosio::name owner) {
 }
 
 void evm_contract::transfer(eosio::name from, eosio::name to, eosio::asset quantity, std::string memo) {
-    assert_inited();
+    assert_unfrozen();
 
     if(to != get_self() || from == get_self())
         return;
@@ -161,7 +174,7 @@ void evm_contract::transfer(eosio::name from, eosio::name to, eosio::asset quant
 }
 
 void evm_contract::withdraw(eosio::name owner, eosio::asset quantity) {
-    assert_inited();
+    assert_unfrozen();
     require_auth(owner);
 
     accounts account_table(get_self(), get_self().value);
@@ -177,7 +190,7 @@ void evm_contract::withdraw(eosio::name owner, eosio::asset quantity) {
 }
 
 bool evm_contract::gc(uint32_t max) {
-    assert_inited();
+    assert_unfrozen();
 
     evm_runtime::state state{get_self(), eosio::same_payer};
     return state.gc(max);
@@ -185,7 +198,7 @@ bool evm_contract::gc(uint32_t max) {
 
 #ifdef WITH_TEST_ACTIONS
 ACTION evm_contract::testtx( const bytes& rlptx, const evm_runtime::test::block_info& bi ) {
-    assert_inited();
+    assert_unfrozen();
 
     eosio::require_auth(get_self());
 
@@ -281,7 +294,7 @@ ACTION evm_contract::dumpall() {
 
 
 ACTION evm_contract::clearall() {
-    assert_inited();
+    assert_unfrozen();
 
     eosio::require_auth(get_self());
 
@@ -316,7 +329,7 @@ ACTION evm_contract::clearall() {
 }
 
 ACTION evm_contract::updatecode( const bytes& address, uint64_t incarnation, const bytes& code_hash, const bytes& code) {
-    assert_inited();
+    assert_unfrozen();
 
     eosio::require_auth(get_self());
 
@@ -326,7 +339,7 @@ ACTION evm_contract::updatecode( const bytes& address, uint64_t incarnation, con
 }
 
 ACTION evm_contract::updatestore(const bytes& address, uint64_t incarnation, const bytes& location, const bytes& initial, const bytes& current) {
-    assert_inited();
+    assert_unfrozen();
 
     eosio::require_auth(get_self());
 
@@ -343,7 +356,7 @@ ACTION evm_contract::updatestore(const bytes& address, uint64_t incarnation, con
 }
 
 ACTION evm_contract::updateaccnt(const bytes& address, const bytes& initial, const bytes& current) {
-    assert_inited();
+    assert_unfrozen();
 
     eosio::require_auth(get_self());
 
@@ -367,7 +380,7 @@ ACTION evm_contract::updateaccnt(const bytes& address, const bytes& initial, con
 }
 
 ACTION evm_contract::setbal(const bytes& addy, const bytes& bal) {
-    assert_inited();
+    assert_unfrozen();
 
     eosio::require_auth(get_self());
 

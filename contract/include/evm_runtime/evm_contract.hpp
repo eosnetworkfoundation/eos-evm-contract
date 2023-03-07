@@ -22,6 +22,9 @@ CONTRACT evm_contract : public contract {
       void init(const uint64_t chainid);
 
       [[eosio::action]]
+      void freeze(bool value);
+
+      [[eosio::action]]
       void pushtx(eosio::name ram_payer, const bytes& rlptx);
 
       [[eosio::action]]
@@ -61,18 +64,28 @@ CONTRACT evm_contract : public contract {
 
       typedef eosio::multi_index<"accounts"_n, account> accounts;
 
+      enum class status_flags : uint32_t {
+         frozen = 0x1
+      };
+
       struct [[eosio::table]] [[eosio::contract("evm_contract")]] config {
          eosio::unsigned_int version; //placeholder for future variant index
          uint64_t chainid = 0;
          time_point_sec genesis_time;
+         uint32_t status = 0; // <- bit mask values from status_flags
       };
-      EOSLIB_SERIALIZE(config, (version)(chainid)(genesis_time));
+      EOSLIB_SERIALIZE(config, (version)(chainid)(genesis_time)(status));
 
       eosio::singleton<"config"_n, config> _config{get_self(), get_self().value};
 
       void assert_inited() {
          check( _config.exists(), "contract not initialized" );
          check( _config.get().version == 0u, "unsupported configuration singleton" );
+      }
+
+      void assert_unfrozen() {
+         assert_inited();
+         check((_config.get().status & static_cast<uint32_t>(status_flags::frozen)) == 0, "contract is frozen");
       }
 
       void push_trx(eosio::name ram_payer, silkworm::Block& block, const bytes& rlptx, silkworm::consensus::IEngine& engine, const silkworm::ChainConfig& chain_config);
