@@ -1,5 +1,6 @@
 require("@nomicfoundation/hardhat-toolbox");
 require("@nomiclabs/hardhat-web3");
+require("@b10k.io/hardhat-uniswap-v2-deploy-plugin");
 
 // task action function receives the Hardhat Runtime Environment as second argument
 task("accounts", "Prints accounts", async (_, { web3 }) => {
@@ -64,6 +65,22 @@ task("send-loop", "Send ERC20 token in a loop")
         console.log("txhash => ", r.hash);
       });
     }
+});
+
+task("emit-event", "Emit event")
+  .addParam("from", "Sender address")  
+  .addParam("contract", "Eventor contract address")
+  .addParam("id", "Deposit id")
+  .addParam("value", "Deposit value")
+  .setAction(async (taskArgs) => {
+    const Eventor = await ethers.getContractFactory('Eventor')
+    const eventor = Eventor.attach(taskArgs.contract).connect(await ethers.getSigner(taskArgs.from));
+
+    const res = await eventor.deposit(
+      ethers.utils.hexZeroPad(ethers.BigNumber.from(taskArgs.id).toHexString(), 32),
+      taskArgs.value
+    );
+    console.log("############################################ EMIT #######");
 });
 
 task("storage-loop", "Store incremental values to the storage contract")
@@ -135,6 +152,94 @@ task("all-erc20-balance", "Prints erc20 balance of all accounts")
 
 });
 
+function eth(n) {
+  return ethers.utils.parseEther(n.toString());
+}
+
+task("swap4eth", "Swap exact tokens for ETH")
+.addParam("erc20", "The erc20 contract address")
+.addParam("weth9", "The weth9 contract address")
+.addParam("router", "The router contract address")
+.setAction(async (taskArgs) => {
+  const signer = await ethers.getSigner(0);
+  //console.log(signer);
+
+  const Token = await ethers.getContractFactory('Token')
+  const token = Token.attach(taskArgs.erc20)
+  
+  const ROUTER = require("@uniswap/v2-periphery/build/UniswapV2Router02.json");
+  const WETH9 = require("@uniswap/v2-periphery/build/WETH9.json");
+
+  //await ethers.getSigner
+  const Router = new ethers.ContractFactory(ROUTER.abi, ROUTER.bytecode);
+  const router = Router.attach(taskArgs.router).connect(signer);
+
+  const Weth9 = new ethers.ContractFactory(WETH9.abi, WETH9.bytecode);
+  const weth9 = Weth9.attach(taskArgs.weth9).connect(signer);
+
+  const AMOUNT_WETH9 = eth(1000);
+  const AMOUNT_TOKEN = eth(1000);
+
+  await weth9.approve(router.address, AMOUNT_WETH9);
+  await token.approve(router.address, AMOUNT_TOKEN);
+
+  const receipt = await router.addLiquidityETH(
+    token.address,
+    eth(1000),
+    eth(1000),
+    eth(100),
+    signer.address,
+    ethers.constants.MaxUint256,
+    { value: eth(1000) }
+  );
+
+  console.log(receipt);
+
+});
+
+
+task("add-liquidity", "Adds liquidity to an ERC-20⇄WETH pool with ETH")
+  .addParam("weth9", "The weth9 contract address")
+  .addParam("erc20", "The erc20 contract address")    
+  .addParam("router", "The router contract address")  
+  .setAction(async (taskArgs) => {
+    const signer = await ethers.getSigner(0);
+    //console.log(signer);
+
+    const Token = await ethers.getContractFactory('Token')
+    const token = Token.attach(taskArgs.erc20)
+    
+    const ROUTER = require("@uniswap/v2-periphery/build/UniswapV2Router02.json");
+    const WETH9 = require("@uniswap/v2-periphery/build/WETH9.json");
+
+    //await ethers.getSigner
+    const Router = new ethers.ContractFactory(ROUTER.abi, ROUTER.bytecode);
+    const router = Router.attach(taskArgs.router).connect(signer);
+
+    const Weth9 = new ethers.ContractFactory(WETH9.abi, WETH9.bytecode);
+    const weth9 = Weth9.attach(taskArgs.weth9).connect(signer);
+
+    const AMOUNT_WETH9 = eth(1000);
+    const AMOUNT_TOKEN = eth(1000);
+
+    const r1 = await weth9.approve(router.address, AMOUNT_WETH9);
+    const r2 = await token.approve(router.address, AMOUNT_TOKEN);
+
+    const receipt = await router.addLiquidityETH(
+      token.address,
+      eth(1000),
+      eth(1000),
+      eth(100),
+      signer.address,
+      ethers.constants.MaxUint256,
+      { value: eth(1000) }
+    );
+
+    console.log(receipt);
+
+});
+
+
 
 
 /** @type import('hardhat/config').HardhatUserConfig */
@@ -143,6 +248,16 @@ module.exports = {
   networks: {
     ltrust: {
       url: "http://localhost:5000",
+      accounts: {
+        mnemonic: "test test test test test test test test test test test junk",
+        path: "m/44'/60'/0'/0",
+        initialIndex: 0,
+        count: 80,
+        passphrase: "",
+      },
+    },
+    ttrust: {
+      url: "https://api-testnet.trust.one",
       accounts: {
         mnemonic: "test test test test test test test test test test test junk",
         path: "m/44'/60'/0'/0",
