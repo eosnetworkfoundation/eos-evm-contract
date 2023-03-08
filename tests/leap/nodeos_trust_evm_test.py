@@ -533,18 +533,14 @@ try:
         Utils.errorExit("Transfer verification failed. Excepted %s, actual: %s" % (expectedAmount, testAccActualAmount))
 
 
-    # Launch trustevm-node & trustevm-rpc
+    # Launch trustevm-node
     dataDir = Utils.DataDir + "eos_evm"
     nodeStdOutDir = dataDir + "/trustevm-node.stdout"
     nodeStdErrDir = dataDir + "/trustevm-node.stderr"
-    nodeRPCStdOutDir = dataDir + "/trustevm-rpc.stdout"
-    nodeRPCStdErrDir = dataDir + "/trustevm-rpc.stderr"
     shutil.rmtree(dataDir, ignore_errors=True)
     os.makedirs(dataDir)
     outFile = open(nodeStdOutDir, "w")
     errFile = open(nodeStdErrDir, "w")
-    outRPCFile = open(nodeRPCStdOutDir, "w")
-    errRPCFile = open(nodeRPCStdErrDir, "w")
     cmd = "%s/cmd/trustevm-node --plugin=blockchain_plugin --ship-endpoint=127.0.0.1:8999 --genesis-json=%s --chain-data=%s --verbosity=5 --nocolor=1 --plugin=rpc_plugin --trust-evm-node=127.0.0.1:8080 --http-port=0.0.0.0:8881 --api-spec=eth,debug,net,trace --chaindata=%s" % (trustEvmBuildRoot, gensisJson, dataDir, dataDir)
     Utils.Print("Launching: %s", cmd)
     popen=Utils.delayedCheckOutput(cmd, stdout=outFile, stderr=errFile)
@@ -554,11 +550,10 @@ try:
     # Validate all balances are the same on both sides
     rows=prodNode.getTable(evmAcc.name, evmAcc.name, "account")
     for row in rows['rows']:
-        Utils.Print("0x{0} balance".format(row['eth_address']))
+        Utils.Print("Checking 0x{0} balance".format(row['eth_address']))
         r = w3.eth.get_balance(Web3.toChecksumAddress('0x'+row['eth_address']))
         assert r == int(row['balance'],16), row['eth_address']
 
-    Utils.Print("\n")
     foundErr = False
     stdErrFile = open(nodeStdErrDir, "r")
     lines = stdErrFile.readlines()
@@ -568,7 +563,6 @@ try:
             foundErr = True
 
     if killEosInstances:
-        popenRPC.terminate()
         popen.kill()
 
     testSuccessful= not foundErr
