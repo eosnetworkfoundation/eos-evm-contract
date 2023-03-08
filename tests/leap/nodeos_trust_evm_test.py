@@ -14,6 +14,7 @@ from ctypes import c_uint8
 import sys
 from binascii import unhexlify
 from web3 import Web3
+import rlp
 
 sys.path.append(os.getcwd())
 sys.path.append(os.path.join(os.getcwd(), "tests"))
@@ -79,20 +80,19 @@ walletMgr=WalletMgr(True)
 pnodes=1
 total_nodes=pnodes + 2
 
-def generate_evm_transactions(nonce):
+def interact_with_storage_contract(dest, nonce):
     for i in range(1, 5): # execute a few
         Utils.Print("Execute ETH contract")
         nonce += 1
-        toAdd = "2787b98fc4e731d0456b3941f0b3fe2e01430000"
         amount = 0
         signed_trx = w3.eth.account.sign_transaction(dict(
             nonce=nonce,
             #        maxFeePerGas=150000000000, #150 GWei
             gas=100000,       #100k Gas
             gasPrice=1,
-            to=Web3.toChecksumAddress(toAdd),
+            to=Web3.toChecksumAddress(dest),
             value=amount,
-            data=unhexlify("6057361d000000000000000000000000000000000000000000000000000000000000007b"),
+            data=unhexlify("6057361d00000000000000000000000000000000000000000000000000000000000000%02x" % nonce),
             chainId=evmChainId
         ), evmSendKey)
 
@@ -104,6 +104,24 @@ def generate_evm_transactions(nonce):
         Utils.Print("\tTable row:", row0)
         time.sleep(1)
 
+    return nonce
+
+def normalize_address(x, allow_blank=False):
+    if allow_blank and x == '':
+        return ''
+    if len(x) in (42, 50) and x[:2] == '0x':
+        x = x[2:]
+    if len(x) in (40, 48):
+        x = unhexlify(x)
+    if len(x) == 24:
+        assert len(x) == 24 and sha3(x[:20])[:4] == x[-4:]
+        x = x[:20]
+    if len(x) != 20:
+        raise Exception("Invalid address format: %r" % x)
+    return x
+
+def makeContractAddress(sender, nonce):
+    return Web3.toHex(Web3.keccak(rlp.encode([normalize_address(sender), nonce]))[12:])
 
 def makeReservedEvmAddress(account):
     bytearr = [0xff, 0xff, 0xff, 0xff,
@@ -143,7 +161,7 @@ def nameStrToInt(s: str):
 try:
     TestHelper.printSystemInfo("BEGIN")
 
-    w3 = Web3()
+    w3 = Web3(Web3.HTTPProvider("http://localhost:8881"))
 
     cluster.setWalletMgr(walletMgr)
 
@@ -331,9 +349,21 @@ try:
     #         return number;
     #     }
     # }
-    retValue = prodNode.pushMessage(evmAcc.name, "updatecode", '{"address":"2787b98fc4e731d0456b3941f0b3fe2e01430000","incarnation":0,"code_hash":"286e3d498e2178afc91275f11d446e62a0d85b060ce66d6ca75f6ec9d874d560","code":"608060405234801561001057600080fd5b50600436106100365760003560e01c80632e64cec11461003b5780636057361d14610059575b600080fd5b610043610075565b60405161005091906100d9565b60405180910390f35b610073600480360381019061006e919061009d565b61007e565b005b60008054905090565b8060008190555050565b60008135905061009781610103565b92915050565b6000602082840312156100b3576100b26100fe565b5b60006100c184828501610088565b91505092915050565b6100d3816100f4565b82525050565b60006020820190506100ee60008301846100ca565b92915050565b6000819050919050565b600080fd5b61010c816100f4565b811461011757600080fd5b5056fea26469706673582212209a159a4f3847890f10bfb87871a61eba91c5dbf5ee3cf6398207e292eee22a1664736f6c63430008070033"}', '-p evmevmevmevm')
+    nonce += 1
+    evmChainId = 15555
+    signed_trx = w3.eth.account.sign_transaction(dict(
+        nonce=nonce,
+        #        maxFeePerGas=150000000000, #150 GWei
+        gas=1000000,       #5M Gas
+        gasPrice=1,
+        data=Web3.toBytes(hexstr='608060405234801561001057600080fd5b50610150806100206000396000f3fe608060405234801561001057600080fd5b50600436106100365760003560e01c80632e64cec11461003b5780636057361d14610059575b600080fd5b610043610075565b60405161005091906100a1565b60405180910390f35b610073600480360381019061006e91906100ed565b61007e565b005b60008054905090565b8060008190555050565b6000819050919050565b61009b81610088565b82525050565b60006020820190506100b66000830184610092565b92915050565b600080fd5b6100ca81610088565b81146100d557600080fd5b50565b6000813590506100e7816100c1565b92915050565b600060208284031215610103576101026100bc565b5b6000610111848285016100d8565b9150509291505056fea2646970667358fe12209ffe32fe5779018f7ee58886c856a4cfdf550f2df32cec944f57716a3abf4a5964736f6c63430008110033'),
+        chainId=evmChainId
+    ), evmSendKey)
 
-    generate_evm_transactions(nonce)
+    actData = {"ram_payer":"evmevmevmevm", "rlptx":Web3.toHex(signed_trx.rawTransaction)[2:]}
+    retValue = prodNode.pushMessage(evmAcc.name, "pushtx", json.dumps(actData), '-p evmevmevmevm', silentErrors=True, force=True)
+    assert retValue[0], f"push trx should have succeeded: {retValue}"
+    nonce = interact_with_storage_contract(makeContractAddress(fromAdd, nonce), nonce)
 
     if gensisJson[0] != '/': gensisJson = os.path.realpath(gensisJson)
     f=open(gensisJson,"w")
@@ -504,7 +534,7 @@ try:
 
 
     # Launch trustevm-node & trustevm-rpc
-    dataDir = Utils.DataDir + "/eos_evm"
+    dataDir = Utils.DataDir + "eos_evm"
     nodeStdOutDir = dataDir + "/trustevm-node.stdout"
     nodeStdErrDir = dataDir + "/trustevm-node.stderr"
     nodeRPCStdOutDir = dataDir + "/trustevm-rpc.stdout"
@@ -515,15 +545,18 @@ try:
     errFile = open(nodeStdErrDir, "w")
     outRPCFile = open(nodeRPCStdOutDir, "w")
     errRPCFile = open(nodeRPCStdErrDir, "w")
-    cmd = "%s/cmd/trustevm-node --plugin=blockchain_plugin --ship-endpoint=127.0.0.1:8999 --genesis-json=%s --chain-data=%s --verbosity=5 --nocolor=1" % (trustEvmBuildRoot, gensisJson, dataDir)
+    cmd = "%s/cmd/trustevm-node --plugin=blockchain_plugin --ship-endpoint=127.0.0.1:8999 --genesis-json=%s --chain-data=%s --verbosity=5 --nocolor=1 --plugin=rpc_plugin --trust-evm-node=127.0.0.1:8080 --http-port=0.0.0.0:8881 --api-spec=eth,debug,net,trace --chaindata=%s" % (trustEvmBuildRoot, gensisJson, dataDir, dataDir)
     Utils.Print("Launching: %s", cmd)
     popen=Utils.delayedCheckOutput(cmd, stdout=outFile, stderr=errFile)
 
-    cmdRPC = "%s/cmd/trustevm-rpc --trust-evm-node=127.0.0.1:8080 --http-port=0.0.0.0:8881 --chaindata=%s --api-spec=eth,debug,net,trace" % (trustEvmBuildRoot, dataDir)
-    Utils.Print("Launching: %s", cmdRPC)
-    popenRPC=Utils.delayedCheckOutput(cmdRPC, stdout=outRPCFile, stderr=errRPCFile)
-
     time.sleep(5) # allow time to sync trxs
+
+    # Validate all balances are the same on both sides
+    rows=prodNode.getTable(evmAcc.name, evmAcc.name, "account")
+    for row in rows['rows']:
+        Utils.Print("0x{0} balance".format(row['eth_address']))
+        r = w3.eth.get_balance(Web3.toChecksumAddress('0x'+row['eth_address']))
+        assert r == int(row['balance'],16), row['eth_address']
 
     Utils.Print("\n")
     foundErr = False
