@@ -65,10 +65,14 @@ std::string to_hex_no_leading_zeros(uint64_t number) {
 }
 
 std::string to_quantity(silkworm::ByteView bytes) {
-    return "0x" + to_hex_no_leading_zeros(bytes);
+    std::string r = "0x" + to_hex_no_leading_zeros(bytes);
+    return (r == "0x") ? "0x0" : r;
 }
 
 std::string to_quantity(uint64_t number) {
+    if (number == 0) {
+        return "0x0";
+    }
     return "0x" + to_hex_no_leading_zeros(number);
 }
 
