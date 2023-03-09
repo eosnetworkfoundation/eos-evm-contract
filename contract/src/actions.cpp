@@ -47,7 +47,7 @@ void evm_contract::init(const uint64_t chainid) {
 
     inevm_singleton(get_self(), get_self().value).get_or_create(get_self());
 
-    open(get_self(), get_self());
+    open(get_self());
 }
 
 void evm_contract::setingressfee(asset ingress_bridge_fee) {
@@ -248,20 +248,20 @@ void evm_contract::pushtx( eosio::name ram_payer, const bytes& rlptx ) {
     ep.state().write_to_db(ep.evm().block().header.number);
 }
 
-void evm_contract::open(eosio::name owner, eosio::name ram_payer) {
+void evm_contract::open(eosio::name owner) {
     assert_inited();
-    require_auth(ram_payer);
+    require_auth(owner);
     check(is_account(owner), "owner account does not exist");
 
     balances balance_table(get_self(), get_self().value);
     if(balance_table.find(owner.value) == balance_table.end())
-        balance_table.emplace(ram_payer, [&](balance& a) {
+        balance_table.emplace(owner, [&](balance& a) {
             a.owner = owner;
         });
 
     nextnonces nextnonce_table(get_self(), get_self().value);
     if(nextnonce_table.find(owner.value) == nextnonce_table.end())
-        nextnonce_table.emplace(ram_payer, [&](nextnonce& a) {
+        nextnonce_table.emplace(owner, [&](nextnonce& a) {
             a.owner = owner;
         });
 }

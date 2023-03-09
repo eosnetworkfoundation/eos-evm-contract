@@ -37,7 +37,7 @@ CONTRACT evm_contract : public contract {
       void pushtx(eosio::name ram_payer, const bytes& rlptx);
 
       [[eosio::action]]
-      void open(eosio::name owner, eosio::name ram_payer);
+      void open(eosio::name owner);
 
       [[eosio::action]]
       void close(eosio::name owner);
