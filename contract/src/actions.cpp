@@ -251,7 +251,6 @@ void evm_contract::pushtx( eosio::name ram_payer, const bytes& rlptx ) {
 void evm_contract::open(eosio::name owner) {
     assert_inited();
     require_auth(owner);
-    check(is_account(owner), "owner account does not exist");
 
     balances balance_table(get_self(), get_self().value);
     if(balance_table.find(owner.value) == balance_table.end())
