@@ -58,6 +58,7 @@ CONTRACT evm_contract : public contract {
       ACTION clearall();
       ACTION dumpall();
       ACTION setbal(const bytes& addy, const bytes& bal);
+      ACTION testbaldust(const name test);
 #endif
    private:
       struct [[eosio::table]] [[eosio::contract("evm_contract")]] config {

@@ -467,6 +467,148 @@ ACTION evm_contract::setbal(const bytes& addy, const bytes& bal) {
         });
     }
 }
+
+ACTION evm_contract::testbaldust(const name test) {
+    if(test == "basic"_n) {
+        balance_with_dust b;
+        //                  ↱minimum EOS
+        //              .123456789abcdefghi EEOS
+        b +=                      200000000_u256; //adds to dust only
+        b +=                           3000_u256; //adds to dust only
+        b +=                100000000000000_u256; //adds strictly to balance
+        b +=                200000000007000_u256; //adds to both balance and dust
+        b +=                 60000000000000_u256; //adds to dust only
+        b +=                 55000000000000_u256; //adds to dust only but dust overflows +1 to balance
+
+        //expect:           415000200010000; .0004 EOS, 15000200010000 dust
+        check(b.balance.amount == 4, "");
+        check(b.dust == 15000200010000, "");
+
+        //                  ↱minimum EOS
+        //              .123456789abcdefghi EEOS
+        b -=                             45_u256; //substracts from dust only
+        b -=                100000000000000_u256; //subtracts strictly from balance
+        b -=                120000000000000_u256; //subtracts from both dust and balance, causes underflow on dust thus -1 balance
+
+        //expect:           195000200009955; .0001 EOS, 95000200009955 dust
+        check(b.balance.amount == 1, "");
+        check(b.dust == 95000200009955, "");
+    }
+    else if(test == "underflow1"_n) {
+        balance_with_dust b;
+        //                  ↱minimum EOS
+        //              .123456789abcdefghi EEOS
+        b -=                             45_u256;
+        //should fail with underflow on dust causing an underflow of balance
+    }
+    else if(test == "underflow2"_n) {
+        balance_with_dust b;
+        //                  ↱minimum EOS
+        //              .123456789abcdefghi EEOS
+        b -=                100000000000000_u256;
+        //should fail with underflow on balance
+    }
+    else if(test == "underflow3"_n) {
+        balance_with_dust b;
+        //                  ↱minimum EOS
+        //              .123456789abcdefghi EEOS
+        b +=                200000000000000_u256;
+        b -=                300000000000000_u256;
+        //should fail with underflow on balance
+    }
+    else if(test == "underflow4"_n) {
+        balance_with_dust b;
+        //                  ↱minimum EOS
+        //              .123456789abcdefghi EEOS
+        b +=                          50000_u256;
+        b -=                      500000000_u256;
+        //should fail with underflow on dust causing an underflow of balance
+    }
+    else if(test == "underflow5"_n) {
+        balance_with_dust b;
+        // do a decrement that would overflow an int64_t but not uint64_t (for balance)
+        //    ↱int64t max       ↱minimum EOS
+        //    9223372036854775807 (2^63)-1
+        //    543210987654321̣123456789abcdefghi EEOS
+        b +=                              50000_u256;
+        b -=  100000000000000000000000000000000_u256;
+        //should fail with underflow
+    }
+    else if(test == "overflow1"_n) {
+        balance_with_dust b;
+        // increment a value that would overflow a int64_t, but not uint64_t
+        //    ↱int64t max       ↱minimum EOS
+        //    9223372036854775807 (2^63)-1
+        //    543210987654321̣123456789abcdefghi EEOS
+        b += 1000000000000000000000000000000000_u256;
+        //should fail with overflow
+    }
+    else if(test == "overflow2"_n) {
+        balance_with_dust b;
+        // increment a value that would overflow a max_asset, but not an int64_t
+        //    ↱max_asset max    ↱minimum EOS
+        //    4611686018427387903 (2^62)-1
+        //    543210987654321̣123456789abcdefghi EEOS
+        b +=  500000000000000000000000000000000_u256;
+        //should fail with overflow
+    }
+    else if(test == "overflow3"_n || test == "overflow4"_n || test == "overflow5"_n || test == "overflowa"_n || test == "overflowb"_n || test == "overflowc"_n) {
+        balance_with_dust b;
+        // start with a value that should be the absolute max allowed
+        //    ↱max_asset max    ↱minimum EOS
+        //    4611686018427387903 (2^62)-1
+        //    543210987654321̣123456789abcdefghi EEOS
+        b +=  461168601842738790399999999999999_u256;
+        if(test == "overflow4"_n) {
+            //add 1 to balance, should fail since it rolls balance over max_asset
+            //                      ↱minimum EOS
+            //                  .123456789abcdefghi EEOS
+            b +=                    100000000000000_u256;
+            //should fail with overflow
+        }
+        if(test == "overflow5"_n) {
+            //add 1 to dust, causing a rollover making balance > max_asset
+            //                      ↱minimum EOS
+            //                  .123456789abcdefghi EEOS
+            b +=                                  1_u256;
+            //should fail with overflow
+        }
+        if(test == "overflowa"_n) {
+            //add something huge
+            //       ↱max_asset max    ↱minimum EOS
+            //       4611686018427387903 (2^62)-1
+            //       543210987654321̣123456789abcdefghi EEOS
+            b +=  999461168601842738790399999999999999_u256;
+            //should fail with overflow
+        }
+        if(test == "overflowb"_n) {
+            // add max allowed to balance again; this should be a 2^62-1 + 2^62-1
+            //    ↱max_asset max    ↱minimum EOS
+            //    4611686018427387903 (2^62)-1
+            //    543210987654321̣123456789abcdefghi EEOS
+            b +=  461168601842738790300000000000000_u256;
+            //should fail with overflow
+        }
+        if(test == "overflowc"_n) {
+            // add max allowed to balance again; but also with max dust; should be a 2^62-1 + 2^62-1 + 1 on asset balance
+            //    ↱max_asset max    ↱minimum EOS
+            //    4611686018427387903 (2^62)-1
+            //    543210987654321̣123456789abcdefghi EEOS
+            b +=  461168601842738790399999999999999_u256;
+            //should fail with overflow
+        }
+    }
+    if(test == "overflowd"_n) {
+        balance_with_dust b;
+        //add something massive
+        //            ↱max_asset max    ↱minimum EOS
+        //            4611686018427387903 (2^62)-1
+        //            543210987654321̣123456789abcdefghi EEOS
+        b +=  99999999461168601842738790399999999999999_u256;
+        //should fail with overflow
+    }
+}
+
 #endif //WITH_TEST_ACTIONS
 
 } //evm_runtime

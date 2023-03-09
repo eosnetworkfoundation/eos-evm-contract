@@ -89,28 +89,40 @@ struct balance_with_dust {
     }
 
     balance_with_dust& operator+=(const intx::uint256& amount) {
-        //asset::max_amount is conservative at 2^62-1, this means two amounts of (2^62-1)+(2^62-1) cannot
+        const intx::div_result<intx::uint256> div_result = udivrem(amount, minimum_natively_representable);
+
+        //asset::max_amount is conservative at 2^62-1, this means two max_amounts of (2^62-1)+(2^62-1) cannot
         // overflow an int64_t which can represent up to 2^63-1. In other words, asset::max_amount+asset::max_amount
-        // are guaranteed greater than asset::max_amount without need to worry about int64_t overflow
-        check(amount/min_asset_bn <= asset::max_amount, "accumulation overflow");
+        // are guaranteed greater than asset::max_amount without need to worry about int64_t overflow. Even more,
+        // asset::max_amount+asset::max_amount+1 is guaranteed greater than asset::max_amount without need to worry
+        // about int64_t overflow. The latter property ensures that if the existing value is max_amount and max_amount
+        // is added with a dust roll over, an int64_t rollover still does not occur on the balance.
+        //This means that we just need to check that whatever we're adding is no more than 2^62-1 (max_amount), and that
+        // the current value is no more than 2^62-1 (max_amount), and adding them together will not overflow.
+        check(div_result.quot <= asset::max_amount, "accumulation overflow");
+        check(balance.amount <= asset::max_amount, "accumulation overflow");
 
-        const int64_t base_amount = (amount/min_asset_bn)[0];
-        check(balance.amount + base_amount < asset::max_amount, "accumulation overflow");
+        const int64_t base_amount = div_result.quot[0];
         balance.amount += base_amount;
-        dust += (amount%min_asset_bn)[0];
+        dust += div_result.rem[0];
 
-        if(dust > min_asset) {
+        if(dust >= min_asset) {
             balance.amount++;
             dust -= min_asset;
         }
+
+        check(balance.amount <= asset::max_amount, "accumulation overflow");
 
         return *this;
     }
 
     balance_with_dust& operator-=(const intx::uint256& amount) {
-        check(amount/min_asset_bn <= balance.amount, "decrementing more than available");
-        balance.amount -= (amount/min_asset_bn)[0];
-        dust -= (amount%min_asset_bn)[0];
+        const intx::div_result<intx::uint256> div_result = udivrem(amount, minimum_natively_representable);
+
+        check(div_result.quot <= balance.amount, "decrementing more than available");
+
+        balance.amount -= div_result.quot[0];
+        dust -= div_result.rem[0];
 
         if(dust & (UINT64_C(1) << 63)) {
             balance.amount--;
@@ -121,8 +133,7 @@ struct balance_with_dust {
         return *this;
     }
 
-    static constexpr intx::uint256 min_asset_bn = intx::exp(10_u256, intx::uint256(evm_precision - token_symbol.precision()));
-    static constexpr uint64_t min_asset = min_asset_bn[0];
+    static constexpr uint64_t min_asset = minimum_natively_representable[0];
 
     EOSLIB_SERIALIZE(balance_with_dust, (balance)(dust));
 };
