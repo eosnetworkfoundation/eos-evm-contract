@@ -61,6 +61,7 @@ CONTRACT evm_contract : public contract {
       ACTION clearall();
       ACTION dumpall();
       ACTION setbal(const bytes& addy, const bytes& bal);
+      ACTION testbaldust(const name test);
 #endif
    private:
 

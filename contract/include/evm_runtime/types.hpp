@@ -15,8 +15,8 @@ namespace evm_runtime {
    constexpr unsigned evm_precision = 18;
    constexpr eosio::name token_account(eosio::name(TOKEN_ACCOUNT_NAME));
    constexpr eosio::symbol token_symbol("EOS", 4u);
-   static_assert(token_symbol.precision() <= evm_precision);
    constexpr intx::uint256 minimum_natively_representable = intx::exp(10_u256, intx::uint256(evm_precision - token_symbol.precision()));
+   static_assert(evm_precision - token_symbol.precision() <= 14, "dust math may overflow a uint64_t");
 
    typedef intx::uint<256>         uint256;
    typedef intx::uint<512>         uint512;
