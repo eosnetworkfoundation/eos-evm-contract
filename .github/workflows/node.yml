@@ -1,0 +1,60 @@
+name: TrustEVM Node CI
+
+on:
+  push:
+  workflow_dispatch:
+    inputs:
+      upload-artifacts:
+        description: 'Upload artifacts, including the build.tar.gz, for debugging.'
+        type: boolean
+        default: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  documentation:
+    name: Attach Documentation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 1
+          submodules: 'false'
+
+      - name: Attach Documentation
+        run: cat .github/workflows/node.md >> $GITHUB_STEP_SUMMARY
+
+  build:
+    name: TrustEVM Node Build
+    runs-on: ubuntu-20.04
+
+    steps:
+      - name: Authenticate
+        id: auth
+        uses: AntelopeIO/github-app-token-action@v1
+        with:
+          app_id: ${{ secrets.TRUSTEVM_CI_APP_ID }}
+          private_key: ${{ secrets.TRUSTEVM_CI_APP_KEY }}
+
+      - name: Checkout Repo
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          submodules: 'recursive'
+          token: ${{ steps.auth.outputs.token }}
+
+      - name: Build TrustEVM Node
+        run: .github/workflows/build-node.sh
+        env:
+          CC: gcc-10
+          CXX: g++-10
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v3
+        if: inputs.upload-artifacts || false
+        with:
+          name: build.tar.gz
+          path: build.tar.gz

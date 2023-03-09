@@ -1,0 +1,6 @@
+eth-hash==0.5.1
+Flask==2.2.2
+Flask-Cors==3.0.10
+requests==2.22.0
+simplejson==3.16.0
+gunicorn==20.1.0
