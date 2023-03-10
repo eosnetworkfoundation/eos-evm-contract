@@ -55,7 +55,7 @@ from core_symbol import CORE_SYMBOL
 # Example:
 #  cd ~/ext/leap/build
 #  edit tests/core_symbol.py to be EOS
-#  ~/ext/TrustEVM/tests/leap/nodeos_trust_evm_test.py --trust-evm-contract-root ~/ext/TrustEVM/contract/build --trust-evm-build-root ~/ext/TrustEVM/build --use-tx-wrapper --leave-running
+#  ~/ext/TrustEVM/tests/leap/nodeos_trust_evm_test.py --trust-evm-contract-root ~/ext/TrustEVM/contract/build --trust-evm-build-root ~/ext/TrustEVM/build --use-tx-wrapper ~/ext/TrustEVM/peripherals/tx_wrapper --leave-running
 #
 #  Launches wallet at port: 9899
 #    Example: bin/cleos --wallet-url http://127.0.0.1:9899 ...
