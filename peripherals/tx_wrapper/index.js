@@ -1,6 +1,7 @@
 const { Api, JsonRpc, RpcError } = require("eosjs");
 const { JsSignatureProvider } = require("eosjs/dist/eosjs-jssig"); // development only
-const fetch = require("node-fetch"); // node only; not needed in browsers
+// const fetch = require("node-fetch"); // node only; not needed in browsers
+const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 const { TextEncoder, TextDecoder } = require("util"); // node only; native TextEncoder/Decoder
 
 const RpcServer = require("http-jsonrpc-server");
@@ -100,9 +101,28 @@ async function eth_sendRawTransaction(params) {
   return '0x'+keccak256(Buffer.from(rlptx, "hex")).toString("hex");
 }
 
+var lastGetTableCallTime = 0
+var gasPrice = "0x1";
 async function eth_gasPrice(params) {
-  // TODO: get price from somewhere
-  return "0x2540BE400";
+  if ( (new Date() - lastGetTableCallTime) >= 500 ) {
+    try {
+      const result = await rpc.get_table_rows({
+        json: true,                // Get the response as json
+        code: process.env.EOS_EVM_ACCOUNT,      // Contract that we target
+        scope: process.env.EOS_EVM_ACCOUNT,     // Account that owns the data
+        table: 'config',           // Table name
+        limit: 1,                  // Maximum number of rows that we want to get
+        reverse: false,            // Optional: Get reversed data
+        show_payer: false          // Optional: Show ram payer
+      });
+      console.log("result:", result);
+      gasPrice = "0x" + parseInt(result.rows[0].gas_price).toString(16);
+      lastGetTableCallTime = new Date();
+    } catch(e) {
+      console.log("Error getting gas price from nodeos: " + e);
+    }
+  }
+  return gasPrice;
 }
 
 function zero_pad(hexstr) {

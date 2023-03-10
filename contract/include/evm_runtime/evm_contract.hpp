@@ -65,8 +65,9 @@ CONTRACT evm_contract : public contract {
          uint64_t       chainid = 0;
          time_point_sec genesis_time;
          asset          ingress_bridge_fee = asset(0, token_symbol);
+         uint64_t       gas_price = 10000000000;
 
-         EOSLIB_SERIALIZE(config, (version)(chainid)(genesis_time)(ingress_bridge_fee));
+         EOSLIB_SERIALIZE(config, (version)(chainid)(genesis_time)(ingress_bridge_fee)(gas_price));
       };
 
       eosio::singleton<"config"_n, config> _config{get_self(), get_self().value};
