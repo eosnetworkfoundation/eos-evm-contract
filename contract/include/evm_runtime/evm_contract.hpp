@@ -73,9 +73,10 @@ CONTRACT evm_contract : public contract {
          uint64_t       chainid = 0;
          time_point_sec genesis_time;
          asset          ingress_bridge_fee = asset(0, token_symbol);
-         uint32_t status = 0; // <- bit mask values from status_flags
-	 
-         EOSLIB_SERIALIZE(config, (version)(chainid)(genesis_time)(ingress_bridge_fee)(status));
+         uint64_t       gas_price = 10000000000;
+         uint32_t       status = 0; // <- bit mask values from status_flags
+
+	 EOSLIB_SERIALIZE(config, (version)(chainid)(genesis_time)(ingress_bridge_fee)(gas_price)(status));         
       };
 
       eosio::singleton<"config"_n, config> _config{get_self(), get_self().value};
@@ -106,3 +107,13 @@ CONTRACT evm_contract : public contract {
 
 
 } //evm_runtime
+
+namespace std {
+template<typename DataStream>
+DataStream& operator<<(DataStream& ds, const std::basic_string<uint8_t>& bs) {
+   ds << (unsigned_int)bs.size();
+   if(bs.size())
+      ds.write((const char*)bs.data(), bs.size());
+   return ds;
+}
+}
