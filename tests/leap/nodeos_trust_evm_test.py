@@ -11,6 +11,10 @@ import calendar
 from datetime import datetime
 from ctypes import c_uint8
 
+import urllib.request
+import urllib.parse
+import urllib.error
+
 import sys
 from binascii import unhexlify
 from web3 import Web3
@@ -22,8 +26,8 @@ sys.path.append(os.path.join(os.getcwd(), "tests"))
 from TestHarness import Cluster, TestHelper, Utils, WalletMgr
 from TestHarness.TestHelper import AppArgs
 from TestHarness.testUtils import ReturnType
+from TestHarness.testUtils import unhandledEnumType
 from core_symbol import CORE_SYMBOL
-
 
 ###############################################################
 # nodeos_trust_evm_test
@@ -33,6 +37,17 @@ from core_symbol import CORE_SYMBOL
 # Need to install:
 #   web3      - pip install web3
 #
+# --use-tx-wrapper path_to_tx_wrapper
+#                  if specified then uses tx_wrapper to get gas price.
+#                  Requires tx_wrapper dependencies installed: nodejs, eosjs, ethereumjs-util
+#                               sudo apt install nodejs
+#                               sudo apt install npm
+#                               npm install eosjs
+#                               npm install ethereumjs-util
+#                               npm install node-fetch
+#                               npm install http-jsonrpc-server
+#                               npm install dotenv
+#                               npm install is-valid-hostname
 # --trust-evm-build-root should point to the root of TrustEVM build dir
 # --trust-evm-contract-root should point to root of TrustEVM contract build dir
 #                           contracts should be built with -DWITH_TEST_ACTIONS=On
@@ -40,7 +55,7 @@ from core_symbol import CORE_SYMBOL
 # Example:
 #  cd ~/ext/leap/build
 #  edit tests/core_symbol.py to be EOS
-#  ~/ext/TrustEVM/tests/leap/nodeos_trust_evm_test.py --trust-evm-contract-root ~/ext/TrustEVM/contract/build --trust-evm-build-root ~/ext/TrustEVM/cmake-build-release-gcc  --leave-running
+#  ~/ext/TrustEVM/tests/leap/nodeos_trust_evm_test.py --trust-evm-contract-root ~/ext/TrustEVM/contract/build --trust-evm-build-root ~/ext/TrustEVM/build --use-tx-wrapper ~/ext/TrustEVM/peripherals/tx_wrapper --leave-running
 #
 #  Launches wallet at port: 9899
 #    Example: bin/cleos --wallet-url http://127.0.0.1:9899 ...
@@ -54,6 +69,7 @@ appArgs=AppArgs()
 appArgs.add(flag="--trust-evm-contract-root", type=str, help="TrustEVM contract build dir", default=None)
 appArgs.add(flag="--trust-evm-build-root", type=str, help="TrustEVM build dir", default=None)
 appArgs.add(flag="--genesis-json", type=str, help="File to save generated genesis json", default="trust-evm-genesis.json")
+appArgs.add(flag="--use-tx-wrapper", type=str, help="tx_wrapper to use to send trx to nodeos", default=None)
 
 args=TestHelper.parse_args({"--keep-logs","--dump-error-details","-v","--leave-running","--clean-run" }, applicationSpecificArgs=appArgs)
 debug=args.v
@@ -64,6 +80,7 @@ killAll=args.clean_run
 trustEvmContractRoot=args.trust_evm_contract_root
 trustEvmBuildRoot=args.trust_evm_build_root
 gensisJson=args.genesis_json
+useTrxWrapper=args.use_tx_wrapper
 
 assert trustEvmContractRoot is not None, "--trust-evm-contract-root is required"
 assert trustEvmBuildRoot is not None, "--trust-evm-build-root is required"
@@ -79,17 +96,19 @@ walletMgr=WalletMgr(True)
 
 pnodes=1
 total_nodes=pnodes + 2
+evmNodePOpen = None
 
 def interact_with_storage_contract(dest, nonce):
     for i in range(1, 5): # execute a few
         Utils.Print("Execute ETH contract")
         nonce += 1
         amount = 0
+        gasP=getGasPrice()
         signed_trx = w3.eth.account.sign_transaction(dict(
             nonce=nonce,
             #        maxFeePerGas=150000000000, #150 GWei
             gas=100000,       #100k Gas
-            gasPrice=1,
+            gasPrice=gasP,
             to=Web3.toChecksumAddress(dest),
             value=amount,
             data=unhexlify("6057361d00000000000000000000000000000000000000000000000000000000000000%02x" % nonce),
@@ -105,6 +124,83 @@ def interact_with_storage_contract(dest, nonce):
         time.sleep(1)
 
     return nonce
+
+def writeTxWrapperEnv():
+    with open(".env", 'w') as envFile:
+        env = \
+f'''
+EOS_RPC="http://127.0.0.1:8888"
+EOS_KEY="{txWrapAcc.activePrivateKey}"
+HOST="127.0.0.1"
+PORT="18888"
+EOS_EVM_ACCOUNT="evmevmevmevm"
+EOS_SENDER="{txWrapAcc.name}"
+'''
+        envFile.write(env)
+
+def processUrllibRequest(endpoint, payload={}, silentErrors=False, exitOnError=False, exitMsg=None, returnType=ReturnType.json):
+    cmd = f"{endpoint}"
+    req = urllib.request.Request(cmd, method="POST")
+    req.add_header('Content-Type', 'application/json')
+    req.add_header('Accept', 'application/json')
+    data = payload
+    data = json.dumps(data)
+    data = data.encode()
+    if Utils.Debug: Utils.Print("cmd: %s" % (cmd))
+    rtn=None
+    start=time.perf_counter()
+    try:
+        response = urllib.request.urlopen(req, data=data)
+        if returnType==ReturnType.json:
+            rtn = {}
+            rtn["code"] = response.getcode()
+            rtn["payload"] = json.load(response)
+        elif returnType==ReturnType.raw:
+            rtn = response.read()
+        else:
+            unhandledEnumType(returnType)
+
+        if Utils.Debug:
+            end=time.perf_counter()
+            Utils.Print("cmd Duration: %.3f sec" % (end-start))
+            printReturn=json.dumps(rtn) if returnType==ReturnType.json else rtn
+            Utils.Print("cmd returned: %s" % (printReturn[:1024]))
+    except urllib.error.HTTPError as ex:
+        if not silentErrors:
+            end=time.perf_counter()
+            msg=ex.msg
+            errorMsg="Exception during \"%s\". %s.  cmd Duration=%.3f sec." % (cmd, msg, end-start)
+            if exitOnError:
+                Utils.cmdError(errorMsg)
+                Utils.errorExit(errorMsg)
+            else:
+                Utils.Print("ERROR: %s" % (errorMsg))
+                if returnType==ReturnType.json:
+                    rtn = json.load(ex)
+                elif returnType==ReturnType.raw:
+                    rtn = ex.read()
+                else:
+                    unhandledEnumType(returnType)
+        else:
+            return None
+
+    if exitMsg is not None:
+        exitMsg=": " + exitMsg
+    else:
+        exitMsg=""
+    if exitOnError and rtn is None:
+        Utils.cmdError("could not \"%s\" - %s" % (cmd,exitMsg))
+        Utils.errorExit("Failed to \"%s\"" % (cmd))
+
+    return rtn
+
+def getGasPrice():
+    if useTrxWrapper is None:
+        return 1
+    else:
+        result = processUrllibRequest("http://127.0.0.1:18888", payload={"method":"eth_gasPrice","params":[],"id":1,"jsonrpc":"2.0"})
+        Utils.Print("result: ", result)
+        return result["payload"]["result"]
 
 def normalize_address(x, allow_blank=False):
     if allow_blank and x == '':
@@ -147,6 +243,7 @@ def charToSymbol(c: str):
 
 def nameStrToInt(s: str):
     n = 0
+    i = 0
     for i, c in enumerate(s):
         if i >= 12:
             break
@@ -189,18 +286,19 @@ try:
     prodNode = cluster.getNode(0)
     nonProdNode = cluster.getNode(1)
 
-    accounts=cluster.createAccountKeys(2)
+    accounts=cluster.createAccountKeys(3)
     if accounts is None:
         Utils.errorExit("FAILURE - create keys")
 
     evmAcc = accounts[0]
     evmAcc.name = "evmevmevmevm"
     testAcc = accounts[1]
+    txWrapAcc = accounts[2]
 
     testWalletName="test"
 
     Print("Creating wallet \"%s\"." % (testWalletName))
-    testWallet=walletMgr.create(testWalletName, [cluster.eosioAccount,accounts[0],accounts[1]])
+    testWallet=walletMgr.create(testWalletName, [cluster.eosioAccount,accounts[0],accounts[1],accounts[2]])
 
     # create accounts via eosio as otherwise a bid is needed
     for account in accounts:
@@ -250,6 +348,23 @@ try:
     cmd="set account permission evmevmevmevm active --add-code -p evmevmevmevm@active"
     prodNode.processCleosCmd(cmd, cmd, silentErrors=True, returnType=ReturnType.raw)
 
+    #
+    # Setup tx_wrapper
+    #
+    txWrapPOpen = None
+    if useTrxWrapper is not None:
+        writeTxWrapperEnv()
+        dataDir = Utils.DataDir + "tx_wrap"
+        outDir = dataDir + "/tx_wrapper.stdout"
+        errDir = dataDir + "/tx_wrapper.stderr"
+        shutil.rmtree(dataDir, ignore_errors=True)
+        os.makedirs(dataDir)
+        outFile = open(outDir, "w")
+        errFile = open(errDir, "w")
+        cmd = "node %s/index.js" % (useTrxWrapper)
+        Utils.Print("Launching: %s" % cmd)
+        txWrapPOpen=Utils.delayedCheckOutput(cmd, stdout=outFile, stderr=errFile)
+
     Utils.Print("Set balance")
     addys = {
         "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266":"0x038318535b54105d4a7aae60c08fc45f9687181b4fdfc625bd1a753fa7397fed75,0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
@@ -270,11 +385,12 @@ try:
     nonce = 0
     evmSendKey = "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
 
+    gasP = getGasPrice()
     signed_trx = w3.eth.account.sign_transaction(dict(
         nonce=nonce,
 #        maxFeePerGas=150000000000, #150 GWei
         gas=100000,       #100k Gas
-        gasPrice=1,
+        gasPrice=gasP,
         to=Web3.toChecksumAddress(toAdd),
         value=amount,
         data=b'',
@@ -298,11 +414,12 @@ try:
 
     # correct nonce
     nonce += 1
+    gasP = getGasPrice()
     signed_trx = w3.eth.account.sign_transaction(dict(
         nonce=nonce,
         #        maxFeePerGas=150000000000, #150 GWei
         gas=100000,       #100k Gas
-        gasPrice=1,
+        gasPrice=gasP,
         to=Web3.toChecksumAddress(toAdd),
         value=amount,
         data=b'',
@@ -317,11 +434,12 @@ try:
     # incorrect chainid
     nonce += 1
     evmChainId = 8888
+    gasP = getGasPrice()
     signed_trx = w3.eth.account.sign_transaction(dict(
         nonce=nonce,
         #        maxFeePerGas=150000000000, #150 GWei
         gas=100000,       #100k Gas
-        gasPrice=1,
+        gasPrice=gasP,
         to=Web3.toChecksumAddress(toAdd),
         value=amount,
         data=b'',
@@ -351,11 +469,12 @@ try:
     # }
     nonce += 1
     evmChainId = 15555
+    gasP = getGasPrice()
     signed_trx = w3.eth.account.sign_transaction(dict(
         nonce=nonce,
         #        maxFeePerGas=150000000000, #150 GWei
         gas=1000000,       #5M Gas
-        gasPrice=1,
+        gasPrice=gasP,
         data=Web3.toBytes(hexstr='608060405234801561001057600080fd5b50610150806100206000396000f3fe608060405234801561001057600080fd5b50600436106100365760003560e01c80632e64cec11461003b5780636057361d14610059575b600080fd5b610043610075565b60405161005091906100a1565b60405180910390f35b610073600480360381019061006e91906100ed565b61007e565b005b60008054905090565b8060008190555050565b6000819050919050565b61009b81610088565b82525050565b60006020820190506100b66000830184610092565b92915050565b600080fd5b6100ca81610088565b81146100d557600080fd5b50565b6000813590506100e7816100c1565b92915050565b600060208284031215610103576101026100bc565b5b6000610111848285016100d8565b9150509291505056fea2646970667358fe12209ffe32fe5779018f7ee58886c856a4cfdf550f2df32cec944f57716a3abf4a5964736f6c63430008110033'),
         chainId=evmChainId
     ), evmSendKey)
@@ -471,11 +590,12 @@ try:
     transferAmount="13.1313 {0}".format(CORE_SYMBOL)
     Print("Transfer EVM->EOS funds %s from account %s to %s" % (transferAmount, evmAcc.name, testAcc.name))
     nonce = 0
+    gasP = getGasPrice()
     signed_trx = w3.eth.account.sign_transaction(dict(
         nonce=nonce,
         #        maxFeePerGas=150000000000, #150 GWei
         gas=100000,       #100k Gas
-        gasPrice=1,
+        gasPrice=gasP,
         to=Web3.toChecksumAddress(toAdd),
         value=int(amount*10000*szabo*100), # .0001 EOS is 100 szabos
         data=b'',
@@ -504,11 +624,12 @@ try:
     transferAmount="1.000 {0}".format(CORE_SYMBOL)
     Print("Transfer EVM->EOS funds %s from account %s to %s" % (transferAmount, evmAcc.name, testAcc.name))
     nonce = nonce + 1
+    gasP = getGasPrice()
     signed_trx = w3.eth.account.sign_transaction(dict(
         nonce=nonce,
         #        maxFeePerGas=150000000000, #150 GWei
         gas=100000,       #100k Gas
-        gasPrice=1,
+        gasPrice=gasP,
         to=Web3.toChecksumAddress(toAdd),
         value=int(amount*10000*szabo*100),
         data=b'',
@@ -542,8 +663,8 @@ try:
     outFile = open(nodeStdOutDir, "w")
     errFile = open(nodeStdErrDir, "w")
     cmd = "%s/cmd/trustevm-node --plugin=blockchain_plugin --ship-endpoint=127.0.0.1:8999 --genesis-json=%s --chain-data=%s --verbosity=5 --nocolor=1 --plugin=rpc_plugin --trust-evm-node=127.0.0.1:8080 --http-port=0.0.0.0:8881 --api-spec=eth,debug,net,trace --chaindata=%s" % (trustEvmBuildRoot, gensisJson, dataDir, dataDir)
-    Utils.Print("Launching: %s", cmd)
-    popen=Utils.delayedCheckOutput(cmd, stdout=outFile, stderr=errFile)
+    Utils.Print("Launching: %s" % cmd)
+    evmNodePOpen=Utils.delayedCheckOutput(cmd, stdout=outFile, stderr=errFile)
 
     time.sleep(5) # allow time to sync trxs
 
@@ -552,7 +673,7 @@ try:
     for row in rows['rows']:
         Utils.Print("Checking 0x{0} balance".format(row['eth_address']))
         r = w3.eth.get_balance(Web3.toChecksumAddress('0x'+row['eth_address']))
-        assert r == int(row['balance'],16), row['eth_address']
+        assert r == int(row['balance'],16), f"{row['eth_address']} {r} != {int(row['balance'],16)}"
 
     foundErr = False
     stdErrFile = open(nodeStdErrDir, "r")
@@ -562,12 +683,14 @@ try:
             Utils.Print("  Found ERROR in trustevm log: ", line)
             foundErr = True
 
-    if killEosInstances:
-        popen.kill()
-
     testSuccessful= not foundErr
 finally:
     TestHelper.shutdown(cluster, walletMgr, testSuccessful=testSuccessful, killEosInstances=killEosInstances, killWallet=killEosInstances, keepLogs=keepLogs, cleanRun=killAll, dumpErrorDetails=dumpErrorDetails)
+    if killEosInstances:
+        if evmNodePOpen is not None:
+            evmNodePOpen.kill()
+        if txWrapPOpen is not None:
+            txWrapPOpen.kill()
 
 exitCode = 0 if testSuccessful else 1
 exit(exitCode)
