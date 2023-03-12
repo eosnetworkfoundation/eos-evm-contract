@@ -432,7 +432,7 @@ BOOST_FIXTURE_TEST_CASE(basic_evm_eos_bridge, native_token_evm_tester_EOS) try {
       BOOST_REQUIRE(evm_balance(evm1) == evm1_before);
 
       //alice will now open a balance
-      open("alice"_n, "alice"_n);
+      open("alice"_n);
       //and try again
       pushtx(txn);
 
@@ -462,7 +462,7 @@ BOOST_FIXTURE_TEST_CASE(basic_evm_eos_bridge, native_token_evm_tester_EOS) try {
                               eosio_assert_message_exception, eosio_assert_message_is("non-open accounts containing contract code must be on allow list for egress bridging"));
 
       //open up bob's balance
-      open("bob"_n, "bob"_n);
+      open("bob"_n);
       //and now it'll go through
       pushtx(txn);
       BOOST_REQUIRE_EQUAL(vault_balance_token("bob"_n), to_bridge);
