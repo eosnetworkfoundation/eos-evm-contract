@@ -48,7 +48,7 @@ void evm_contract::init(const uint64_t chainid) {
 
     inevm_singleton(get_self(), get_self().value).get_or_create(get_self());
 
-    open(get_self(), get_self());
+    open(get_self());
 }
 
 void evm_contract::setingressfee(asset ingress_bridge_fee) {
@@ -85,6 +85,19 @@ void evm_contract::removeegress(const std::vector<name>& accounts) {
     for(const name& account : accounts)
         if(auto it = egresslist_table.find(account.value); it != egresslist_table.end())
             egresslist_table.erase(it);
+}
+
+void evm_contract::freeze(bool value) {
+    eosio::require_auth(get_self());
+
+    assert_inited();
+    config config2 = _config.get();
+    if (value) {
+        config2.status |= static_cast<uint32_t>(status_flags::frozen);
+    } else {
+        config2.status &= ~static_cast<uint32_t>(status_flags::frozen);
+    }
+    _config.set(config2, get_self());
 }
 
 void check_result( ValidationResult r, const Transaction& txn, const char* desc ) {
@@ -217,7 +230,7 @@ void evm_contract::push_trx( eosio::name ram_payer, Block& block, const bytes& r
 void evm_contract::pushtx( eosio::name ram_payer, const bytes& rlptx ) {
     LOGTIME("EVM START");
 
-    assert_inited();
+    assert_unfrozen();
     std::optional<std::pair<const std::string, const ChainConfig*>> found_chain_config = lookup_known_chain(_config.get().chainid);
     check( found_chain_config.has_value(), "failed to find expected chain config" );
     eosio::require_auth(ram_payer);
@@ -232,26 +245,25 @@ void evm_contract::pushtx( eosio::name ram_payer, const bytes& rlptx ) {
     push_trx( ram_payer, block, rlptx, engine, *found_chain_config->second );
 }
 
-void evm_contract::open(eosio::name owner, eosio::name ram_payer) {
-    assert_inited();
-    require_auth(ram_payer);
-    check(is_account(owner), "owner account does not exist");
+void evm_contract::open(eosio::name owner) {
+    assert_unfrozen();
+    require_auth(owner);
 
     balances balance_table(get_self(), get_self().value);
     if(balance_table.find(owner.value) == balance_table.end())
-        balance_table.emplace(ram_payer, [&](balance& a) {
+        balance_table.emplace(owner, [&](balance& a) {
             a.owner = owner;
         });
 
     nextnonces nextnonce_table(get_self(), get_self().value);
     if(nextnonce_table.find(owner.value) == nextnonce_table.end())
-        nextnonce_table.emplace(ram_payer, [&](nextnonce& a) {
+        nextnonce_table.emplace(owner, [&](nextnonce& a) {
             a.owner = owner;
         });
 }
 
 void evm_contract::close(eosio::name owner) {
-    assert_inited();
+    assert_unfrozen();
     require_auth(owner);
 
     eosio::check(owner != get_self(), "Cannot close self");
@@ -336,7 +348,7 @@ void evm_contract::handle_evm_transfer(eosio::asset quantity, const std::string&
 }
 
 void evm_contract::transfer(eosio::name from, eosio::name to, eosio::asset quantity, std::string memo) {
-    assert_inited();
+    assert_unfrozen();
     eosio::check(quantity.symbol == token_symbol, "received unexpected token");
 
     if(to != get_self() || from == get_self())
@@ -351,7 +363,7 @@ void evm_contract::transfer(eosio::name from, eosio::name to, eosio::asset quant
 }
 
 void evm_contract::withdraw(eosio::name owner, eosio::asset quantity) {
-    assert_inited();
+    assert_unfrozen();
     require_auth(owner);
 
     balances balance_table(get_self(), get_self().value);
@@ -367,7 +379,7 @@ void evm_contract::withdraw(eosio::name owner, eosio::asset quantity) {
 }
 
 bool evm_contract::gc(uint32_t max) {
-    assert_inited();
+    assert_unfrozen();
 
     evm_runtime::state state{get_self(), eosio::same_payer};
     return state.gc(max);
@@ -375,7 +387,7 @@ bool evm_contract::gc(uint32_t max) {
 
 #ifdef WITH_TEST_ACTIONS
 ACTION evm_contract::testtx( const bytes& rlptx, const evm_runtime::test::block_info& bi ) {
-    assert_inited();
+    assert_unfrozen();
 
     eosio::require_auth(get_self());
 
@@ -471,7 +483,7 @@ ACTION evm_contract::dumpall() {
 
 
 ACTION evm_contract::clearall() {
-    assert_inited();
+    assert_unfrozen();
 
     eosio::require_auth(get_self());
 
@@ -506,7 +518,7 @@ ACTION evm_contract::clearall() {
 }
 
 ACTION evm_contract::updatecode( const bytes& address, uint64_t incarnation, const bytes& code_hash, const bytes& code) {
-    assert_inited();
+    assert_unfrozen();
 
     eosio::require_auth(get_self());
 
@@ -516,7 +528,7 @@ ACTION evm_contract::updatecode( const bytes& address, uint64_t incarnation, con
 }
 
 ACTION evm_contract::updatestore(const bytes& address, uint64_t incarnation, const bytes& location, const bytes& initial, const bytes& current) {
-    assert_inited();
+    assert_unfrozen();
 
     eosio::require_auth(get_self());
 
@@ -533,7 +545,7 @@ ACTION evm_contract::updatestore(const bytes& address, uint64_t incarnation, con
 }
 
 ACTION evm_contract::updateaccnt(const bytes& address, const bytes& initial, const bytes& current) {
-    assert_inited();
+    assert_unfrozen();
 
     eosio::require_auth(get_self());
 
@@ -557,7 +569,7 @@ ACTION evm_contract::updateaccnt(const bytes& address, const bytes& initial, con
 }
 
 ACTION evm_contract::setbal(const bytes& addy, const bytes& bal) {
-    assert_inited();
+    assert_unfrozen();
 
     eosio::require_auth(get_self());
 
@@ -578,6 +590,148 @@ ACTION evm_contract::setbal(const bytes& addy, const bytes& bal) {
         });
     }
 }
+
+ACTION evm_contract::testbaldust(const name test) {
+    if(test == "basic"_n) {
+        balance_with_dust b;
+        //                  ↱minimum EOS
+        //              .123456789abcdefghi EEOS
+        b +=                      200000000_u256; //adds to dust only
+        b +=                           3000_u256; //adds to dust only
+        b +=                100000000000000_u256; //adds strictly to balance
+        b +=                200000000007000_u256; //adds to both balance and dust
+        b +=                 60000000000000_u256; //adds to dust only
+        b +=                 55000000000000_u256; //adds to dust only but dust overflows +1 to balance
+
+        //expect:           415000200010000; .0004 EOS, 15000200010000 dust
+        check(b.balance.amount == 4, "");
+        check(b.dust == 15000200010000, "");
+
+        //                  ↱minimum EOS
+        //              .123456789abcdefghi EEOS
+        b -=                             45_u256; //substracts from dust only
+        b -=                100000000000000_u256; //subtracts strictly from balance
+        b -=                120000000000000_u256; //subtracts from both dust and balance, causes underflow on dust thus -1 balance
+
+        //expect:           195000200009955; .0001 EOS, 95000200009955 dust
+        check(b.balance.amount == 1, "");
+        check(b.dust == 95000200009955, "");
+    }
+    else if(test == "underflow1"_n) {
+        balance_with_dust b;
+        //                  ↱minimum EOS
+        //              .123456789abcdefghi EEOS
+        b -=                             45_u256;
+        //should fail with underflow on dust causing an underflow of balance
+    }
+    else if(test == "underflow2"_n) {
+        balance_with_dust b;
+        //                  ↱minimum EOS
+        //              .123456789abcdefghi EEOS
+        b -=                100000000000000_u256;
+        //should fail with underflow on balance
+    }
+    else if(test == "underflow3"_n) {
+        balance_with_dust b;
+        //                  ↱minimum EOS
+        //              .123456789abcdefghi EEOS
+        b +=                200000000000000_u256;
+        b -=                300000000000000_u256;
+        //should fail with underflow on balance
+    }
+    else if(test == "underflow4"_n) {
+        balance_with_dust b;
+        //                  ↱minimum EOS
+        //              .123456789abcdefghi EEOS
+        b +=                          50000_u256;
+        b -=                      500000000_u256;
+        //should fail with underflow on dust causing an underflow of balance
+    }
+    else if(test == "underflow5"_n) {
+        balance_with_dust b;
+        // do a decrement that would overflow an int64_t but not uint64_t (for balance)
+        //    ↱int64t max       ↱minimum EOS
+        //    9223372036854775807 (2^63)-1
+        //    543210987654321̣123456789abcdefghi EEOS
+        b +=                              50000_u256;
+        b -=  100000000000000000000000000000000_u256;
+        //should fail with underflow
+    }
+    else if(test == "overflow1"_n) {
+        balance_with_dust b;
+        // increment a value that would overflow a int64_t, but not uint64_t
+        //    ↱int64t max       ↱minimum EOS
+        //    9223372036854775807 (2^63)-1
+        //    543210987654321̣123456789abcdefghi EEOS
+        b += 1000000000000000000000000000000000_u256;
+        //should fail with overflow
+    }
+    else if(test == "overflow2"_n) {
+        balance_with_dust b;
+        // increment a value that would overflow a max_asset, but not an int64_t
+        //    ↱max_asset max    ↱minimum EOS
+        //    4611686018427387903 (2^62)-1
+        //    543210987654321̣123456789abcdefghi EEOS
+        b +=  500000000000000000000000000000000_u256;
+        //should fail with overflow
+    }
+    else if(test == "overflow3"_n || test == "overflow4"_n || test == "overflow5"_n || test == "overflowa"_n || test == "overflowb"_n || test == "overflowc"_n) {
+        balance_with_dust b;
+        // start with a value that should be the absolute max allowed
+        //    ↱max_asset max    ↱minimum EOS
+        //    4611686018427387903 (2^62)-1
+        //    543210987654321̣123456789abcdefghi EEOS
+        b +=  461168601842738790399999999999999_u256;
+        if(test == "overflow4"_n) {
+            //add 1 to balance, should fail since it rolls balance over max_asset
+            //                      ↱minimum EOS
+            //                  .123456789abcdefghi EEOS
+            b +=                    100000000000000_u256;
+            //should fail with overflow
+        }
+        if(test == "overflow5"_n) {
+            //add 1 to dust, causing a rollover making balance > max_asset
+            //                      ↱minimum EOS
+            //                  .123456789abcdefghi EEOS
+            b +=                                  1_u256;
+            //should fail with overflow
+        }
+        if(test == "overflowa"_n) {
+            //add something huge
+            //       ↱max_asset max    ↱minimum EOS
+            //       4611686018427387903 (2^62)-1
+            //       543210987654321̣123456789abcdefghi EEOS
+            b +=  999461168601842738790399999999999999_u256;
+            //should fail with overflow
+        }
+        if(test == "overflowb"_n) {
+            // add max allowed to balance again; this should be a 2^62-1 + 2^62-1
+            //    ↱max_asset max    ↱minimum EOS
+            //    4611686018427387903 (2^62)-1
+            //    543210987654321̣123456789abcdefghi EEOS
+            b +=  461168601842738790300000000000000_u256;
+            //should fail with overflow
+        }
+        if(test == "overflowc"_n) {
+            // add max allowed to balance again; but also with max dust; should be a 2^62-1 + 2^62-1 + 1 on asset balance
+            //    ↱max_asset max    ↱minimum EOS
+            //    4611686018427387903 (2^62)-1
+            //    543210987654321̣123456789abcdefghi EEOS
+            b +=  461168601842738790399999999999999_u256;
+            //should fail with overflow
+        }
+    }
+    if(test == "overflowd"_n) {
+        balance_with_dust b;
+        //add something massive
+        //            ↱max_asset max    ↱minimum EOS
+        //            4611686018427387903 (2^62)-1
+        //            543210987654321̣123456789abcdefghi EEOS
+        b +=  99999999461168601842738790399999999999999_u256;
+        //should fail with overflow
+    }
+}
+
 #endif //WITH_TEST_ACTIONS
 
 } //evm_runtime

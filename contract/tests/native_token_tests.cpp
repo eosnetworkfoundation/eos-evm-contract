@@ -55,8 +55,8 @@ struct native_token_evm_tester : basic_evm_tester {
       return std::get<1>(vault_balance(owner));
    }
 
-   transaction_trace_ptr open(name owner, name ram_payer) {
-      return push_action("evm"_n, "open"_n, ram_payer, mvo()("owner", owner)("ram_payer", ram_payer));
+   transaction_trace_ptr open(name owner) {
+      return push_action("evm"_n, "open"_n, owner, mvo()("owner", owner));
    }
    transaction_trace_ptr close(name owner) {
       return push_action("evm"_n, "close"_n, owner, mvo()("owner", owner));
@@ -110,7 +110,7 @@ BOOST_FIXTURE_TEST_CASE(basic_deposit_withdraw, native_token_evm_tester_EOS) try
                            eosio_assert_message_exception, eosio_assert_message_is("receiving account has not been opened"));
 
 
-   open("alice"_n, "alice"_n);
+   open("alice"_n);
 
    //alice sends her own tokens in to her EVM balance
    {
@@ -212,18 +212,10 @@ BOOST_FIXTURE_TEST_CASE(weird_names, native_token_evm_tester_EOS) try {
 
 } FC_LOG_AND_RETHROW()
 
-BOOST_FIXTURE_TEST_CASE(non_existing_account, native_token_evm_tester_EOS) try {
-   //can only open for accounts that exist
-
-   BOOST_REQUIRE_EXCEPTION(open("spoon"_n, "alice"_n),
-                           eosio_assert_message_exception, eosio_assert_message_is("owner account does not exist"));
-
-} FC_LOG_AND_RETHROW()
-
 BOOST_FIXTURE_TEST_CASE(non_standard_native_symbol, native_token_evm_tester_SPOON) try {
    //the symbol 4,EOS is fixed as the expected native symbol. try transfering in a different symbol from eosio.token
 
-   open("alice"_n, "alice"_n);
+   open("alice"_n);
 
    BOOST_REQUIRE_EXCEPTION(transfer_token("alice"_n, "evm"_n, make_asset(1'0000), "alice"),
                            eosio_assert_message_exception, eosio_assert_message_is("received unexpected token"));

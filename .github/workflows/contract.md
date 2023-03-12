@@ -42,7 +42,7 @@ This workflow performs the following steps:
     1. If tests are enabled, install the `leap-dev` binary.
     1. If tests are enabled, build the TrustEVM contract tests using `make` and `cmake`.
     1. If tests are enabled, upload the build folder for the contract test code to GitHub Actions.
-    1. If tests are enabled, run them.
+    1. If tests are enabled, run them and ignore the outcome.
     1. If tests are enabled, attach xUnit-formatted test metrics as an artifact.
 
 ## Outputs
