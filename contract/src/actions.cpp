@@ -124,7 +124,7 @@ void check_result( ValidationResult r, const Transaction& txn, const char* desc 
     eosio::check( false, desc );
 }
 
-void evm_contract::push_trx( eosio::name ram_payer, Block& block, const bytes& rlptx, silkworm::consensus::IEngine& engine, const silkworm::ChainConfig& chain_config ) {
+Receipt evm_contract::execute_tx( Block& block, const bytes& rlptx, silkworm::ExecutionProcessor& ep ) {
     //when being called as an inline action, clutch in allowance for reserved addresses & signatures by setting from_my_self=true
     const bool from_self = get_sender() == get_self();
 
@@ -183,6 +183,7 @@ void evm_contract::push_trx( eosio::name ram_payer, Block& block, const bytes& r
     ep.state().write_to_db(ep.evm().block().header.number);
 
     LOGTIME("EVM EXECUTE");
+    return receipt;
 }
 
 void evm_contract::pushtx( eosio::name ram_payer, const bytes& rlptx ) {
@@ -200,7 +201,14 @@ void evm_contract::pushtx( eosio::name ram_payer, const bytes& rlptx ) {
     block.header.number = 1 + (block.header.timestamp - _config.get().genesis_time.sec_since_epoch()); // same logic with block_mapping in TrustEVM
 
     silkworm::consensus::TrustEngine engine{*found_chain_config->second};
-    push_trx( ram_payer, block, rlptx, engine, *found_chain_config->second );
+
+    evm_runtime::state state{get_self(), ram_payer};
+    silkworm::ExecutionProcessor ep{block, engine, state, *found_chain_config->second};
+
+    auto receipt = execute_tx(block, rlptx, ep);
+
+    engine.finalize(ep.state(), ep.evm().block(), ep.evm().revision());
+    ep.state().write_to_db(ep.evm().block().header.number);
 }
 
 void evm_contract::open(eosio::name owner, eosio::name ram_payer) {
@@ -345,7 +353,7 @@ bool evm_contract::gc(uint32_t max) {
 }
 
 #ifdef WITH_TEST_ACTIONS
-ACTION evm_contract::testtx( const bytes& rlptx, const evm_runtime::test::block_info& bi ) {
+ACTION evm_contract::testtx( const std::optional<bytes>& orlptx, const evm_runtime::test::block_info& bi ) {
     assert_unfrozen();
 
     eosio::require_auth(get_self());
@@ -354,7 +362,14 @@ ACTION evm_contract::testtx( const bytes& rlptx, const evm_runtime::test::block_
     block.header = bi.get_block_header();
 
     evm_runtime::test::engine engine;
-    push_trx( get_self(), block, rlptx, engine, evm_runtime::test::kTestNetwork );
+    evm_runtime::state state{get_self(), get_self()};
+    silkworm::ExecutionProcessor ep{block, engine, state, evm_runtime::test::kTestNetwork};
+
+    if(orlptx) {
+        execute_tx(block, *orlptx, ep);
+    }
+    engine.finalize(ep.state(), ep.evm().block(), ep.evm().revision());
+    ep.state().write_to_db(ep.evm().block().header.number);
 }
 
 ACTION evm_contract::dumpstorage(const bytes& addy) {

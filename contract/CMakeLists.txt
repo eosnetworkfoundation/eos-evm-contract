@@ -13,6 +13,9 @@ option(WITH_TEST_ACTIONS
 option(WITH_LOGTIME
    "Use `logtime` instrisic to log the time spent in transaction execution" OFF)
 
+option(WITH_LARGE_STACK
+   "Build with 50Mb of stack size, needed for unit tests" OFF)
+
 ExternalProject_Add(
    evm_runtime_project
    SOURCE_DIR ${CMAKE_SOURCE_DIR}/src
@@ -21,6 +24,7 @@ ExternalProject_Add(
               -DCMAKE_TOOLCHAIN_FILE=${CDT_ROOT}/lib/cmake/cdt/CDTWasmToolchain.cmake
               -DWITH_TEST_ACTIONS=${WITH_TEST_ACTIONS}
               -DWITH_LOGTIME=${WITH_LOGTIME}
+              -DWITH_LARGE_STACK=${WITH_LARGE_STACK}
    UPDATE_COMMAND ""
    PATCH_COMMAND ""
    TEST_COMMAND ""
