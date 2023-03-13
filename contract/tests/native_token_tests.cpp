@@ -532,4 +532,22 @@ BOOST_FIXTURE_TEST_CASE(evm_eos_nonexistant, native_token_evm_tester_EOS) try {
    }
 } FC_LOG_AND_RETHROW()
 
+BOOST_FIXTURE_TEST_CASE(evm_eos_disallow_reserved_zero, native_token_evm_tester_EOS) try {
+   evm_eoa evm1;
+
+   transfer_token("alice"_n, "evm"_n, make_asset(10'0000), evm1.address_0x());
+
+   //doing anything with the reserved-zero address should fail; in this case just send an empty message to it
+   silkworm::Transaction txn {
+      .type = silkworm::Transaction::Type::kLegacy,
+      .max_priority_fee_per_gas = 0,
+      .max_fee_per_gas = 0,
+      .gas_limit = 21000,
+      .to = make_reserved_address(0u)
+   };
+   evm1.sign(txn);
+   BOOST_REQUIRE_EXCEPTION(pushtx(txn),
+                           eosio_assert_message_exception, eosio_assert_message_is("reserved 0 address cannot be used"));
+} FC_LOG_AND_RETHROW()
+
 BOOST_AUTO_TEST_SUITE_END()
