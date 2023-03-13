@@ -147,9 +147,6 @@ Receipt evm_contract::execute_tx( Block& block, const bytes& rlptx, silkworm::Ex
     eosio::check(tx.from.has_value(), "unable to recover sender");
     LOGTIME("EVM RECOVER SENDER");
 
-    evm_runtime::state state{get_self(), ram_payer};
-    silkworm::ExecutionProcessor ep{block, engine, state, chain_config};
-
     if(from_self) {
         check(is_reserved_address(*tx.from), "actions from self without a reserved from address are unexpected");
         const name ingress_account(*extract_reserved_address(*tx.from) ?: get_self().value); //reserved-0 used for from-contract
@@ -178,9 +175,6 @@ Receipt evm_contract::execute_tx( Block& block, const bytes& rlptx, silkworm::Ex
 
     Receipt receipt;
     ep.execute_transaction(tx, receipt);
-
-    engine.finalize(ep.state(), ep.evm().block(), ep.evm().revision());
-    ep.state().write_to_db(ep.evm().block().header.number);
 
     LOGTIME("EVM EXECUTE");
     return receipt;
@@ -310,8 +304,14 @@ void evm_contract::handle_evm_transfer(eosio::asset quantity, const std::string&
 
     Bytes rlp;
     rlp::encode(rlp, txn);
-    pushtx_action pushtx_act(get_self(), {{get_self(), "active"_n}});
-    pushtx_act.send(get_self(), rlp);
+
+    action(permission_level{ get_self(), "active"_n },
+         get_self(), "pushtx"_n,
+         std::make_tuple( get_self(), bytes{rlp.begin(), rlp.end()} )
+    ).send();
+
+    // pushtx_action pushtx_act(get_self(), {{get_self(), "active"_n}});
+    // pushtx_act.send(get_self(), rlp);
 }
 
 void evm_contract::transfer(eosio::name from, eosio::name to, eosio::asset quantity, std::string memo) {

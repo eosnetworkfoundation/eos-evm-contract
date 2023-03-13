@@ -77,9 +77,9 @@ struct native_token_evm_tester : basic_evm_tester {
    };
 
    evmc::address make_reserved_address(uint64_t account) const {
-      return evmc_address({0xff, 0xff, 0xff, 0xff,
-                           0xff, 0xff, 0xff, 0xff,
-                           0xff, 0xff, 0xff, 0xff,
+      return evmc_address({0xbb, 0xbb, 0xbb, 0xbb,
+                           0xbb, 0xbb, 0xbb, 0xbb,
+                           0xbb, 0xbb, 0xbb, 0xbb,
                            static_cast<uint8_t>(account >> 56),
                            static_cast<uint8_t>(account >> 48),
                            static_cast<uint8_t>(account >> 40),

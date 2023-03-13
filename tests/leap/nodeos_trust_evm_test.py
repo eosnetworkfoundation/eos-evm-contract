@@ -220,9 +220,9 @@ def makeContractAddress(sender, nonce):
     return Web3.toHex(Web3.keccak(rlp.encode([normalize_address(sender), nonce]))[12:])
 
 def makeReservedEvmAddress(account):
-    bytearr = [0xff, 0xff, 0xff, 0xff,
-               0xff, 0xff, 0xff, 0xff,
-               0xff, 0xff, 0xff, 0xff,
+    bytearr = [0xbb, 0xbb, 0xbb, 0xbb,
+               0xbb, 0xbb, 0xbb, 0xbb,
+               0xbb, 0xbb, 0xbb, 0xbb,
                c_uint8(account >> 56).value,
                c_uint8(account >> 48).value,
                c_uint8(account >> 40).value,
