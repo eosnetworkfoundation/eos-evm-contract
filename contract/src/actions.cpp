@@ -148,7 +148,7 @@ void evm_contract::push_trx( eosio::name ram_payer, Block& block, const bytes& r
 
     if(from_self) {
         check(is_reserved_address(*tx.from), "actions from self without a reserved from address are unexpected");
-        const name ingress_account(*extract_reserved_address(*tx.from) ?: get_self().value); //reserved-0 used for from-contract
+        const name ingress_account(*extract_reserved_address(*tx.from));
 
         const intx::uint512 max_gas_cost = intx::uint256(tx.gas_limit) * tx.max_fee_per_gas;
         check(max_gas_cost + tx.value < std::numeric_limits<intx::uint256>::max(), "too much gas");
@@ -188,10 +188,11 @@ void evm_contract::push_trx( eosio::name ram_payer, Block& block, const bytes& r
 
         for(const auto& reserved_object : ep.state().reserved_objects()) {
             const evmc::address& address = reserved_object.first;
-            const name egress_account(*extract_reserved_address(address) ?: get_self().value); //egress to reserved-0 goes to contract's bucket; TODO: needs more love w/ gas changes
+            const name egress_account(*extract_reserved_address(address));
             const Account& reserved_account = *reserved_object.second.current;
 
             check(reserved_account.code_hash == kEmptyHash, "contracts cannot be created in the reserved address space");
+            check(egress_account.value != 0, "reserved 0 address cannot be used");
 
             if(reserved_account.balance ==  0_u256)
                 continue;
@@ -337,9 +338,10 @@ void evm_contract::handle_evm_transfer(eosio::asset quantity, const std::string&
         .max_fee_per_gas = 0,
         .gas_limit = 21000,
         .to = to_evmc_address(*address_bytes),
-        .value = value
+        .value = value,
+        .r = 0u,  // r == 0 is pseudo signature that resolves to reserved address range
+        .s = get_self().value
     };
-    //txn's r == 0 && s == 0 which is a psuedo-signature from reserved address zero
 
     Bytes rlp;
     rlp::encode(rlp, txn);
