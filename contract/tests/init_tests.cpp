@@ -44,10 +44,10 @@ BOOST_FIXTURE_TEST_CASE(check_init, basic_evm_tester) try {
    BOOST_REQUIRE_EXCEPTION(push_action("evm"_n, "setbal"_n, "evm"_n, mvo()("addy", bytes())("bal", bytes())),
                            eosio_assert_message_exception,
                            [](const eosio_assert_message_exception& e) {return testing::expect_assert_message(e, "assertion failure with message: contract not initialized");});
+   */
    BOOST_REQUIRE_EXCEPTION(push_action("evm"_n, "gc"_n, "evm"_n, mvo()("max", 42)),
                            eosio_assert_message_exception,
                            [](const eosio_assert_message_exception& e) {return testing::expect_assert_message(e, "assertion failure with message: contract not initialized");});
-   */
    BOOST_REQUIRE_EXCEPTION(push_action("evm"_n, "freeze"_n, "evm"_n, mvo()("value", true)),
                            eosio_assert_message_exception,
                            [](const eosio_assert_message_exception& e) {return testing::expect_assert_message(e, "assertion failure with message: contract not initialized");});
@@ -112,10 +112,10 @@ BOOST_FIXTURE_TEST_CASE(check_freeze, basic_evm_tester) try {
    BOOST_REQUIRE_EXCEPTION(push_action("evm"_n, "setbal"_n, "evm"_n, mvo()("addy", bytes())("bal", bytes())),
                            eosio_assert_message_exception,
                            [](const eosio_assert_message_exception& e) {return testing::expect_assert_message(e, "assertion failure with message: contract is frozen");});
+   */
    BOOST_REQUIRE_EXCEPTION(push_action("evm"_n, "gc"_n, "evm"_n, mvo()("max", 42)),
                            eosio_assert_message_exception,
                            [](const eosio_assert_message_exception& e) {return testing::expect_assert_message(e, "assertion failure with message: contract is frozen");});
-   */
    // unfreeze
    push_action("evm"_n, "freeze"_n, "evm"_n, mvo()("value", false));
    produce_block();
@@ -157,8 +157,8 @@ BOOST_FIXTURE_TEST_CASE(check_freeze, basic_evm_tester) try {
 
    push_action("evm"_n, "setbal"_n, "evm"_n, mvo()("addy", bytes())("bal", bytes()));
 
-   push_action("evm"_n, "gc"_n, "evm"_n, mvo()("max", 42));
    */
+   push_action("evm"_n, "gc"_n, "evm"_n, mvo()("max", 42));
 
 } FC_LOG_AND_RETHROW()
 
