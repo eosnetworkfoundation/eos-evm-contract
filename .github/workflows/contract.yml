@@ -74,7 +74,6 @@ jobs:
           if-no-files-found: error
 
       - name: Download Leap - dev binary
-        if: matrix.DWITH_TEST_ACTIONS == 'on' || matrix.DWITH_TEST_ACTIONS == 'true'
         uses: AntelopeIO/asset-artifact-download-action@v2
         with:
           owner: AntelopeIO
@@ -86,15 +85,12 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install Leap
-        if: matrix.DWITH_TEST_ACTIONS == 'on' || matrix.DWITH_TEST_ACTIONS == 'true'
         run: sudo apt-get install -y ./leap*.deb
 
       - name: Build TrustEVM Contract Tests
-        if: matrix.DWITH_TEST_ACTIONS == 'on' || matrix.DWITH_TEST_ACTIONS == 'true'
         run: .github/workflows/build-contract-test.sh
 
       - name: Upload Artifacts
-        if: matrix.DWITH_TEST_ACTIONS == 'on' || matrix.DWITH_TEST_ACTIONS == 'true'
         uses: actions/upload-artifact@v3
         with:
           name: contract-test.tar.gz
@@ -102,11 +98,11 @@ jobs:
           if-no-files-found: error
 
       - name: Test TrustEVM Contract
-        if: matrix.DWITH_TEST_ACTIONS == 'on' || matrix.DWITH_TEST_ACTIONS == 'true'
         run: .github/workflows/test-contract.sh
+        env:
+          DWITH_TEST_ACTIONS: ${{ matrix.DWITH_TEST_ACTIONS }}
 
       - name: Upload Test Metrics
-        if: matrix.DWITH_TEST_ACTIONS == 'on' || matrix.DWITH_TEST_ACTIONS == 'true'
         uses: actions/upload-artifact@v3
         with:
           name: test-results.xml

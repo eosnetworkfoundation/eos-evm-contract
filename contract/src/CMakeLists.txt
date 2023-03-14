@@ -82,4 +82,8 @@ target_include_directories( evm_runtime PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/../../silkworm/third_party/evmone/evmc/include
 )
 
-target_link_options(evm_runtime PUBLIC -stack-size=20480)
+if (WITH_LARGE_STACK)
+    target_link_options(evm_runtime PUBLIC --stack-size=50000000)
+else()
+    target_link_options(evm_runtime PUBLIC --stack-size=20480)
+endif()

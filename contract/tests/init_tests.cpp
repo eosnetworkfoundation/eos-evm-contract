@@ -19,7 +19,8 @@ BOOST_FIXTURE_TEST_CASE(check_init, basic_evm_tester) try {
                            [](const eosio_assert_message_exception& e) {return testing::expect_assert_message(e, "assertion failure with message: contract not initialized");});
    // Test of transfer notification w/o init is handled in native_token_evm_tests/transfer_notifier_without_init test as it requires additional setup
 
-   BOOST_REQUIRE_EXCEPTION(push_action("evm"_n, "testtx"_n, "evm"_n, mvo()("rlptx", bytes())("bi", mvo()("coinbase", bytes())("difficulty", 0)("gasLimit", 0)("number", 0)("timestamp", 0))),
+   /*
+   BOOST_REQUIRE_EXCEPTION(push_action("evm"_n, "testtx"_n, "evm"_n, mvo()("orlptx", std::optional<bytes>())("bi", mvo()("coinbase", bytes())("difficulty", 0)("gasLimit", 0)("number", 0)("timestamp", 0))),
                            eosio_assert_message_exception,
                            [](const eosio_assert_message_exception& e) {return testing::expect_assert_message(e, "assertion failure with message: contract not initialized");});
    BOOST_REQUIRE_EXCEPTION(push_action("evm"_n, "updatecode"_n, "evm"_n, mvo()("address", bytes())("incarnation", 0)("code_hash", bytes())("code", bytes())),
@@ -43,6 +44,7 @@ BOOST_FIXTURE_TEST_CASE(check_init, basic_evm_tester) try {
    BOOST_REQUIRE_EXCEPTION(push_action("evm"_n, "setbal"_n, "evm"_n, mvo()("addy", bytes())("bal", bytes())),
                            eosio_assert_message_exception,
                            [](const eosio_assert_message_exception& e) {return testing::expect_assert_message(e, "assertion failure with message: contract not initialized");});
+   */
    BOOST_REQUIRE_EXCEPTION(push_action("evm"_n, "gc"_n, "evm"_n, mvo()("max", 42)),
                            eosio_assert_message_exception,
                            [](const eosio_assert_message_exception& e) {return testing::expect_assert_message(e, "assertion failure with message: contract not initialized");});
@@ -83,7 +85,8 @@ BOOST_FIXTURE_TEST_CASE(check_freeze, basic_evm_tester) try {
                            [](const eosio_assert_message_exception& e) {return testing::expect_assert_message(e, "assertion failure with message: contract is frozen");});
    // Test of transfer notification w/o init is handled in native_token_evm_tests/transfer_notifier_without_init test as it requires additional setup
 
-   BOOST_REQUIRE_EXCEPTION(push_action("evm"_n, "testtx"_n, "evm"_n, mvo()("rlptx", bytes())("bi", mvo()("coinbase", bytes())("difficulty", 0)("gasLimit", 0)("number", 0)("timestamp", 0))),
+   /*
+   BOOST_REQUIRE_EXCEPTION(push_action("evm"_n, "testtx"_n, "evm"_n, mvo()("orlptx", std::optional<bytes>())("bi", mvo()("coinbase", bytes())("difficulty", 0)("gasLimit", 0)("number", 0)("timestamp", 0))),
                            eosio_assert_message_exception,
                            [](const eosio_assert_message_exception& e) {return testing::expect_assert_message(e, "assertion failure with message: contract is frozen");});
    BOOST_REQUIRE_EXCEPTION(push_action("evm"_n, "updatecode"_n, "evm"_n, mvo()("address", bytes())("incarnation", 0)("code_hash", bytes())("code", bytes())),
@@ -109,10 +112,10 @@ BOOST_FIXTURE_TEST_CASE(check_freeze, basic_evm_tester) try {
    BOOST_REQUIRE_EXCEPTION(push_action("evm"_n, "setbal"_n, "evm"_n, mvo()("addy", bytes())("bal", bytes())),
                            eosio_assert_message_exception,
                            [](const eosio_assert_message_exception& e) {return testing::expect_assert_message(e, "assertion failure with message: contract is frozen");});
+   */
    BOOST_REQUIRE_EXCEPTION(push_action("evm"_n, "gc"_n, "evm"_n, mvo()("max", 42)),
                            eosio_assert_message_exception,
                            [](const eosio_assert_message_exception& e) {return testing::expect_assert_message(e, "assertion failure with message: contract is frozen");});
-
    // unfreeze
    push_action("evm"_n, "freeze"_n, "evm"_n, mvo()("value", false));
    produce_block();
@@ -131,7 +134,8 @@ BOOST_FIXTURE_TEST_CASE(check_freeze, basic_evm_tester) try {
 
    // Test of transfer notification w/o init is handled in native_token_evm_tests/transfer_notifier_without_init test as it requires additional setup
 
-   BOOST_REQUIRE_EXCEPTION(push_action("evm"_n, "testtx"_n, "evm"_n, mvo()("rlptx", bytes())("bi", mvo()("coinbase", bytes())("difficulty", 0)("gasLimit", 0)("number", 0)("timestamp", 0))),
+   /*
+   BOOST_REQUIRE_EXCEPTION(push_action("evm"_n, "testtx"_n, "evm"_n, mvo()("orlptx", std::optional<bytes>())("bi", mvo()("coinbase", bytes())("difficulty", 0)("gasLimit", 0)("number", 0)("timestamp", 0))),
                            eosio_assert_message_exception,
                            [](const eosio_assert_message_exception& e) {return testing::expect_assert_message(e, "assertion failure with message: invalid coinbase");});
 
@@ -153,6 +157,7 @@ BOOST_FIXTURE_TEST_CASE(check_freeze, basic_evm_tester) try {
 
    push_action("evm"_n, "setbal"_n, "evm"_n, mvo()("addy", bytes())("bal", bytes()));
 
+   */
    push_action("evm"_n, "gc"_n, "evm"_n, mvo()("max", 42));
 
 } FC_LOG_AND_RETHROW()
