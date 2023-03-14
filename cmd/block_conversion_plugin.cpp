@@ -2,6 +2,7 @@
 #include "channels.hpp"
 #include "abi_utils.hpp"
 #include "utils.hpp"
+#include "contract_common/evm_common/block_mapping.hpp"
 
 #include <fstream>
 
@@ -9,37 +10,21 @@
 #include <silkworm/trie/vector_root.hpp>
 #include <silkworm/common/endian.hpp>
 
-struct block_mapping {
-   
-   uint64_t genesis_timestamp = 1667688089000000; //us
-   uint64_t block_interval    = 1000000;          //us
-
-   void set_genesis_timestamp(uint64_t timestamp){
-      genesis_timestamp = timestamp;
-   }
-
-   void set_block_interval(uint64_t interval) {
-      block_interval = interval;
-   }
-
-   inline uint32_t timestamp_to_evm_block(uint64_t timestamp) {
-      if( timestamp < genesis_timestamp ) {
-         SILK_CRIT << "Invalid timestamp [" << timestamp << ", genesis: " << genesis_timestamp;
-         assert(timestamp >= genesis_timestamp);
-      }
-      return 1 + (timestamp - genesis_timestamp)/block_interval;
-   }
-
-   inline uint64_t evm_block_to_timestamp(uint32_t block_num) {
-      return genesis_timestamp + block_num * block_interval;
-   }
-
-};
 using sys = sys_plugin;
 class block_conversion_plugin_impl : std::enable_shared_from_this<block_conversion_plugin_impl> {
    public:
       block_conversion_plugin_impl()
         : evm_blocks_channel(appbase::app().get_channel<channels::evm_blocks>()){}
+
+
+      uint32_t timestamp_to_evm_block_num(uint64_t timestamp) const {
+         if (timestamp < bm.value().genesis_timestamp) {
+            SILK_CRIT << "Invalid timestamp " << timestamp << ", genesis: " << bm->genesis_timestamp;
+            assert(timestamp >= bm->genesis_timestamp);
+         }
+
+         return bm->timestamp_to_evm_block_num(timestamp);
+      }
 
       void load_head() {
          auto head_header = appbase::app().get_plugin<engine_plugin>().get_head_canonical_header();
@@ -67,11 +52,20 @@ class block_conversion_plugin_impl : std::enable_shared_from_this<block_conversi
             return;
          }
 
-         bm.set_block_interval(silkworm::endian::load_big_u64(genesis_header->nonce.data())*1e3);
-         bm.set_genesis_timestamp(genesis_header->timestamp*1e6);
+         uint64_t block_interval_ms = silkworm::endian::load_big_u64(genesis_header->nonce.data());
+         // TODO: Consider redefining genesis nonce to be in units of seconds rather than milliseconds? Or just hardcode to 1 second?
 
-         SILK_INFO << "Block interval: " << bm.block_interval;
-         SILK_INFO << "Genesis timestamp: " << bm.genesis_timestamp;
+         if (block_interval_ms == 0  || block_interval_ms % 1000 != 0) {
+            SILK_CRIT << "Genesis nonce is invalid. Must be a positive multiple of 1000 representing the block interval in milliseconds. " 
+                         "Instead got: " << block_interval_ms;
+            sys::error("Invalid genesis nonce");
+            return;
+         }
+
+         bm.emplace(genesis_header->timestamp, block_interval_ms/1e3);
+
+         SILK_INFO << "Block interval: " << bm->block_interval;
+         SILK_INFO << "Genesis timestamp: " << bm->genesis_timestamp;
       }
 
       evmc::bytes32 compute_transaction_root(const silkworm::BlockBody& body) {
@@ -94,7 +88,7 @@ class block_conversion_plugin_impl : std::enable_shared_from_this<block_conversi
          new_block.header.difficulty        = 1;
          new_block.header.number            = num;
          new_block.header.gas_limit         = 0x7ffffffffff;
-         new_block.header.timestamp         = bm.evm_block_to_timestamp(num)/1e6;
+         new_block.header.timestamp         = bm.value().evm_block_num_to_evm_timestamp(num)/1e6;
          new_block.header.transactions_root = silkworm::kEmptyRoot;
          //new_block.header.mix_hash
          //new_block.header.nonce           
@@ -136,13 +130,13 @@ class block_conversion_plugin_impl : std::enable_shared_from_this<block_conversi
                //SILK_INFO << "--Enter Block #" << b->block_num;
 
                // Keep the last block before genesis timestamp
-               if (b->timestamp <= bm.genesis_timestamp) {
-                  SILK_DEBUG << "Before genesis: " << bm.genesis_timestamp <<  " Block #" << b->block_num << " timestamp: " << b->timestamp;
+               if (b->timestamp <= bm.value().genesis_timestamp) {
+                  SILK_DEBUG << "Before genesis: " << bm->genesis_timestamp <<  " Block #" << b->block_num << " timestamp: " << b->timestamp;
                   native_blocks.clear();
                   native_blocks.push_back(*b);
                   return;
                }
-               
+
                // Add received native block to our local reversible chain.
                // If the received native block can't be linked we remove the forked blocks until the fork point.
                // Also we remove the forked block transactions from the corresponding evm block as they where previously included
@@ -151,7 +145,7 @@ class block_conversion_plugin_impl : std::enable_shared_from_this<block_conversi
                   //SILK_DEBUG << "Fork at Block #" << b->block_num;
                   const auto& forked_block = native_blocks.back();
 
-                  while( bm.timestamp_to_evm_block(forked_block.timestamp) < evm_blocks.back().header.number )
+                  while( timestamp_to_evm_block_num(forked_block.timestamp) < evm_blocks.back().header.number )
                      evm_blocks.pop_back();
 
                   auto& last_evm_block = evm_blocks.back();
@@ -160,7 +154,7 @@ class block_conversion_plugin_impl : std::enable_shared_from_this<block_conversi
                   });
 
                   native_blocks.pop_back();
-                  if( native_blocks.size() && bm.timestamp_to_evm_block(native_blocks.back().timestamp) == last_evm_block.header.number )
+                  if( native_blocks.size() && timestamp_to_evm_block_num(native_blocks.back().timestamp) == last_evm_block.header.number )
                      set_upper_bound(last_evm_block, native_blocks.back());
                }
 
@@ -172,7 +166,7 @@ class block_conversion_plugin_impl : std::enable_shared_from_this<block_conversi
 
                // Process the last native block received.
                // We extend the evm chain if necessary up until the block where the received block belongs
-               auto evm_num = bm.timestamp_to_evm_block(b->timestamp);
+               auto evm_num = timestamp_to_evm_block_num(b->timestamp);
                //SILK_INFO << "Expecting evm number: " << evm_num;
 
                while(evm_blocks.back().header.number < evm_num) {
@@ -213,11 +207,11 @@ class block_conversion_plugin_impl : std::enable_shared_from_this<block_conversi
                }
 
                if( lib_timestamp ) {
-                  auto evm_lib = bm.timestamp_to_evm_block(*lib_timestamp) - 1;
+                  auto evm_lib = timestamp_to_evm_block_num(*lib_timestamp) - 1;
                   //SILK_DEBUG << "EVM LIB: #" << evm_lib;
 
                   // Remove irreversible native blocks
-                  while(bm.timestamp_to_evm_block(native_blocks.front().timestamp) < evm_lib) {
+                  while(timestamp_to_evm_block_num(native_blocks.front().timestamp) < evm_lib) {
                      //SILK_DEBUG << "Remove IRR native: #" << native_blocks.front().block_num;
                      native_blocks.pop_front();
                   }
@@ -244,7 +238,7 @@ class block_conversion_plugin_impl : std::enable_shared_from_this<block_conversi
       std::list<silkworm::Block>                    evm_blocks;
       channels::evm_blocks::channel_type&           evm_blocks_channel;
       channels::native_blocks::channel_type::handle native_blocks_subscription;
-      block_mapping                                 bm;
+      std::optional<evm_common::block_mapping>      bm;
 };
 
 block_conversion_plugin::block_conversion_plugin() : my(new block_conversion_plugin_impl()) {}

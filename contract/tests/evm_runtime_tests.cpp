@@ -544,9 +544,9 @@ struct evm_runtime_tester : eosio_system_tester, silkworm::State {
       );
    }
 
-   action_result pushtx( const bytes& rlptx, const block_info& bi, name signer=ME ) { 
+   action_result pushtx( const std::optional<bytes>& rlptx, const block_info& bi, name signer=ME ) { 
       return call(signer, "testtx"_n, mvo()
-         ("rlptx", rlptx)
+         ("orlptx", rlptx)
          ("bi", bi)
       );
    }
@@ -794,14 +794,23 @@ struct evm_runtime_tester : eosio_system_tester, silkworm::State {
    ValidationResult apply_test_block(const Block& block) {
       
       auto bi = block_info::create(block);
-      dlog("block_info ${a}", ("a",bi));
-      for(const auto& tx : block.transactions) {
-         Bytes btx;
-         rlp::encode(btx, tx);
-         auto res = pushtx(to_bytes(btx), bi);
+      dlog("txs: ${n}, block_info ${a}", ("n",block.transactions.size())("a",bi));
+
+      if(block.transactions.empty()) {
+         auto res = pushtx({}, bi);
          if(res.size()) {
             std::cout << "ERR:" << res << std::endl;
             return ValidationResult::kInvalidOmmerHeader;
+         }
+      } else {
+         for(const auto& tx : block.transactions) {
+            Bytes btx;
+            rlp::encode(btx, tx);
+            auto res = pushtx(to_bytes(btx), bi);
+            if(res.size()) {
+               std::cout << "ERR:" << res << std::endl;
+               return ValidationResult::kInvalidOmmerHeader;
+            }
          }
       }
 
@@ -957,6 +966,18 @@ struct evm_runtime_tester : eosio_system_tester, silkworm::State {
    // https://ethereum-tests.readthedocs.io/en/latest/test_types/blockchain_tests.html
    RunResults blockchain_test(const std::string& test_name, const nlohmann::json& json_test) {
 
+      //mod_exp restriction: exponent bit size cannot exceed bit size of either base or modulus
+      if( test_name == "modexp_d27g0v0_Istanbul" ||
+          test_name == "modexp_d27g1v0_Istanbul" ||
+          test_name == "modexp_d27g2v0_Istanbul" ||
+          test_name == "modexp_d27g3v0_Istanbul" ) {
+         return Status::kSkipped;
+      }
+
+      if (json_test.contains("postStateHash")) {
+         return Status::kSkipped;
+      }
+
       std::string network{json_test["network"].get<std::string>()};
       init_pre_state(test_name, json_test["pre"]);
 
@@ -965,10 +986,6 @@ struct evm_runtime_tester : eosio_system_tester, silkworm::State {
          if (status != Status::kPassed) {
                return status;
          }
-      }
-
-      if (json_test.contains("postStateHash")) {
-         return Status::kPassed;
       }
 
       gc(std::numeric_limits<uint32_t>::max());
@@ -1001,11 +1018,6 @@ struct evm_runtime_tester : eosio_system_tester, silkworm::State {
 
          //Only Istanbul
          if(network != "Istanbul") continue;
-         //if(test.key() != "opcAEDiffPlaces_d34g0v0_London") continue;
-         //std::cout << test.key() << std::endl;
-         //if(test.key() == "CALLBlake2f_MaxRounds_d0g0v0_Istanbul") {
-         //  
-         //}
 
          const RunResults r{(*this.*runner)(test.key(), json_test)};
          total += r;
@@ -1027,11 +1039,11 @@ struct evm_runtime_tester : eosio_system_tester, silkworm::State {
          std::cout << '.';
       }
       if (res.failed) {
-         std::cout << kColorMaroonHigh << "  Failed" << kColorReset << std::endl;
+         std::cout << "  Failed" << std::endl;
       } else if (res.skipped) {
          std::cout << " Skipped" << std::endl;
       } else {
-         std::cout << kColorGreen << "  Passed" << kColorReset << std::endl;
+         std::cout << "  Passed" << std::endl;
       }
    }
 
@@ -1067,18 +1079,11 @@ BOOST_FIXTURE_TEST_CASE( GeneralStateTests, evm_runtime_tester ) try {
       }
    }
 
-   std::cout << kColorGreen << total_passed << " tests passed" << kColorReset << ", ";
-   if (total_failed != 0) {
-      std::cout << kColorMaroonHigh;
-   }
-   std::cout << total_failed << " failed";
-   if (total_failed != 0) {
-      std::cout << kColorReset;
-   }
-   std::cout << ", " << total_skipped << " skipped";
-
    const auto [_, duration] = sw.lap();
-   std::cout << " in " << StopWatch::format(duration) << std::endl;
+   std::cout << total_passed  << " tests passed" << ", "
+             << total_failed  << " failed" << ", "
+             << total_skipped << " skipped"
+             << " in " << StopWatch::format(duration) << std::endl;
 
    BOOST_REQUIRE_EQUAL(total_failed, 0);
 
