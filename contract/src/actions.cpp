@@ -51,7 +51,7 @@ void evm_contract::init(const uint64_t chainid) {
 }
 
 void evm_contract::setingressfee(asset ingress_bridge_fee) {
-    assert_inited();
+    assert_unfrozen();
     require_auth(get_self());
 
     check( ingress_bridge_fee.symbol == token_symbol, "unexpected bridge symbol" );
@@ -63,7 +63,7 @@ void evm_contract::setingressfee(asset ingress_bridge_fee) {
 }
 
 void evm_contract::addegress(const std::vector<name>& accounts) {
-    assert_inited();
+    assert_unfrozen();
     require_auth(get_self());
 
     egresslist egresslist_table(get_self(), get_self().value);
@@ -76,7 +76,7 @@ void evm_contract::addegress(const std::vector<name>& accounts) {
 }
 
 void evm_contract::removeegress(const std::vector<name>& accounts) {
-    assert_inited();
+    assert_unfrozen();
     require_auth(get_self());
 
     egresslist egresslist_table(get_self(), get_self().value);
@@ -408,7 +408,7 @@ ACTION evm_contract::testtx( const std::optional<bytes>& orlptx, const evm_runti
 }
 
 ACTION evm_contract::dumpstorage(const bytes& addy) {
-    assert_inited();
+    assert_unfrozen();
 
     eosio::require_auth(get_self());
 
@@ -442,7 +442,7 @@ ACTION evm_contract::dumpstorage(const bytes& addy) {
 }
 
 ACTION evm_contract::dumpall() {
-    assert_inited();
+    assert_unfrozen();
 
     eosio::require_auth(get_self());
 
