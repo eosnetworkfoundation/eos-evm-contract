@@ -106,3 +106,24 @@ target_link_libraries(unit_test silkrpc Catch2::Catch2 GTest::gmock asio-grpc::a
 include(CTest)
 include(Catch)
 catch_discover_tests(unit_test)
+
+# Silkworm consensus tests
+hunter_add_package(CLI11)
+find_package(CLI11 CONFIG REQUIRED)
+add_executable(consensus consensus.cpp )
+include_directories(${CMAKE_SOURCE_DIR}/silkworm/third_party/magic_enum/include) 
+include_directories(
+    ${CMAKE_BINARY_DIR}
+    ${CMAKE_SOURCE_DIR}/silkworm/node
+    ${CMAKE_SOURCE_DIR}/silkworm/core
+    ${CMAKE_SOURCE_DIR}/silkworm/third_party/evmone/lib
+    ${CMAKE_SOURCE_DIR}/silkworm/third_party/evmone/evmc/include
+    ${CMAKE_SOURCE_DIR}/external/magic_enum/include
+    ${CMAKE_SOURCE_DIR}/external/abseil
+
+    ${CMAKE_SOURCE_DIR}/external
+    ${CMAKE_SOURCE_DIR}/silkworm/third_party/silkpre/third_party/secp256k1/include
+)
+
+target_compile_definitions(consensus PRIVATE SILKWORM_CONSENSUS_TEST_DIR="${CMAKE_SOURCE_DIR}/silkworm/third_party/tests")
+target_link_libraries(consensus PRIVATE engine_plugin shipreceiver_plugin sys_plugin blockchain_plugin rpc_plugin trustevm_node-buildinfo evmc::loader CLI11::CLI11)

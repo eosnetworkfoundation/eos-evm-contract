@@ -121,5 +121,8 @@ This repo contains the following GitHub Actions workflows for CI:
 - TrustEVM Contract CI - build the TrustEVM contract and its associated tests
     - [Pipeline](https://github.com/eosnetworkfoundation/TrustEVM/actions/workflows/contract.yml)
     - [Documentation](./.github/workflows/contract.md)
+- TrustEVM Node CI - build the TrustEVM node
+    - [Pipeline](https://github.com/eosnetworkfoundation/TrustEVM/actions/workflows/node.yml)
+    - [Documentation](./.github/workflows/node.md)
 
 See the pipeline documentation for more information.

@@ -88,57 +88,70 @@ void state::update_account(const evmc::address& address, std::optional<Account> 
     auto itr = inx.find(make_key(address));
     ++stats.account.read;
 
-    if (current.has_value()) {
+    auto emplace = [&](auto& row) {
+        row.id = accounts.available_primary_key();
+        row.eth_address = to_bytes(address);
+        row.nonce = current->nonce;
+        row.balance = to_bytes(current->balance);
+        row.code_hash = current->code_hash == silkworm::kEmptyHash ? std::nullopt : std::optional<bytes>(to_bytes(current->code_hash));
+    };
 
+    auto update = [&](auto& row) {
+        row.nonce = current->nonce;
+        row.balance = to_bytes(current->balance);
+        row.code_hash = current->code_hash == silkworm::kEmptyHash ? std::nullopt : std::optional<bytes>(to_bytes(current->code_hash));
+    };
+
+    auto remove_account = [&](auto& itr) {
+        storage_table db(_self, itr->id);
+        // add to garbage collection table for later removal
+        gc_store_table gc(_self, _self.value);
+        gc.emplace(_ram_payer, [&](auto& row){
+            row.id = gc.available_primary_key();
+            row.storage_id = itr->id;
+        });
+        // Decrease ref_count for code
+        if (itr->code_hash ) {
+            account_code_table codes(_self, _self.value);
+            auto inxc = codes.get_index<"by.codehash"_n>();
+            auto itrc = inxc.find(make_key(itr->code_hash.value()));
+            if(itrc == inxc.end()) {
+                // SHOULD NOT REACH HERE! 
+                // But we ignore this for robustness.
+            } else {
+                if (itrc->ref_count <= 1) {
+                    gc_code_table gccode(_self, _self.value);
+                    gccode.emplace(_ram_payer, [&](auto& row){
+                        row.id = gccode.available_primary_key();
+                        row.code_id = itrc->id;
+                    });
+                }
+                codes.modify(*itrc, eosio::same_payer, [&](auto& row){
+                    if (row.ref_count > 0)
+                        row.ref_count --;
+                });
+            }
+        }
+        accounts.erase(*itr);
+    };
+
+
+    if (current.has_value()) {
         if (itr == inx.end()) {
-            accounts.emplace(_ram_payer, [&](auto& row){
-                row.id = accounts.available_primary_key();
-                row.eth_address = to_bytes(address);
-                row.nonce = current->nonce;
-                row.balance = to_bytes(current->balance);
-                row.code_hash = current->code_hash == silkworm::kEmptyHash ? std::nullopt : std::optional<bytes>(to_bytes(current->code_hash));
-            });
+            accounts.emplace(_ram_payer, emplace);
             ++stats.account.create;
         } else {
-            accounts.modify(*itr, eosio::same_payer, [&](auto& row){
-                row.nonce = current->nonce;
-                row.code_hash = current->code_hash == silkworm::kEmptyHash ? std::nullopt : std::optional<bytes>(to_bytes(current->code_hash));
-                row.balance = to_bytes(current->balance);
-            });
-            ++stats.account.update;
+            if( initial && initial->incarnation != current->incarnation ) {
+                remove_account(itr);
+                accounts.emplace(_ram_payer, emplace);
+            } else {
+                accounts.modify(*itr, eosio::same_payer, update);
+                ++stats.account.update;
+            }
         }
     } else {
         if(itr != inx.end()) {
-            storage_table db(_self, itr->id);
-            // add to garbage collection table for later removal
-            gc_store_table gc(_self, _self.value);
-            gc.emplace(_ram_payer, [&](auto& row){
-                row.id = gc.available_primary_key();
-                row.storage_id = itr->id;
-            });
-            // Decrease ref_count for code
-            if (itr->code_hash ) {
-                account_code_table codes(_self, _self.value);
-                auto inxc = codes.get_index<"by.codehash"_n>();
-                auto itrc = inxc.find(make_key(itr->code_hash.value()));
-                if(itrc == inxc.end()) {
-                    // SHOULD NOT REACH HERE! 
-                    // But we ignore this for robustness.
-                } else {
-                    if (itrc->ref_count <= 1) {
-                        gc_code_table gccode(_self, _self.value);
-                        gccode.emplace(_ram_payer, [&](auto& row){
-                            row.id = gccode.available_primary_key();
-                            row.code_id = itrc->id;
-                        });
-                    }
-                    codes.modify(*itrc, eosio::same_payer, [&](auto& row){
-                        if (row.ref_count > 0)
-                            row.ref_count --;
-                    });
-                }
-            }
-            accounts.erase(*itr);
+            remove_account(itr);
             ++stats.account.remove;
         }
     }
