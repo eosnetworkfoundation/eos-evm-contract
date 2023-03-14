@@ -5,7 +5,7 @@
 #include <evm_runtime/types.hpp>
 
 #include <silkworm/types/block.hpp>
-#include <silkworm/consensus/engine.hpp>
+#include <silkworm/execution/processor.hpp>
 #ifdef WITH_TEST_ACTIONS
 #include <evm_runtime/test/block_info.hpp>
 #endif
@@ -44,7 +44,7 @@ CONTRACT evm_contract : public contract {
       bool gc(uint32_t max);
 
 #ifdef WITH_TEST_ACTIONS
-      ACTION testtx( const bytes& rlptx, const evm_runtime::test::block_info& bi );
+      ACTION testtx( const std::optional<bytes>& orlptx, const evm_runtime::test::block_info& bi );
       ACTION updatecode( const bytes& address, uint64_t incarnation, const bytes& code_hash, const bytes& code);
       ACTION updateaccnt(const bytes& address, const bytes& initial, const bytes& current);
       ACTION updatestore(const bytes& address, uint64_t incarnation, const bytes& location, const bytes& initial, const bytes& current);
@@ -88,7 +88,7 @@ CONTRACT evm_contract : public contract {
          check((_config.get().status & static_cast<uint32_t>(status_flags::frozen)) == 0, "contract is frozen");
       }
 
-      void push_trx(eosio::name ram_payer, silkworm::Block& block, const bytes& rlptx, silkworm::consensus::IEngine& engine, const silkworm::ChainConfig& chain_config);
+      silkworm::Receipt execute_tx( silkworm::Block& block, const bytes& rlptx, silkworm::ExecutionProcessor& ep );
 };
 
 
