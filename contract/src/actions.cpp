@@ -119,7 +119,7 @@ void check_result( ValidationResult r, const Transaction& txn, const char* desc 
     eosio::check( false, desc );
 }
 
-void evm_contract::push_trx( eosio::name ram_payer, Block& block, const bytes& rlptx, silkworm::consensus::IEngine& engine, const silkworm::ChainConfig& chain_config ) {
+Receipt evm_contract::execute_tx( silkworm::Block& block, const bytes& rlptx, silkworm::ExecutionProcessor& ep ) {
     //when being called as an inline action, clutch in allowance for reserved addresses & signatures by setting from_my_self=true
     const bool from_self = get_sender() == get_self();
 
@@ -141,9 +141,6 @@ void evm_contract::push_trx( eosio::name ram_payer, Block& block, const bytes& r
     tx.recover_sender();
     eosio::check(tx.from.has_value(), "unable to recover sender");
     LOGTIME("EVM RECOVER SENDER");
-
-    evm_runtime::state state{get_self(), ram_payer};
-    silkworm::ExecutionProcessor ep{block, engine, state, chain_config};
 
     if(from_self) {
         check(is_reserved_address(*tx.from), "actions from self without a reserved from address are unexpected");
@@ -216,12 +213,12 @@ void evm_contract::push_trx( eosio::name ram_payer, Block& block, const bytes& r
                 non_open_account_sent = true;
             }
         }
-
         if(total_egress != 0_u256)
             inevm->set(inevm->get() -= total_egress, eosio::same_payer);
     }
 
     LOGTIME("EVM EXECUTE");
+    return receipt;
 }
 
 void evm_contract::pushtx( eosio::name ram_payer, const bytes& rlptx ) {
@@ -250,7 +247,7 @@ void evm_contract::pushtx( eosio::name ram_payer, const bytes& rlptx ) {
 }
 
 void evm_contract::open(eosio::name owner) {
-    assert_inited();
+    assert_unfrozen();
     require_auth(owner);
 
     balances balance_table(get_self(), get_self().value);
@@ -353,7 +350,7 @@ void evm_contract::handle_evm_transfer(eosio::asset quantity, const std::string&
 }
 
 void evm_contract::transfer(eosio::name from, eosio::name to, eosio::asset quantity, std::string memo) {
-    assert_inited();
+    assert_unfrozen();
     eosio::check(quantity.symbol == token_symbol, "received unexpected token");
 
     if(to != get_self() || from == get_self())
