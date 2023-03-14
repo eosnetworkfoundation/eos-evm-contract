@@ -9,13 +9,13 @@ import sys
 from binascii import unhexlify
 from web3 import Web3
 
-sys.path.append(os.getcwd())
 sys.path.append(os.path.join(os.getcwd(), "tests"))
 
-from TestHarness import Cluster, TestHelper, Utils, WalletMgr
-from TestHarness.TestHelper import AppArgs
-from core_symbol import CORE_SYMBOL
+os.environ["CORE_SYMBOL_NAME"]='EOS'
+print(f"CORE_SYMBOL_NAME: {os.environ.get('CORE_SYMBOL_NAME')}")
 
+from TestHarness import Cluster, TestHelper, Utils, WalletMgr, CORE_SYMBOL
+from TestHarness.TestHelper import AppArgs
 
 ###############################################################
 # nodeos_trust_evm_test
@@ -25,13 +25,16 @@ from core_symbol import CORE_SYMBOL
 # Need to install:
 #   web3      - pip install web3
 #
-# --turst-evm-root should point to the root of TrustEVM build dir
 # --trust-evm-contract-root should point to root of TrustEVM contract build dir
 #                           contracts should be built with -DWITH_TEST_ACTIONS=On
 #
-# Example:
-#  cd ~/ext/leap/build
-#  ~/ext/TrustEVM/tests/leap/nodeos_trust_evm_test.py --trust-evm-contract-root ~/ext/TrustEVM/contract/build --leave-running
+# Example (Running with leap src build):
+#  cd ~/leap/build
+#  ~/TrustEVM/tests/leap/nodeos_trust_evm_test.py --trust-evm-contract-root ~/TrustEVM/contract/build --leave-running
+#
+# Example (Running with leap dev-install):
+#  export PYTHONPATH=<leap-dev-install-root>/lib/python3/dist-packages
+#  ~/TrustEVM/tests/leap/nodeos_trust_evm_test.py --trust-evm-contract-root ~/TrustEVM/contract/build --leave-running
 #
 #  Launches wallet at port: 9899
 #    Example: bin/cleos --wallet-url http://127.0.0.1:9899 ...
