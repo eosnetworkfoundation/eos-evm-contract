@@ -8,15 +8,20 @@ function ee()
     eval "$@"
 }
 
+export Dleap_DIR='/usr/lib/x86_64-linux-gnu/cmake/leap'
+
 # debug code
 ee cdt-cc --version
 ee cmake --version
+ee cmake --version
+echo 'Leap version:'
+cat "$Dleap_DIR/EosioTester.cmake" | grep 'EOSIO_VERSION' | grep -oP "['\"].*['\"]" | tr -d "'\"" || :
 
 # build
 ee mkdir -p contract/build
 ee pushd contract
 ee pushd build
-ee "cmake -DCMAKE_BUILD_TYPE=$DCMAKE_BUILD_TYPE -DWITH_TEST_ACTIONS=$DWITH_TEST_ACTIONS -DWITH_LARGE_STACK=$DWITH_TEST_ACTIONS .."
+ee "cmake -DCMAKE_BUILD_TYPE=$DCMAKE_BUILD_TYPE .."
 ee make -j "$(nproc)"
 
 # pack

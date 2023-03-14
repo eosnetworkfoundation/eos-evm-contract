@@ -144,7 +144,7 @@ try:
         nonProdNode.transferFunds(cluster.eosioAccount, account, transferAmount, "test transfer", waitForTransBlock=True)
         trans=nonProdNode.delegatebw(account, 20000000.0000, 20000000.0000, waitForTransBlock=True, exitOnError=True)
 
-    contractDir=trustEvmContractRoot + "/evm_runtime"
+    contractDir=trustEvmContractRoot + "/evm_runtime_without_test_actions"
     wasmFile="evm_runtime.wasm"
     abiFile="evm_runtime.abi"
     Utils.Print("Publish evm_runtime contract")

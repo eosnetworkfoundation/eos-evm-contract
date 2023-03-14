@@ -196,7 +196,7 @@ try:
 
     # setup evm
 
-    contractDir=trustEvmContractRoot + "/evm_runtime"
+    contractDir=trustEvmContractRoot + "/evm_runtime_without_test_actions"
     wasmFile="evm_runtime.wasm"
     abiFile="evm_runtime.abi"
     Utils.Print("Publish evm_runtime contract")

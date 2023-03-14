@@ -16,8 +16,8 @@ public:
    basic_evm_tester() {
       create_accounts({"evm"_n});
 
-      set_code("evm"_n, testing::contracts::evm_runtime_wasm());
-      set_abi("evm"_n, testing::contracts::evm_runtime_abi().data());
+      set_code("evm"_n, testing::contracts::evm_runtime_without_test_actions_wasm());
+      set_abi("evm"_n, testing::contracts::evm_runtime_without_test_actions_abi().data());
    }
 
    void init(const uint64_t chainid) {

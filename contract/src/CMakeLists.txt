@@ -82,6 +82,7 @@ target_include_directories( evm_runtime PUBLIC
 )
 
 if (WITH_LARGE_STACK)
+# Build with 50MB of stack size, needed for consensus tests
     target_link_options(evm_runtime PUBLIC --stack-size=50000000)
 else()
     target_link_options(evm_runtime PUBLIC --stack-size=20480)

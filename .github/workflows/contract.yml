@@ -24,10 +24,7 @@ jobs:
 
   build:
     runs-on: ubuntu-20.04
-    strategy:
-      matrix:
-        DWITH_TEST_ACTIONS: ['on', 'off']
-    name: TrustEVM Contract Build - Tests ${{ matrix.DWITH_TEST_ACTIONS }}
+    name: TrustEVM Contract Build and Tests
     env:
       CC: gcc-10
       CXX: g++-10
@@ -61,18 +58,6 @@ jobs:
       - name: Install CDT
         run: sudo apt-get install -y ./cdt*.deb
 
-      - name: Build TrustEVM Contract
-        run: .github/workflows/build-contract.sh
-        env:
-          DWITH_TEST_ACTIONS: ${{ matrix.DWITH_TEST_ACTIONS }}
-
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@v3
-        with:
-          name: contract.test-actions-${{ matrix.DWITH_TEST_ACTIONS }}.tar.gz
-          path: contract.tar.gz
-          if-no-files-found: error
-
       - name: Download Leap - dev binary
         uses: AntelopeIO/asset-artifact-download-action@v2
         with:
@@ -87,20 +72,18 @@ jobs:
       - name: Install Leap
         run: sudo apt-get install -y ./leap*.deb
 
-      - name: Build TrustEVM Contract Tests
-        run: .github/workflows/build-contract-test.sh
+      - name: Build TrustEVM Contracts and Tests
+        run: .github/workflows/build-contract.sh
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: contract-test.tar.gz
-          path: contract-test.tar.gz
+          name: contract.tar.gz
+          path: contract.tar.gz
           if-no-files-found: error
 
       - name: Test TrustEVM Contract
         run: .github/workflows/test-contract.sh
-        env:
-          DWITH_TEST_ACTIONS: ${{ matrix.DWITH_TEST_ACTIONS }}
 
       - name: Upload Test Metrics
         uses: actions/upload-artifact@v3

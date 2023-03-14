@@ -34,11 +34,14 @@ struct contracts {
    static std::vector<uint8_t> eosio_bios_wasm() { return read_wasm("${CMAKE_CURRENT_SOURCE_DIR}/contracts/eosio.bios/eosio.bios.wasm"); }
    static std::vector<char>    eosio_bios_abi() { return read_abi("${CMAKE_CURRENT_SOURCE_DIR}/contracts/eosio.bios/eosio.bios.abi"); }
 
-   static std::vector<uint8_t> evm_runtime_wasm() { return read_wasm("${CMAKE_CURRENT_SOURCE_DIR}/../build/evm_runtime/evm_runtime.wasm"); }
-   static std::vector<char>    evm_runtime_abi() { return read_abi("${CMAKE_CURRENT_SOURCE_DIR}/../build/evm_runtime/evm_runtime.abi"); }
+   static std::vector<uint8_t> evm_runtime_with_test_actions_wasm() { return read_wasm("${CMAKE_BINARY_DIR}/evm_runtime_with_test_actions/evm_runtime.wasm"); }
+   static std::vector<char>    evm_runtime_with_test_actions_abi() { return read_abi("${CMAKE_BINARY_DIR}/evm_runtime_with_test_actions/evm_runtime.abi"); }
+
+   static std::vector<uint8_t> evm_runtime_without_test_actions_wasm() { return read_wasm("${CMAKE_BINARY_DIR}/evm_runtime_without_test_actions/evm_runtime.wasm"); }
+   static std::vector<char>    evm_runtime_without_test_actions_abi() { return read_abi("${CMAKE_BINARY_DIR}/evm_runtime_without_test_actions/evm_runtime.abi"); }
 
    static std::string eth_test_folder() {
-      return "${CMAKE_CURRENT_SOURCE_DIR}/../../silkworm/third_party/tests";
+      return "${CMAKE_SOURCE_DIR}/../silkworm/third_party/tests";
    }
 
    static std::string skip_list() {

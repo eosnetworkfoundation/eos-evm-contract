@@ -385,8 +385,12 @@ struct evm_runtime_tester : eosio_system_tester, silkworm::State {
    
    abi_serializer evm_runtime_abi;
    std::map< name, private_key> key_map;
+   
    bool is_verbose = false;
    bool slow_tests = false;
+
+   uint32_t start_ordinal = 0;
+   uint32_t limit = 0;
 
    size_t total_passed{0};
    size_t total_failed{0};
@@ -395,14 +399,29 @@ struct evm_runtime_tester : eosio_system_tester, silkworm::State {
    evm_runtime_tester() {
       std::string verbose_arg = "--verbose";
       std::string slowtests_arg = "--slow-tests";
+      std::string start_ordinal_arg = "--start-ordinal=";
+      std::string limit_arg = "--limit=";
+
+      auto starts_with = [](const std::string& str, const std::string& prefix) -> bool {
+         if (str.size() < prefix.size()) {
+            return false;
+         }
+
+         return (str.compare(0, prefix.size(), prefix) == 0);
+      };
+
       auto argc = boost::unit_test::framework::master_test_suite().argc;
       auto argv = boost::unit_test::framework::master_test_suite().argv;
-      for (int i = 0; i < argc; i++) {
-         if (verbose_arg == argv[i]) {
+      for (int i = 0; i < argc; ++i) {
+         std::string current_arg = argv[i];
+         if (current_arg == verbose_arg) {
             is_verbose = true;
-         }
-         if (slowtests_arg == argv[i]) {
+         } else if (current_arg == slowtests_arg) {
             slow_tests = true;
+         } else if (starts_with(current_arg, start_ordinal_arg)) {
+            start_ordinal = std::stoul(current_arg.substr(start_ordinal_arg.size()));
+         } else if (starts_with(current_arg, limit_arg)) {
+            limit = std::stoul(current_arg.substr(limit_arg.size()));
          }
       }
 
@@ -410,8 +429,8 @@ struct evm_runtime_tester : eosio_system_tester, silkworm::State {
       create_account_with_resources(ME, system_account_name, 5000000);
       set_authority( ME, "active"_n, {1, {{get_public_key(ME,"active"),1}}, {{{ME,"eosio.code"_n},1}}} );
 
-      set_code(ME, contracts::evm_runtime_wasm());
-      set_abi(ME, contracts::evm_runtime_abi().data());
+      set_code(ME, contracts::evm_runtime_with_test_actions_wasm());
+      set_abi(ME, contracts::evm_runtime_with_test_actions_abi().data());
 
       const auto& accnt = control->db().get<account_object,by_name>(ME);
       abi_def abi;
@@ -1068,7 +1087,16 @@ BOOST_FIXTURE_TEST_CASE( GeneralStateTests, evm_runtime_tester ) try {
       const fs::path& dir{entry.first};
       const RunnerFunc runner{entry.second};
 
-      for (auto i = fs::recursive_directory_iterator(root_dir / dir); i != fs::recursive_directory_iterator{}; ++i) {
+      uint32_t ordinal = 0;
+      for (auto i = fs::recursive_directory_iterator(root_dir / dir); i != fs::recursive_directory_iterator{}; ++i, ++ordinal) {
+         if (limit != 0 && (start_ordinal + limit) <= ordinal) {
+            break;
+         }
+
+         if (ordinal < start_ordinal) {
+            continue;
+         }
+
          if (exclude_test(*i, root_dir, slow_tests)) {
                ++total_skipped;
                i.disable_recursion_pending();

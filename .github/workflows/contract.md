@@ -18,7 +18,6 @@ This GitHub action will run under the following circumstances:
 ## Inputs
 The inputs for this GitHub action are:
 1. `DCMAKE_BUILD_TYPE` - defined in the GitHub Action YAML, this sets the build type and determines the level of optimization, debugging information, and other flags; one of `Debug`, `Release`, `RelWithDebInfo`, or `MinSizeRel`.
-1. `DWITH_TEST_ACTIONS` - defined in the GitHub Action YAML, build with or without code paths intended to be excercised exclusively by tests.
 1. `GITHUB_TOKEN` - a GitHub Actions intrinsic used to access the repository and other public resources.
 1. `TRUSTEVM_CI_APP_ID` - the app ID of the `trustevm-ci-submodule-checkout` GitHub App.
 1. `TRUSTEVM_CI_APP_KEY` - the private key to the `trustevm-ci-submodule-checkout` GitHub App.
@@ -36,19 +35,16 @@ This workflow performs the following steps:
     1. Checkout the repo and submodules using the ephemeral token.
     1. Download the CDT binary using the [AntelopeIO/asset-artifact-download-action](https://github.com/AntelopeIO/asset-artifact-download-action) action.
     1. Install the CDT binary.
-    1. Build the TrustEVM contract using `make` and `cmake`.
-    1. Upload the contract build folder to GitHub Actions.
-    1. If tests are enabled, download the `leap-dev` binary using [AntelopeIO/asset-artifact-download-action](https://github.com/AntelopeIO/asset-artifact-download-action) action.
-    1. If tests are enabled, install the `leap-dev` binary.
-    1. If tests are enabled, build the TrustEVM contract tests using `make` and `cmake`.
-    1. If tests are enabled, upload the build folder for the contract test code to GitHub Actions.
-    1. If tests are enabled, run them and ignore the outcome.
-    1. If tests are enabled, attach xUnit-formatted test metrics as an artifact.
+    1. Download the `leap-dev` binary using [AntelopeIO/asset-artifact-download-action](https://github.com/AntelopeIO/asset-artifact-download-action) action.
+    1. Install the `leap-dev` binary.
+    1. Build the TrustEVM contracts (one with test actions and one without) and the contract tests using `cmake` and `make`.
+    1. Upload the contract build folder (includes both compiled contracts and the compiled tests) to GitHub Actions.
+    1. Run the tests.
+    1. Attach xUnit-formatted test metrics as an artifact.
 
 ## Outputs
 This workflow produces the following outputs:
-1. Contract Build Artifacts - `contract.test-actions-off.tar.gz` containing the built contract from the `contract/build` folder with `DWITH_TEST_ACTIONS=off`.
-1. Contract Build Artifacts - `contract.test-actions-on.tar.gz` containing the built contract from the `contract/build` folder with `DWITH_TEST_ACTIONS=on`.
+1. Contract Build Artifacts - `contract.tar.gz` containing the built contracts (one with test actions and one without) from the `contract/build`.
 1. Contract Test Artifacts - `contract-test.tar.gz` containing the built contract test artifacts from the `contract/tests/build` folder.
 
 > 📁 Due to actions/upload-artifact [issue 39](https://github.com/actions/upload-artifact/issues/39) which has been open for over _three years and counting_, the archives attached as artifacts will be zipped by GitHub when you download them such that you get a `*.zip` containing the `*.tar.gz`. There is nothing anyone can do about this except for Microsoft/GitHub.

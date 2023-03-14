@@ -26,14 +26,14 @@ Clients can also push Ethereum compatible transactions to the Antelope blockchai
          
 ## Compilation
 
-### checkout the source code:
+### Checkout the source code
 ```
 git clone https://github.com/eosnetworkfoundation/TrustEVM.git
 cd TrustEVM
 git submodule update --init --recursive
 ```
 
-### compile TrustEVM-node, TrustEVM-rpc, unittests
+### Build TrustEVM-node, TrustEVM-rpc, unittests
 
 Prerequisites:
 - Ubuntu 20 or later or other compatible Linux
@@ -63,49 +63,62 @@ cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ .
 make -j8
 ```
 
+### Build the EVM runtime contract
 
-### compile EVM smart contract for Antelope blockchain:
 Prerequisites:
 - cmake 3.16 or later
 - install cdt
+- compile leap following the instructions in https://github.com/AntelopeIO/leap (if you want to build the contract tests)
+
+To install CDT:
 ```
 wget https://github.com/AntelopeIO/cdt/releases/download/v3.1.0/cdt_3.1.0_amd64.deb
 sudo apt install ./cdt_3.1.0_amd64.deb
 ```
 or refer to the detail instructions from https://github.com/AntelopeIO/cdt
 
-steps of building EVM smart contracts:
+Steps to build EVM smart contracts with tests:
 ```
 cd contract
 mkdir build
 cd build
-cmake ..
+cmake -Dleap_DIR=/<PATH_TO_LEAP_SOURCE>/build/lib/cmake/leap ..
 make -j
 ```
+
 You should get the following output files:
 ```
-TrustEVM/contract/build/evm_runtime/evm_runtime.wasm
-TrustEVM/contract/build/evm_runtime/evm_runtime.abi
+contract/build/evm_runtime_without_test_actions/evm_runtime.wasm
+contract/build/evm_runtime_without_test_actions/evm_runtime.abi
+contract/build/evm_runtime_with_test_actions/evm_runtime.wasm
+contract/build/evm_runtime_with_test_actions/evm_runtime.abi
+contract/build/teests/unit_test
 ```
 
-## Unittests
-
-We need to compile the leap project in Antelope in order to compile unittests:
-following the instruction in https://github.com/AntelopeIO/leap to compile leap
-
-To compile unittests:
+To run the tests:
 ```
-cd TrustEVM/contract/tests
+cd contract/build
+ctest -j
+```
+
+Or you can avoid running the consensus tests (which take a long time):
+```
+ctest -LE consensus_tests -j
+```
+
+Steps to build EVM smart contract without tests:
+```
+cd contract
 mkdir build
 cd build
-cmake -Deosio_DIR=/<PATH_TO_LEAP_SOURCE>/build/lib/cmake/eosio ..
-make -j4 unit_test
+cmake -DBUILD_TESTS=OFF ..
+make -j
 ```
 
-to run unittest:
+You should get the following output files:
 ```
-cd contract/tests/build
-./unit_test
+contract/build/evm_runtime_without_test_actions/evm_runtime.wasm
+contract/build/evm_runtime_without_test_actions/evm_runtime.abi
 ```
 
 ## Deployments
