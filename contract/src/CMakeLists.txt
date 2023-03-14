@@ -71,6 +71,7 @@ add_contract( evm_contract evm_runtime ${SOURCES})
 
 target_include_directories( evm_runtime PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/../include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../cmd/contract_common
     ${CMAKE_CURRENT_SOURCE_DIR}/../external/intx/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../external/ethash/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../external/GSL/include
