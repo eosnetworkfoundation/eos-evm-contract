@@ -14,7 +14,7 @@ option(WITH_LOGTIME
    "Use `logtime` instrisic to log the time spent in transaction execution" OFF)
 
 option(WITH_LARGE_STACK
-   "Build with 50Mb of stack size, needed for unit tests" OFF)
+   "Build with 50MB of stack size, needed for unit tests" OFF)
 
 ExternalProject_Add(
    evm_runtime_project
