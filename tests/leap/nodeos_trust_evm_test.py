@@ -334,6 +334,9 @@ try:
     Utils.Print("Block timestamp: ", block["timestamp"])
 
     genesis_info = {
+        "alloc": {
+            "0x0000000000000000000000000000000000000000" : {"balance":"0x00"}
+        },
         "coinbase": "0x0000000000000000000000000000000000000000",
         "config": {
             "chainId": 15555,
