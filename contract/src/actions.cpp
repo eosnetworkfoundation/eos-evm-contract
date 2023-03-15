@@ -329,6 +329,13 @@ ACTION evm_contract::clearall() {
         eosio::print("db size:", uint64_t(db_size), "\n");
         itr = accounts.erase(itr);
     }
+
+    account_code_table codes(_self, _self.value);
+    auto itrc = codes.begin();
+    while(itrc != codes.end()) {
+        itrc = codes.erase(itrc);
+    }
+
     gc(std::numeric_limits<uint32_t>::max());
 
     auto account_size = std::distance(accounts.cbegin(), accounts.cend());
