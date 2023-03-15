@@ -9,6 +9,7 @@ configure_file(${CMAKE_SOURCE_DIR}/contracts.hpp.in ${CMAKE_BINARY_DIR}/contract
 
 include_directories(
     ${CMAKE_BINARY_DIR}
+    ${CMAKE_SOURCE_DIR}/../../cmd/contract_common
     ${CMAKE_SOURCE_DIR}/silkworm/node
     ${CMAKE_SOURCE_DIR}/silkworm/core
     ${CMAKE_SOURCE_DIR}/../../silkworm/third_party/evmone/lib
@@ -27,6 +28,7 @@ add_eosio_test_executable( unit_test
     ${CMAKE_SOURCE_DIR}/evm_runtime_tests.cpp
     ${CMAKE_SOURCE_DIR}/init_tests.cpp
     ${CMAKE_SOURCE_DIR}/native_token_tests.cpp
+    ${CMAKE_SOURCE_DIR}/mapping_tests.cpp
     ${CMAKE_SOURCE_DIR}/main.cpp
     ${CMAKE_SOURCE_DIR}/silkworm/core/silkworm/rlp/encode.cpp
     ${CMAKE_SOURCE_DIR}/silkworm/core/silkworm/rlp/decode.cpp
@@ -42,4 +44,7 @@ add_eosio_test_executable( unit_test
     ${CMAKE_SOURCE_DIR}/../external/ethash/lib/ethash/primes.c
 )
 
-add_test(NAME unit_test COMMAND unit_test --report_level=detailed --color_output -- --eos-vm-oc)
+# TODO: add back eos-vm-oc once change to disable EOS VM OC subjective limits during unit test are added
+add_test(NAME consensus_tests COMMAND unit_test --report_level=detailed --color_output --run_test=evm_runtime_tests)
+
+add_test(NAME unit_tests COMMAND unit_test --report_level=detailed --color_output --run_test=!evm_runtime_tests)

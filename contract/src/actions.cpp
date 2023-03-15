@@ -8,6 +8,8 @@
 #include <evm_runtime/intrinsics.hpp>
 #include <evm_runtime/eosio.token.hpp>
 
+#include <evm_common/block_mapping.hpp>
+
 #include <silkworm/consensus/trust/engine.hpp>
 // included here so NDEBUG is defined to disable assert macro
 #include <silkworm/execution/processor.cpp>
@@ -43,7 +45,7 @@ void evm_contract::init(const uint64_t chainid) {
     _config.set({
         .version = 0,
         .chainid = chainid,
-        .genesis_time = current_time_point()
+        .genesis_time = eosio::current_time_point() // implicitly converts from Antelope timestamp to EVM compatible timestamp
     }, get_self());
 
     inevm_singleton(get_self(), get_self().value).get_or_create(get_self());
@@ -120,8 +122,8 @@ void check_result( ValidationResult r, const Transaction& txn, const char* desc 
     eosio::check( false, desc );
 }
 
-void evm_contract::push_trx( eosio::name ram_payer, Block& block, const bytes& rlptx, silkworm::consensus::IEngine& engine, const silkworm::ChainConfig& chain_config ) {
-    //when being called as an inline action, clutch in allowance for reserved addresses & signatures by setting from_my_self=true
+Receipt evm_contract::execute_tx( Block& block, const bytes& rlptx, silkworm::ExecutionProcessor& ep ) {
+    //when being called as an inline action, clutch in allowance for reserved addresses & signatures by setting from_self=true
     const bool from_self = get_sender() == get_self();
 
     std::optional<balances> balance_table;
@@ -142,9 +144,6 @@ void evm_contract::push_trx( eosio::name ram_payer, Block& block, const bytes& r
     tx.recover_sender();
     eosio::check(tx.from.has_value(), "unable to recover sender");
     LOGTIME("EVM RECOVER SENDER");
-
-    evm_runtime::state state{get_self(), ram_payer};
-    silkworm::ExecutionProcessor ep{block, engine, state, chain_config};
 
     if(from_self) {
         check(is_reserved_address(*tx.from), "actions from self without a reserved from address are unexpected");
@@ -174,9 +173,6 @@ void evm_contract::push_trx( eosio::name ram_payer, Block& block, const bytes& r
 
     Receipt receipt;
     ep.execute_transaction(tx, receipt);
-
-    engine.finalize(ep.state(), ep.evm().block(), ep.evm().revision());
-    ep.state().write_to_db(ep.evm().block().header.number);
 
     if(from_self)
         eosio::check(receipt.success, "ingress bridge actions must succeed");
@@ -226,6 +222,7 @@ void evm_contract::push_trx( eosio::name ram_payer, Block& block, const bytes& r
     }
 
     LOGTIME("EVM EXECUTE");
+    return receipt;
 }
 
 void evm_contract::pushtx( eosio::name ram_payer, const bytes& rlptx ) {
@@ -236,14 +233,23 @@ void evm_contract::pushtx( eosio::name ram_payer, const bytes& rlptx ) {
     check( found_chain_config.has_value(), "failed to find expected chain config" );
     eosio::require_auth(ram_payer);
 
+    evm_common::block_mapping bm(_config.get().genesis_time.sec_since_epoch());
+
     Block block;
     block.header.difficulty  = 1;
     block.header.gas_limit   = 0x7ffffffffff;
-    block.header.timestamp   = eosio::current_time_point().sec_since_epoch();
-    block.header.number = 1 + (block.header.timestamp - _config.get().genesis_time.sec_since_epoch()); // same logic with block_mapping in TrustEVM
+    block.header.number      = bm.timestamp_to_evm_block_num(eosio::current_time_point().time_since_epoch().count());
+    block.header.timestamp   = bm.evm_block_num_to_evm_timestamp(block.header.number);
 
     silkworm::consensus::TrustEngine engine{*found_chain_config->second};
-    push_trx( ram_payer, block, rlptx, engine, *found_chain_config->second );
+
+    evm_runtime::state state{get_self(), ram_payer};
+    silkworm::ExecutionProcessor ep{block, engine, state, *found_chain_config->second};
+
+    auto receipt = execute_tx(block, rlptx, ep);
+
+    engine.finalize(ep.state(), ep.evm().block(), ep.evm().revision());
+    ep.state().write_to_db(ep.evm().block().header.number);
 }
 
 void evm_contract::open(eosio::name owner) {
@@ -388,7 +394,7 @@ bool evm_contract::gc(uint32_t max) {
 }
 
 #ifdef WITH_TEST_ACTIONS
-ACTION evm_contract::testtx( const bytes& rlptx, const evm_runtime::test::block_info& bi ) {
+ACTION evm_contract::testtx( const std::optional<bytes>& orlptx, const evm_runtime::test::block_info& bi ) {
     assert_unfrozen();
 
     eosio::require_auth(get_self());
@@ -397,7 +403,14 @@ ACTION evm_contract::testtx( const bytes& rlptx, const evm_runtime::test::block_
     block.header = bi.get_block_header();
 
     evm_runtime::test::engine engine;
-    push_trx( get_self(), block, rlptx, engine, evm_runtime::test::kTestNetwork );
+    evm_runtime::state state{get_self(), get_self()};
+    silkworm::ExecutionProcessor ep{block, engine, state, evm_runtime::test::kTestNetwork};
+
+    if(orlptx) {
+        execute_tx(block, *orlptx, ep);
+    }
+    engine.finalize(ep.state(), ep.evm().block(), ep.evm().revision());
+    ep.state().write_to_db(ep.evm().block().header.number);
 }
 
 ACTION evm_contract::dumpstorage(const bytes& addy) {
