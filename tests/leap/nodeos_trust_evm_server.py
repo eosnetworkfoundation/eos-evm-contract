@@ -21,6 +21,7 @@ sys.path.append(os.path.join(os.getcwd(), "tests"))
 
 from TestHarness import Cluster, TestHelper, Utils, WalletMgr
 from TestHarness.TestHelper import AppArgs
+from TestHarness.testUtils import ReturnType
 from core_symbol import CORE_SYMBOL
 
 
@@ -170,6 +171,7 @@ try:
     for account in accounts:
         Print("Create new account %s via %s with private key: %s" % (account.name, cluster.eosioAccount.name, account.activePrivateKey))
         trans=nonProdNode.createInitializeAccount(account, cluster.eosioAccount, stakedDeposit=0, waitForTransBlock=True, stakeNet=10000, stakeCPU=10000, buyRAM=10000000, exitOnError=True)
+        #   max supply 1000000000.0000 (1 Billion)
         transferAmount="100000000.0000 {0}".format(CORE_SYMBOL)
         Print("Transfer funds %s from account %s to %s" % (transferAmount, cluster.eosioAccount.name, account.name))
         nonProdNode.transferFunds(cluster.eosioAccount, account, transferAmount, "test transfer", waitForTransBlock=True)
@@ -205,6 +207,10 @@ try:
     trans = prodNode.pushMessage(evmAcc.name, "init", '{"chainid":15555}', '-p evmevmevmevm')
     prodNode.waitForTransBlockIfNeeded(trans[1], True)
 
+    # add eosio.code permission
+    cmd="set account permission evmevmevmevm active --add-code -p evmevmevmevm@active"
+    prodNode.processCleosCmd(cmd, cmd, silentErrors=True, returnType=ReturnType.raw)
+
     transId=prodNode.getTransId(trans[1])
     blockNum = prodNode.getBlockNumByTransId(transId)
     block = prodNode.getBlock(blockNum)
@@ -212,7 +218,9 @@ try:
     Utils.Print("Block timestamp: ", block["timestamp"])
 
     genesis_info = {
-        "alloc": {},
+        "alloc": {
+            "0x0000000000000000000000000000000000000000" : {"balance":"0x00"}
+        },
         "coinbase": "0x0000000000000000000000000000000000000000",
         "config": {
             "chainId": 15555,
@@ -324,12 +332,14 @@ try:
         "0x9E126C57330FA71556628e0aabd6B6B6783d99fA":"0x034d7b61c8dd53a761ab44d1e06be6b1338de4095c620112494b8830792c84f64b,0xba8c9ff38e4179748925335a9891b969214b37dc3723a1754b8b849d3eea9ac0"
     }
 
+    # init with 100,000 EOS
     for i,k in enumerate(addys):
         print("addys: [{0}] [{1}] [{2}]".format(i,k[2:].lower(), len(k[2:])))
-        trans = prodNode.pushMessage(evmAcc.name, "setbal", '{"addy":"' + k[2:].lower() + '", "bal":"0000000000000000000000000000000000100000000000000000000000000000"}', '-p evmevmevmevm')
-        genesis_info["alloc"][k.lower()] = {"balance":"0x100000000000000000000000000000"}
+        transferAmount="100000.0000 {0}".format(CORE_SYMBOL)
+        Print("Transfer funds %s from account %s to %s" % (transferAmount, cluster.eosioAccount.name, evmAcc.name))
+        trans = prodNode.transferFunds(cluster.eosioAccount, evmAcc, transferAmount, "0x" + k[2:].lower(), waitForTransBlock=False)
         if not (i+1) % 20: time.sleep(1)
-    prodNode.waitForTransBlockIfNeeded(trans[1], True)
+    prodNode.waitForTransBlockIfNeeded(trans, True)
 
     if gensisJson[0] != '/': gensisJson = os.path.realpath(gensisJson)
     f=open(gensisJson,"w")
