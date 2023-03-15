@@ -8,6 +8,8 @@
 #include <evm_runtime/intrinsics.hpp>
 #include <evm_runtime/eosio.token.hpp>
 
+#include <evm_common/block_mapping.hpp>
+
 #include <silkworm/consensus/trust/engine.hpp>
 // included here so NDEBUG is defined to disable assert macro
 #include <silkworm/execution/processor.cpp>
@@ -43,7 +45,7 @@ void evm_contract::init(const uint64_t chainid) {
     _config.set({
         .version = 0,
         .chainid = chainid,
-        .genesis_time = current_time_point()
+        .genesis_time = eosio::current_time_point() // implicitly converts from Antelope timestamp to EVM compatible timestamp
     }, get_self());
 
     inevm_singleton(get_self(), get_self().value).get_or_create(get_self());
@@ -153,11 +155,13 @@ void evm_contract::pushtx( eosio::name ram_payer, const bytes& rlptx ) {
     check( found_chain_config.has_value(), "failed to find expected chain config" );
     eosio::require_auth(ram_payer);
 
+    evm_common::block_mapping bm(_config.get().genesis_time.sec_since_epoch());
+
     Block block;
     block.header.difficulty  = 1;
     block.header.gas_limit   = 0x7ffffffffff;
-    block.header.timestamp   = eosio::current_time_point().sec_since_epoch();
-    block.header.number = 1 + (block.header.timestamp - _config.get().genesis_time.sec_since_epoch()); // same logic with block_mapping in TrustEVM
+    block.header.number      = bm.timestamp_to_evm_block_num(eosio::current_time_point().time_since_epoch().count());
+    block.header.timestamp   = bm.evm_block_num_to_evm_timestamp(block.header.number);
 
     silkworm::consensus::TrustEngine engine{*found_chain_config->second};
 
