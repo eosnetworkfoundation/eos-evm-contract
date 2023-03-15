@@ -334,7 +334,6 @@ try:
     Utils.Print("Block timestamp: ", block["timestamp"])
 
     genesis_info = {
-        "alloc": {},
         "coinbase": "0x0000000000000000000000000000000000000000",
         "config": {
             "chainId": 15555,
@@ -384,7 +383,6 @@ try:
         transferAmount="1000000.0000 {0}".format(CORE_SYMBOL)
         Print("Transfer funds %s from account %s to %s" % (transferAmount, cluster.eosioAccount.name, evmAcc.name))
         prodNode.transferFunds(cluster.eosioAccount, evmAcc, transferAmount, "0x" + k[2:].lower(), waitForTransBlock=True)
-        genesis_info["alloc"][k.lower()] = {"balance":"0x0000000000d3c21bcecceda1000000"} # 1 Million EOS
         if not (i+1) % 20: time.sleep(1)
 
     Utils.Print("Send balance")
@@ -676,7 +674,7 @@ try:
     Utils.Print("Launching: %s" % cmd)
     evmNodePOpen=Utils.delayedCheckOutput(cmd, stdout=outFile, stderr=errFile)
 
-    time.sleep(5) # allow time to sync trxs
+    time.sleep(10) # allow time to sync trxs
 
     # Validate all balances are the same on both sides
     rows=prodNode.getTable(evmAcc.name, evmAcc.name, "account")
