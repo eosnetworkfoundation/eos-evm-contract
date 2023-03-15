@@ -50,7 +50,6 @@ from core_symbol import CORE_SYMBOL
 #                               npm install is-valid-hostname
 # --trust-evm-build-root should point to the root of TrustEVM build dir
 # --trust-evm-contract-root should point to root of TrustEVM contract build dir
-#                           contracts should be built with -DWITH_TEST_ACTIONS=On
 #
 # Example:
 #  cd ~/ext/leap/build
@@ -378,7 +377,7 @@ try:
         Utils.Print("Launching: %s" % cmd)
         txWrapPOpen=Utils.delayedCheckOutput(cmd, stdout=outFile, stderr=errFile)
 
-    Utils.Print("Set balance")
+    Utils.Print("Transfer initial balances")
 
     # init with 1 Million EOS
     for i,k in enumerate(addys):
@@ -407,8 +406,6 @@ try:
         data=b'',
         chainId=evmChainId
     ), evmSendKey)
-
-    Utils.Print("raw: ", signed_trx.rawTransaction)
 
     actData = {"ram_payer":"evmevmevmevm", "rlptx":Web3.toHex(signed_trx.rawTransaction)[2:]}
     trans = prodNode.pushMessage(evmAcc.name, "pushtx", json.dumps(actData), '-p evmevmevmevm')
