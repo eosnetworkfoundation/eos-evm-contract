@@ -400,7 +400,7 @@ ACTION evm_contract::setbal(const bytes& addy, const bytes& bal) {
     if(itr == inx.end()) {
         accounts.emplace(get_self(), [&](auto& row){
             row.id = accounts.available_primary_key();;
-            row.code_hash = to_bytes(kEmptyHash);
+            row.code_id = std::nullopt;
             row.eth_address = addy;
             row.balance = bal;
         });

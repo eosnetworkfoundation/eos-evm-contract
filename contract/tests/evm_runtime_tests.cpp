@@ -119,6 +119,24 @@ const table_id_object& find_or_create_table( chainbase::database& db, name code,
 }
 
 template <typename T, typename Object>
+static std::optional<Object> get_by_primary_key(chainbase::database& db, const name& scope, const T& o) {
+   const auto& tab = find_or_create_table(
+      db, "evm"_n, scope, Object::table_name(), "evm"_n
+   );
+
+   const auto* kv_obj = db.find<key_value_object, by_scope_primary>(
+      boost::make_tuple(tab.id, o)
+   );
+
+   BOOST_REQUIRE( kv_obj != nullptr );
+
+   return fc::raw::unpack<Object>(
+      kv_obj->value.data(),
+      kv_obj->value.size()
+   );
+}
+
+template <typename T, typename Object>
 static std::optional<Object> get_by_index(chainbase::database& db, const name& scope, const name& inx, const T& o) {
    
    const auto& tab_inx = find_or_create_table(
@@ -237,7 +255,7 @@ struct account {
    bytes       eth_address;
    uint64_t    nonce;
    bytes       balance;
-   std::optional<bytes>       code_hash;
+   std::optional<uint64_t>       code_id;
 
 
    struct by_address {
@@ -251,17 +269,6 @@ struct account {
       evmc::uint256be res;
       std::copy(balance.begin(), balance.end(), res.bytes);
       return res;
-   }
-
-   evmc::bytes32 get_code_hash()const {
-      if (code_hash.has_value()) {
-         evmc::bytes32 res;
-         std::copy(code_hash.value().begin(), code_hash.value().end(), res.bytes);
-         return res;
-      }
-      else {
-         return kEmptyHash;
-      }
    }
 
    static name table_name() { return "account"_n; }
@@ -280,17 +287,8 @@ struct account {
       return r;
    }
 
-   Account as_silkworm_account() {
-      return Account{
-         nonce,
-         intx::be::load<u256>(get_balance()),
-         get_code_hash(),
-         0 //TODO: ??
-      };
-   }
-
 };
-FC_REFLECT(account, (id)(eth_address)(nonce)(balance)(code_hash));
+FC_REFLECT(account, (id)(eth_address)(nonce)(balance)(code_id));
 
 struct account_code {
    uint64_t    id;
@@ -302,7 +300,7 @@ struct account_code {
    struct by_codehash {
       typedef index256_object index_object;
       static name index_name() {
-         return account::index_name("by.codehash"_n);
+         return account_code::index_name("by.codehash"_n);
       }
    };
 
@@ -442,7 +440,7 @@ struct evm_runtime_tester : eosio_system_tester, silkworm::State {
       }
 
       BOOST_REQUIRE_EQUAL( success(), push_action(eosio::chain::config::system_account_name, "wasmcfg"_n, mvo()("settings", "high")) );
-      create_account_with_resources(ME, system_account_name, 50000000);
+      create_account_with_resources(ME, system_account_name, 7000000);
       set_authority( ME, "active"_n, {1, {{get_public_key(ME,"active"),1}}, {{{ME,"eosio.code"_n},1}}} );
 
       set_code(ME, contracts::evm_runtime_wasm());
@@ -597,7 +595,26 @@ struct evm_runtime_tester : eosio_system_tester, silkworm::State {
       auto& db = const_cast<chainbase::database&>(control->db());
       auto accnt = account::get_by_address(db, address);
       if(!accnt) return {};
-      return accnt->as_silkworm_account();
+
+      if (accnt->code_id.has_value()) {
+         auto r = get_by_primary_key<uint64_t, account_code>(db, "evm"_n, accnt->code_id.value());
+         if (r) {
+            evmc::bytes32 res;
+            std::copy(r.value().code_hash.begin(), r.value().code_hash.end(), res.bytes);
+            return Account{
+               accnt->nonce,
+               intx::be::load<u256>(accnt->get_balance()),
+               res,
+               0 //TODO: ??
+            };
+         }
+      }
+      return Account{
+            accnt->nonce,
+            intx::be::load<u256>(accnt->get_balance()),
+            kEmptyHash,
+            0 //TODO: ??
+      };
    };
 
    mutable bytes read_code_buffer;

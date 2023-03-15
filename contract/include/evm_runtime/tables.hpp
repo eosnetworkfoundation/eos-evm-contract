@@ -12,7 +12,7 @@ struct [[eosio::table]] [[eosio::contract("evm_contract")]] account {
     bytes       eth_address;
     uint64_t    nonce;
     bytes       balance;
-    std::optional<bytes>       code_hash;
+    std::optional<uint64_t>       code_id;
 
     uint64_t primary_key()const { return id; }
 
@@ -26,11 +26,7 @@ struct [[eosio::table]] [[eosio::contract("evm_contract")]] account {
         return res;
     }
 
-    bytes32 get_code_hash()const {
-        return code_hash ? to_bytes32(code_hash.value()) : silkworm::kEmptyHash;
-    }
-
-    EOSLIB_SERIALIZE(account, (id)(eth_address)(nonce)(balance)(code_hash));
+    EOSLIB_SERIALIZE(account, (id)(eth_address)(nonce)(balance)(code_id));
 };
 
 typedef multi_index< "account"_n, account,

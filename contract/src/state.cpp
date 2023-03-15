@@ -17,8 +17,23 @@ std::optional<Account> state::read_account(const evmc::address& address) const n
         return {};
     }
     
-    auto code_hash = itr->get_code_hash();
     addr2id[address] = itr->id;
+
+    evmc::bytes32 code_hash;
+    if (itr->code_id) {
+        account_code_table codes(_self, _self.value);
+        auto citr = codes.find(itr->code_id.value());
+        if (citr != codes.end()) {
+            code_hash = to_bytes32(citr->code_hash);
+            addr2code[code_hash] = citr->code;
+        } else {
+            // Should not reach here! 
+            // Return empty hash for robustness.
+            code_hash = silkworm::kEmptyHash;
+        }
+    } else {
+        code_hash = silkworm::kEmptyHash;
+    }
 
     return Account{itr->nonce, intx::be::load<uint256>(itr->get_balance()), code_hash, 0};
 }
@@ -93,13 +108,14 @@ void state::update_account(const evmc::address& address, std::optional<Account> 
         row.eth_address = to_bytes(address);
         row.nonce = current->nonce;
         row.balance = to_bytes(current->balance);
-        row.code_hash = current->code_hash == silkworm::kEmptyHash ? std::nullopt : std::optional<bytes>(to_bytes(current->code_hash));
+        // Codes are not supposed to changed in this call.
+        row.code_id = std::nullopt;
     };
 
     auto update = [&](auto& row) {
         row.nonce = current->nonce;
         row.balance = to_bytes(current->balance);
-        row.code_hash = current->code_hash == silkworm::kEmptyHash ? std::nullopt : std::optional<bytes>(to_bytes(current->code_hash));
+        // Codes are not supposed to changed in this call.
     };
 
     auto remove_account = [&](auto& itr) {
@@ -111,11 +127,10 @@ void state::update_account(const evmc::address& address, std::optional<Account> 
             row.storage_id = itr->id;
         });
         // Decrease ref_count for code
-        if (itr->code_hash ) {
+        if (itr->code_id ) {
             account_code_table codes(_self, _self.value);
-            auto inxc = codes.get_index<"by.codehash"_n>();
-            auto itrc = inxc.find(make_key(itr->code_hash.value()));
-            if(itrc == inxc.end()) {
+            auto itrc = codes.find(itr->code_id.value());
+            if(itrc == codes.end()) {
                 // SHOULD NOT REACH HERE! 
                 // But we ignore this for robustness.
             } else {
@@ -192,9 +207,11 @@ void state::update_account_code(const evmc::address& address, uint64_t, const ev
     account_code_table codes(_self, _self.value);
     auto inxc = codes.get_index<"by.codehash"_n>();
     auto itrc = inxc.find(make_key(code_hash));
+    uint64_t code_id;
     if(itrc == inxc.end()) {
+        code_id = codes.available_primary_key();
         codes.emplace(_ram_payer, [&](auto& row){
-            row.id = codes.available_primary_key();
+            row.id = code_id;
             row.code_hash = to_bytes(code_hash);
             row.code = bytes{code.begin(), code.end()};
             row.ref_count = 1;
@@ -204,6 +221,7 @@ void state::update_account_code(const evmc::address& address, uint64_t, const ev
         codes.modify(*itrc, eosio::same_payer, [&](auto& row){
             row.ref_count ++;
         });
+        code_id = itrc->id;
     }
     
     account_table accounts(_self, _self.value);
@@ -212,7 +230,7 @@ void state::update_account_code(const evmc::address& address, uint64_t, const ev
     ++stats.account.read;
     if( itr != inx.end() ) {
         accounts.modify(*itr, eosio::same_payer, [&](auto& row){
-            row.code_hash = to_bytes(code_hash);
+            row.code_id = code_id;
         });
         ++stats.account.update;
     } else {
@@ -220,7 +238,7 @@ void state::update_account_code(const evmc::address& address, uint64_t, const ev
             row.id = accounts.available_primary_key();;
             row.eth_address = to_bytes(address);
             row.nonce = 0;
-            row.code_hash = to_bytes(code_hash);
+            row.code_id = code_id;
         });
         ++stats.account.create;
     }
@@ -251,7 +269,7 @@ void state::update_storage(const evmc::address& address, uint64_t incarnation, c
                 row.id = table_id;
                 row.eth_address = to_bytes(address);
                 row.nonce = 0;
-                row.code_hash = to_bytes(silkworm::kEmptyHash);
+                row.code_id = std::nullopt;
             });
             ++stats.account.read;
         } else {
