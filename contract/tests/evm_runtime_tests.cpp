@@ -294,7 +294,7 @@ FC_REFLECT(account, (id)(eth_address)(nonce)(balance)(code_hash));
 
 struct account_code {
    uint64_t    id;
-   uint64_t    ref_count;
+   uint32_t    ref_count;
    bytes       code;
    bytes       code_hash;
 

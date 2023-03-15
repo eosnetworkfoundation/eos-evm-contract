@@ -39,7 +39,7 @@ typedef multi_index< "account"_n, account,
 
 struct [[eosio::table]] [[eosio::contract("evm_contract")]] account_code {
     uint64_t    id;
-    uint64_t    ref_count;
+    uint32_t    ref_count;
     bytes       code;
     bytes       code_hash;
 
