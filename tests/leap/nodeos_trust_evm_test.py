@@ -300,14 +300,25 @@ try:
     Print("Creating wallet \"%s\"." % (testWalletName))
     testWallet=walletMgr.create(testWalletName, [cluster.eosioAccount,accounts[0],accounts[1],accounts[2]])
 
+    addys = {
+        "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266":"0x038318535b54105d4a7aae60c08fc45f9687181b4fdfc625bd1a753fa7397fed75,0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+    }
+
+    numAddys = len(addys)
+
     # create accounts via eosio as otherwise a bid is needed
     for account in accounts:
         Print("Create new account %s via %s" % (account.name, cluster.eosioAccount.name))
         trans=nonProdNode.createInitializeAccount(account, cluster.eosioAccount, stakedDeposit=0, waitForTransBlock=True, stakeNet=10000, stakeCPU=10000, buyRAM=10000000, exitOnError=True)
-        transferAmount="100000000.0000 {0}".format(CORE_SYMBOL)
+        #   max supply 1000000000.0000 (1 Billion)
+        transferAmount="100000000.0000 {0}".format(CORE_SYMBOL) # 100 Million
         Print("Transfer funds %s from account %s to %s" % (transferAmount, cluster.eosioAccount.name, account.name))
         nonProdNode.transferFunds(cluster.eosioAccount, account, transferAmount, "test transfer", waitForTransBlock=True)
-        trans=nonProdNode.delegatebw(account, 20000000.0000, 20000000.0000, waitForTransBlock=True, exitOnError=True)
+        if account.name == evmAcc.name:
+            # stake more for evmAcc so it has a smaller balance, during setup of addys below the difference will be transferred in
+            trans=nonProdNode.delegatebw(account, 20000000.0000 + numAddys*1000000.0000, 20000000.0000, waitForTransBlock=True, exitOnError=True)
+        else:
+            trans=nonProdNode.delegatebw(account, 20000000.0000, 20000000.0000, waitForTransBlock=True, exitOnError=True)
 
     contractDir=trustEvmContractRoot + "/evm_runtime"
     wasmFile="evm_runtime.wasm"
@@ -366,16 +377,15 @@ try:
         txWrapPOpen=Utils.delayedCheckOutput(cmd, stdout=outFile, stderr=errFile)
 
     Utils.Print("Set balance")
-    addys = {
-        "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266":"0x038318535b54105d4a7aae60c08fc45f9687181b4fdfc625bd1a753fa7397fed75,0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
-    }
 
+    # init with 1 Million EOS
     for i,k in enumerate(addys):
         print("addys: [{0}] [{1}] [{2}]".format(i,k[2:].lower(), len(k[2:])))
-        trans = prodNode.pushMessage(evmAcc.name, "setbal", '{"addy":"' + k[2:].lower() + '", "bal":"0000000000000000000000000000000000100000000000000000000000000000"}', '-p evmevmevmevm')
-        genesis_info["alloc"][k.lower()] = {"balance":"0x100000000000000000000000000000"}
+        transferAmount="1000000.0000 {0}".format(CORE_SYMBOL)
+        Print("Transfer funds %s from account %s to %s" % (transferAmount, cluster.eosioAccount.name, evmAcc.name))
+        prodNode.transferFunds(cluster.eosioAccount, evmAcc, transferAmount, "0x" + k[2:].lower(), waitForTransBlock=True)
+        genesis_info["alloc"][k.lower()] = {"balance":"0x0000000000d3c21bcecceda1000000"} # 1 Million EOS
         if not (i+1) % 20: time.sleep(1)
-    prodNode.waitForTransBlockIfNeeded(trans[1], True)
 
     Utils.Print("Send balance")
     evmChainId = 15555
@@ -508,7 +518,7 @@ try:
     testAccActualAmount=prodNode.getAccountEosBalanceStr(testAcc.name)
     Utils.Print("\tAccount balances: EVM %s, Test %s" % (evmAccActualAmount, testAccActualAmount))
     if expectedAmount != evmAccActualAmount or expectedAmount != testAccActualAmount:
-        Utils.errorExit("Unexpected starting conditions. Excepted %s, evm actual: %s, test actual" % (expectedAmount, evmAccActualAmount, testAccActualAmount))
+        Utils.errorExit("Unexpected starting conditions. Excepted %s, evm actual: %s, test actual %s" % (expectedAmount, evmAccActualAmount, testAccActualAmount))
 
     # set ingress bridge fee
     data="[\"0.0100 {0}\"]".format(CORE_SYMBOL)
