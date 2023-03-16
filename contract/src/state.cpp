@@ -17,9 +17,23 @@ std::optional<Account> state::read_account(const evmc::address& address) const n
         return {};
     }
     
-    auto code_hash = itr->get_code_hash();
     addr2id[address] = itr->id;
-    addr2code[code_hash] = itr->code;
+
+    evmc::bytes32 code_hash;
+    if (itr->code_id) {
+        account_code_table codes(_self, _self.value);
+        auto citr = codes.find(itr->code_id.value());
+        if (citr != codes.end()) {
+            code_hash = to_bytes32(citr->code_hash);
+            addr2code[code_hash] = citr->code;
+        } else {
+            // Should not reach here! 
+            // Return empty hash for robustness.
+            code_hash = silkworm::kEmptyHash;
+        }
+    } else {
+        code_hash = silkworm::kEmptyHash;
+    }
 
     return Account{itr->nonce, intx::be::load<uint256>(itr->get_balance()), code_hash, 0};
 }
@@ -31,11 +45,10 @@ ByteView state::read_code(const evmc::bytes32& code_hash) const noexcept {
         return ByteView{(const uint8_t*)code.data(), code.size()};
     }
     
-    account_table accounts(_self, _self.value);
-    auto inx = accounts.get_index<"by.codehash"_n>();
+    account_code_table codes(_self, _self.value);
+    auto inx = codes.get_index<"by.codehash"_n>();
     auto itr = inx.find(make_key(code_hash));
-    ++stats.account.read;
-
+    
     if (itr == inx.end() || itr->code.size() == 0) {
         return ByteView{};
     }
@@ -84,7 +97,7 @@ void state::update_account(const evmc::address& address, std::optional<Account> 
 
     const bool equal{current == initial};
     if(equal) return;
-
+    
     account_table accounts(_self, _self.value);
     auto inx = accounts.get_index<"by.address"_n>();
     auto itr = inx.find(make_key(address));
@@ -95,13 +108,14 @@ void state::update_account(const evmc::address& address, std::optional<Account> 
         row.eth_address = to_bytes(address);
         row.nonce = current->nonce;
         row.balance = to_bytes(current->balance);
-        row.code_hash = to_bytes(current->code_hash);
+        // Codes are not supposed to changed in this call.
+        row.code_id = std::nullopt;
     };
 
     auto update = [&](auto& row) {
         row.nonce = current->nonce;
         row.balance = to_bytes(current->balance);
-        row.code_hash = to_bytes(current->code_hash);
+        // Codes are not supposed to changed in this call.
     };
 
     auto remove_account = [&](auto& itr) {
@@ -112,6 +126,18 @@ void state::update_account(const evmc::address& address, std::optional<Account> 
             row.id = gc.available_primary_key();
             row.storage_id = itr->id;
         });
+        // Remove code if necessary
+        if (itr->code_id) {
+            account_code_table codes(_self, _self.value);
+            const auto& itrc = codes.get(itr->code_id.value(), "code not found");
+            if(itrc.ref_count-1) {
+                codes.modify(itrc, eosio::same_payer, [&](auto& row){
+                    row.ref_count--;
+                });
+            } else {
+                codes.erase(itrc);
+            }
+        }
         accounts.erase(*itr);
     };
 
@@ -151,18 +177,38 @@ bool state::gc(uint32_t max) {
         i = gc.erase(i);
         --max;
     }
+
     return gc.begin() == gc.end();
 }
 
 void state::update_account_code(const evmc::address& address, uint64_t, const evmc::bytes32& code_hash, ByteView code) {
+    account_code_table codes(_self, _self.value);
+    auto inxc = codes.get_index<"by.codehash"_n>();
+    auto itrc = inxc.find(make_key(code_hash));
+    uint64_t code_id;
+    if(itrc == inxc.end()) {
+        code_id = codes.available_primary_key();
+        codes.emplace(_ram_payer, [&](auto& row){
+            row.id = code_id;
+            row.code_hash = to_bytes(code_hash);
+            row.code = bytes{code.begin(), code.end()};
+            row.ref_count = 1;
+        });
+    } else {
+        // code should be immutable
+        codes.modify(*itrc, eosio::same_payer, [&](auto& row){
+            row.ref_count++;
+        });
+        code_id = itrc->id;
+    }
+    
     account_table accounts(_self, _self.value);
     auto inx = accounts.get_index<"by.address"_n>();
     auto itr = inx.find(make_key(address));
     ++stats.account.read;
     if( itr != inx.end() ) {
         accounts.modify(*itr, eosio::same_payer, [&](auto& row){
-            row.code = bytes{code.begin(), code.end()};
-            row.code_hash = to_bytes(code_hash);
+            row.code_id = code_id;
         });
         ++stats.account.update;
     } else {
@@ -170,8 +216,7 @@ void state::update_account_code(const evmc::address& address, uint64_t, const ev
             row.id = accounts.available_primary_key();;
             row.eth_address = to_bytes(address);
             row.nonce = 0;
-            row.code = bytes{code.begin(), code.end()};
-            row.code_hash = to_bytes(code_hash);
+            row.code_id = code_id;
         });
         ++stats.account.create;
     }
@@ -202,7 +247,7 @@ void state::update_storage(const evmc::address& address, uint64_t incarnation, c
                 row.id = table_id;
                 row.eth_address = to_bytes(address);
                 row.nonce = 0;
-                row.code_hash = to_bytes(kEmptyHash);
+                row.code_id = std::nullopt;
             });
             ++stats.account.read;
         } else {
