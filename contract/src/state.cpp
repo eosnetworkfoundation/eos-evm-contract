@@ -129,8 +129,8 @@ void state::update_account(const evmc::address& address, std::optional<Account> 
         // Remove code if necessary
         if (itr->code_id) {
             account_code_table codes(_self, _self.value);
-            auto itrc = codes.get(itr->code_id.value());
-            if(--itrc.ref_count) {
+            const auto& itrc = codes.get(itr->code_id.value(), "code not found");
+            if(itrc.ref_count-1) {
                 codes.modify(itrc, eosio::same_payer, [&](auto& row){
                     row.ref_count--;
                 });
@@ -197,7 +197,7 @@ void state::update_account_code(const evmc::address& address, uint64_t, const ev
     } else {
         // code should be immutable
         codes.modify(*itrc, eosio::same_payer, [&](auto& row){
-            row.ref_count ++;
+            row.ref_count++;
         });
         code_id = itrc->id;
     }

@@ -944,6 +944,8 @@ struct evm_runtime_tester : eosio_system_tester, silkworm::State {
          const auto nonce_str{j["nonce"].get<std::string>()};
          account.nonce = std::stoull(nonce_str, nullptr, /*base=*/16);
 
+         update_account(address, /*initial=*/std::nullopt, account);
+
          const Bytes code{from_hex(j["code"].get<std::string>()).value()};
          if (!code.empty()) {
                account.incarnation = kDefaultIncarnation;
@@ -953,8 +955,6 @@ struct evm_runtime_tester : eosio_system_tester, silkworm::State {
                
                update_account_code(address, account.incarnation, account.code_hash, code);
          }
-
-         update_account(address, /*initial=*/std::nullopt, account);
 
          for (const auto& storage : j["storage"].items()) {
                Bytes key{from_hex(storage.key()).value()};
