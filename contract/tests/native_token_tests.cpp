@@ -3,6 +3,7 @@
 #include <fc/io/raw_fwd.hpp>
 
 using namespace eosio::testing;
+using namespace evm_test;
 
 static const char do_nothing_wast[] = R"=====(
 (module
@@ -14,92 +15,65 @@ static const char do_nothing_wast[] = R"=====(
 )=====";
 
 struct native_token_evm_tester : basic_evm_tester {
-   native_token_evm_tester(std::string native_smybol_str, bool doinit) : native_symbol(symbol::from_string(native_smybol_str)) {
-      if(doinit)
-         init(15555);
-      create_accounts({"eosio.token"_n, "alice"_n, "bob"_n, "carol"_n});
+   enum class init_mode
+   {
+      do_not_init,
+      init_without_ingress_bridge_fee,
+      init_with_ingress_bridge_fee,
+   };
+
+   native_token_evm_tester(std::string native_symbol_str, init_mode mode, uint64_t ingress_bridge_fee_amount = 0) :
+      basic_evm_tester(std::move(native_symbol_str))
+   {
+      std::vector<name> new_accounts = {"alice"_n, "bob"_n, "carol"_n};
+
+      create_accounts(new_accounts);
+
+      for(const name& recipient : new_accounts) {
+         transfer_token(faucet_account_name, recipient, make_asset(100'0000));
+      }
+
+      if (mode != init_mode::do_not_init) {
+         std::optional<asset> ingress_bridge_fee;
+         if (mode == init_mode::init_with_ingress_bridge_fee) {
+            ingress_bridge_fee.emplace(make_asset(ingress_bridge_fee_amount));
+         }
+
+         init(evm_chain_id,
+              suggested_gas_price,
+              suggested_miner_cut,
+              ingress_bridge_fee,
+              mode == init_mode::init_with_ingress_bridge_fee);
+      }
+
       produce_block();
-
-      set_code("eosio.token"_n, contracts::eosio_token_wasm());
-      set_abi("eosio.token"_n, contracts::eosio_token_abi().data());
-
-      push_action("eosio.token"_n, "create"_n, "eosio.token"_n, mvo()("issuer", "eosio.token"_n)
-                                                                     ("maximum_supply", asset(1'000'000'0000, native_symbol)));
-      for(const name& n : {"alice"_n, "bob"_n, "carol"_n})
-         push_action("eosio.token"_n, "issue"_n, "eosio.token"_n, mvo()("to", n)
-                                                                       ("quantity", asset(100'0000, native_symbol))
-                                                                       ("memo", ""));
-   }
-
-   transaction_trace_ptr transfer_token(name from, name to, asset quantity, std::string memo) {
-      return push_action("eosio.token"_n, "transfer"_n, from, mvo()("from", from)
-                                                                   ("to", to)
-                                                                   ("quantity", quantity)
-                                                                   ("memo", memo));
    }
 
    int64_t native_balance(name owner) const {
-      return get_currency_balance("eosio.token"_n, native_symbol, owner).get_amount();
+      return get_currency_balance(token_account_name, native_symbol, owner).get_amount();
    }
 
-   std::tuple<asset, uint64_t> vault_balance(name owner) const {
-      const vector<char> d = get_row_by_account("evm"_n, "evm"_n, "balances"_n, owner);
-      FC_ASSERT(d.size(), "EVM not open");
-      auto [_, amount, dust] = fc::raw::unpack<vault_balance_row>(d);
-      return std::make_tuple(amount, dust);
-   }
    int64_t vault_balance_token(name owner) const {
-      return std::get<0>(vault_balance(owner)).get_amount();
+      return vault_balance(owner).balance.get_amount();
    }
    uint64_t vault_balance_dust(name owner) const {
-      return std::get<1>(vault_balance(owner));
+      return vault_balance(owner).dust;
    }
 
-   transaction_trace_ptr open(name owner) {
-      return push_action("evm"_n, "open"_n, owner, mvo()("owner", owner));
-   }
-   transaction_trace_ptr close(name owner) {
-      return push_action("evm"_n, "close"_n, owner, mvo()("owner", owner));
-   }
-   transaction_trace_ptr withdraw(name owner, asset quantity) {
-      return push_action("evm"_n, "withdraw"_n, owner, mvo()("owner", owner)("quantity", quantity));
-   }
-
-   symbol native_symbol;
-   asset make_asset(int64_t amount) {
-      return asset(amount, native_symbol);
-   }
-
-   struct vault_balance_row {
-      name     owner;
-      asset    balance;
-      uint64_t dust = 0;
-   };
-
-   evmc::address make_reserved_address(uint64_t account) const {
-      return evmc_address({0xbb, 0xbb, 0xbb, 0xbb,
-                           0xbb, 0xbb, 0xbb, 0xbb,
-                           0xbb, 0xbb, 0xbb, 0xbb,
-                           static_cast<uint8_t>(account >> 56),
-                           static_cast<uint8_t>(account >> 48),
-                           static_cast<uint8_t>(account >> 40),
-                           static_cast<uint8_t>(account >> 32),
-                           static_cast<uint8_t>(account >> 24),
-                           static_cast<uint8_t>(account >> 16),
-                           static_cast<uint8_t>(account >> 8),
-                           static_cast<uint8_t>(account >> 0)});
+   balance_and_dust inevm() const
+   {
+      return fc::raw::unpack<balance_and_dust>(get_row_by_account("evm"_n, "evm"_n, "inevm"_n, "inevm"_n));
    }
 };
-FC_REFLECT(native_token_evm_tester::vault_balance_row, (owner)(balance)(dust))
 
 struct native_token_evm_tester_EOS : native_token_evm_tester {
-   native_token_evm_tester_EOS() : native_token_evm_tester("4,EOS", true) {}
+   native_token_evm_tester_EOS() : native_token_evm_tester("4,EOS", init_mode::init_with_ingress_bridge_fee) {}
 };
 struct native_token_evm_tester_SPOON : native_token_evm_tester {
-   native_token_evm_tester_SPOON() : native_token_evm_tester("4,SPOON", true) {}
+   native_token_evm_tester_SPOON() : native_token_evm_tester("4,SPOON", init_mode::init_without_ingress_bridge_fee) {}
 };
 struct native_token_evm_tester_noinit : native_token_evm_tester {
-   native_token_evm_tester_noinit() : native_token_evm_tester("4,EOS", false) {}
+   native_token_evm_tester_noinit() : native_token_evm_tester("4,EOS", init_mode::do_not_init) {}
 };
 
 BOOST_AUTO_TEST_SUITE(native_token_evm_tests)
@@ -241,6 +215,8 @@ BOOST_FIXTURE_TEST_CASE(basic_eos_evm_bridge, native_token_evm_tester_EOS) try {
    };
    BOOST_REQUIRE(expected_inevm == inevm());
 
+   auto initial_special_balance = vault_balance("evm"_n);
+
    //to start with, there is no ingress bridge fee. should be 1->1
 
    //transfer 1.0000 EOS from alice to evm1 account
@@ -295,7 +271,7 @@ BOOST_FIXTURE_TEST_CASE(basic_eos_evm_bridge, native_token_evm_tester_EOS) try {
 
    //set the bridge free to 0.1000 EOS
    const int64_t bridge_fee = 1000;
-   setingressfee(make_asset(bridge_fee));
+   setfeeparams(fee_parameters{.ingress_bridge_fee = make_asset(bridge_fee)});
 
    //transferring less than the bridge fee isn't allowed
    {
@@ -314,7 +290,7 @@ BOOST_FIXTURE_TEST_CASE(basic_eos_evm_bridge, native_token_evm_tester_EOS) try {
    BOOST_REQUIRE(expected_inevm == inevm());
 
    //nothing should have accumulated in contract's special balance yet
-   BOOST_REQUIRE(vault_balance("evm"_n) == std::make_tuple(make_asset(0), 0UL));
+   BOOST_REQUIRE(vault_balance("evm"_n) == initial_special_balance);
 
    //transfer 2.0000 EOS from alice to evm1 account, expect 1.9000 to be delivered to evm1 account, 0.1000 to contract balance
    {
@@ -330,24 +306,18 @@ BOOST_FIXTURE_TEST_CASE(basic_eos_evm_bridge, native_token_evm_tester_EOS) try {
       expected_inevm.balance +=  make_asset(to_bridge - bridge_fee);
       BOOST_REQUIRE(expected_inevm == inevm());
 
-      BOOST_REQUIRE_EQUAL(vault_balance_token("evm"_n), bridge_fee);
+      intx::uint256 new_special_balance{initial_special_balance};
+      new_special_balance += smallest * bridge_fee;
+      BOOST_REQUIRE_EQUAL(static_cast<intx::uint256>(vault_balance("evm"_n)), new_special_balance);
    }
 
 } FC_LOG_AND_RETHROW()
 
 BOOST_FIXTURE_TEST_CASE(disallow_bridge_sigs_outside_bridge_trx, native_token_evm_tester_EOS) try {
    evm_eoa evm1;
-   silkworm::Transaction txn {
-      .type = silkworm::Transaction::Type::kLegacy,
-      .max_priority_fee_per_gas = 0,
-      .max_fee_per_gas = 0,
-      .gas_limit = 21000,
-      .to = evm1.address,
-      .value = 11111111_u256,
-   };
 
    //r == 0 indicates a bridge signature. These are only allowed in contract-initiated (i.e. inline) EVM actions
-   BOOST_REQUIRE_EXCEPTION(pushtx(txn),
+   BOOST_REQUIRE_EXCEPTION(pushtx(generate_tx(evm1.address, 11111111_u256)),
                            eosio_assert_message_exception, eosio_assert_message_is("bridge signature used outside of bridge transaction"));
 } FC_LOG_AND_RETHROW()
 
@@ -356,6 +326,8 @@ BOOST_FIXTURE_TEST_CASE(basic_evm_eos_bridge, native_token_evm_tester_EOS) try {
 
    //reminder: .0001 EOS is 100 szabos
    const intx::uint256 smallest = 100_szabo;
+
+   const auto gas_fee = intx::uint256{get_config().gas_price} * 21000;
 
    //alice transfers in 10.0000 EOS to evm1
    {
@@ -372,42 +344,30 @@ BOOST_FIXTURE_TEST_CASE(basic_evm_eos_bridge, native_token_evm_tester_EOS) try {
    {
       const int64_t to_transfer = 2'0000;
       const intx::uint256 evm1_before = *evm_balance(evm1);
+      const intx::uint256 special_balance_before{vault_balance("evm"_n)};
 
-      silkworm::Transaction txn {
-         .type = silkworm::Transaction::Type::kLegacy,
-         .max_priority_fee_per_gas = 0,
-         .max_fee_per_gas = 0,
-         .gas_limit = 21000,
-         .to = evm2.address,
-         .value = 100_szabo * to_transfer,
-      };
+      auto txn = generate_tx(evm2.address, 100_szabo * to_transfer);
       evm1.sign(txn);
       pushtx(txn);
 
-      BOOST_REQUIRE(*evm_balance(evm1) == evm1_before - txn.value);
+      BOOST_REQUIRE_EQUAL(*evm_balance(evm1), (evm1_before - txn.value - gas_fee));
       BOOST_REQUIRE(!!evm_balance(evm2));
       BOOST_REQUIRE(*evm_balance(evm2) == txn.value);
+      BOOST_REQUIRE_EQUAL(static_cast<intx::uint256>(vault_balance("evm"_n)), (special_balance_before + gas_fee));
    }
 
-   //evm1 is going to egress 1.0000 EOS to alice. alice does not have an open balance, so this goes direct inline to native EOS valance
+   //evm1 is going to egress 1.0000 EOS to alice. alice does not have an open balance, so this goes direct inline to native EOS balance
    {
       const int64_t to_bridge = 1'0000;
       const intx::uint256 evm1_before = *evm_balance(evm1);
       const int64_t alice_native_before = native_balance("alice"_n);
 
-      silkworm::Transaction txn {
-         .type = silkworm::Transaction::Type::kLegacy,
-         .max_priority_fee_per_gas = 0,
-         .max_fee_per_gas = 0,
-         .gas_limit = 21000,
-         .to = make_reserved_address("alice"_n.to_uint64_t()),
-         .value = 100_szabo * to_bridge,
-      };
+      auto txn = generate_tx(make_reserved_address("alice"_n.to_uint64_t()), 100_szabo * to_bridge);
       evm1.sign(txn);
       pushtx(txn);
 
       BOOST_REQUIRE_EQUAL(alice_native_before + to_bridge, native_balance("alice"_n));
-      BOOST_REQUIRE(evm_balance(evm1) == evm1_before - txn.value);
+      BOOST_REQUIRE_EQUAL(*evm_balance(evm1), (evm1_before - txn.value - gas_fee));
    }
 
    //evm1 is now going to try to egress 1.00001 EOS to alice. Since this includes dust without an open balance for alice, this fails
@@ -416,14 +376,7 @@ BOOST_FIXTURE_TEST_CASE(basic_evm_eos_bridge, native_token_evm_tester_EOS) try {
       const intx::uint256 evm1_before = *evm_balance(evm1);
       const int64_t alice_native_before = native_balance("alice"_n);
 
-      silkworm::Transaction txn {
-         .type = silkworm::Transaction::Type::kLegacy,
-         .max_priority_fee_per_gas = 0,
-         .max_fee_per_gas = 0,
-         .gas_limit = 21000,
-         .to = make_reserved_address("alice"_n.to_uint64_t()),
-         .value = 100_szabo * to_bridge + 10_szabo, //dust
-      };
+      auto txn = generate_tx(make_reserved_address("alice"_n.to_uint64_t()), 100_szabo * to_bridge + 10_szabo);
       evm1.sign(txn);
       BOOST_REQUIRE_EXCEPTION(pushtx(txn),
                               eosio_assert_message_exception, eosio_assert_message_is("egress bridging to non-open accounts must not contain dust"));
@@ -436,9 +389,11 @@ BOOST_FIXTURE_TEST_CASE(basic_evm_eos_bridge, native_token_evm_tester_EOS) try {
       //and try again
       pushtx(txn);
 
-      BOOST_REQUIRE_EQUAL(alice_native_before, native_balance("alice"_n));                                  //native balance unchanged
-      BOOST_REQUIRE(evm_balance(evm1) == evm1_before - txn.value);                                          //EVM balance decresed
-      BOOST_REQUIRE(vault_balance("alice"_n) == std::make_tuple(make_asset(1'0000), 10'000'000'000'000UL)); //vault balance increased to 1.0000EOS, 10szabo
+      BOOST_REQUIRE_EQUAL(alice_native_before, native_balance("alice"_n));          // native balance unchanged
+      BOOST_REQUIRE_EQUAL(*evm_balance(evm1), (evm1_before - txn.value - gas_fee)); // EVM balance decreased
+      BOOST_REQUIRE(vault_balance("alice"_n) ==
+                    (balance_and_dust{make_asset(1'0000),
+                                      10'000'000'000'000UL})); // vault balance increased to 1.0000 EOS, 10 szabo
    }
 
    //install some code on bob's account
@@ -449,14 +404,7 @@ BOOST_FIXTURE_TEST_CASE(basic_evm_eos_bridge, native_token_evm_tester_EOS) try {
       const int64_t to_bridge = 1'0000;
       const intx::uint256 evm1_before = *evm_balance(evm1);
 
-      silkworm::Transaction txn {
-         .type = silkworm::Transaction::Type::kLegacy,
-         .max_priority_fee_per_gas = 0,
-         .max_fee_per_gas = 0,
-         .gas_limit = 21000,
-         .to = make_reserved_address("bob"_n.to_uint64_t()),
-         .value = 100_szabo * to_bridge,
-      };
+      auto txn = generate_tx(make_reserved_address("bob"_n.to_uint64_t()), 100_szabo * to_bridge);
       evm1.sign(txn);
       BOOST_REQUIRE_EXCEPTION(pushtx(txn),
                               eosio_assert_message_exception, eosio_assert_message_is("non-open accounts containing contract code must be on allow list for egress bridging"));
@@ -466,7 +414,7 @@ BOOST_FIXTURE_TEST_CASE(basic_evm_eos_bridge, native_token_evm_tester_EOS) try {
       //and now it'll go through
       pushtx(txn);
       BOOST_REQUIRE_EQUAL(vault_balance_token("bob"_n), to_bridge);
-      BOOST_REQUIRE(evm_balance(evm1) == evm1_before - txn.value);
+      BOOST_REQUIRE_EQUAL(*evm_balance(evm1), (evm1_before - txn.value - gas_fee));
    }
 
    //install some code on carol's account
@@ -478,14 +426,7 @@ BOOST_FIXTURE_TEST_CASE(basic_evm_eos_bridge, native_token_evm_tester_EOS) try {
       const int64_t carol_native_before = native_balance("carol"_n);
       const intx::uint256 evm1_before = *evm_balance(evm1);
 
-      silkworm::Transaction txn {
-         .type = silkworm::Transaction::Type::kLegacy,
-         .max_priority_fee_per_gas = 0,
-         .max_fee_per_gas = 0,
-         .gas_limit = 21000,
-         .to = make_reserved_address("carol"_n.to_uint64_t()),
-         .value = 100_szabo * to_bridge,
-      };
+      auto txn = generate_tx(make_reserved_address("carol"_n.to_uint64_t()), 100_szabo * to_bridge);
       evm1.sign(txn);
       BOOST_REQUIRE_EXCEPTION(pushtx(txn),
                               eosio_assert_message_exception, eosio_assert_message_is("non-open accounts containing contract code must be on allow list for egress bridging"));
@@ -495,7 +436,7 @@ BOOST_FIXTURE_TEST_CASE(basic_evm_eos_bridge, native_token_evm_tester_EOS) try {
       //and now it'll go through
       pushtx(txn);
       BOOST_REQUIRE_EQUAL(carol_native_before + to_bridge, native_balance("carol"_n));
-      BOOST_REQUIRE(evm_balance(evm1) == evm1_before - txn.value);
+      BOOST_REQUIRE_EQUAL(*evm_balance(evm1), (evm1_before - txn.value - gas_fee));
 
       //remove carol from egress allow list
       removeegress({"carol"_n});
@@ -518,14 +459,7 @@ BOOST_FIXTURE_TEST_CASE(evm_eos_nonexistant, native_token_evm_tester_EOS) try {
    {
       const int64_t to_bridge = 1'0000;
 
-      silkworm::Transaction txn {
-         .type = silkworm::Transaction::Type::kLegacy,
-         .max_priority_fee_per_gas = 0,
-         .max_fee_per_gas = 0,
-         .gas_limit = 21000,
-         .to = make_reserved_address("spoon"_n.to_uint64_t()),
-         .value = 100_szabo * to_bridge,
-      };
+      auto txn = generate_tx(make_reserved_address("spoon"_n.to_uint64_t()), 100_szabo * to_bridge);
       evm1.sign(txn);
       BOOST_REQUIRE_EXCEPTION(pushtx(txn),
                               eosio_assert_message_exception, eosio_assert_message_is("can only egress bridge to existing accounts"));
@@ -538,13 +472,7 @@ BOOST_FIXTURE_TEST_CASE(evm_eos_disallow_reserved_zero, native_token_evm_tester_
    transfer_token("alice"_n, "evm"_n, make_asset(10'0000), evm1.address_0x());
 
    //doing anything with the reserved-zero address should fail; in this case just send an empty message to it
-   silkworm::Transaction txn {
-      .type = silkworm::Transaction::Type::kLegacy,
-      .max_priority_fee_per_gas = 0,
-      .max_fee_per_gas = 0,
-      .gas_limit = 21000,
-      .to = make_reserved_address(0u)
-   };
+   auto txn = generate_tx(make_reserved_address(0u), 0);
    evm1.sign(txn);
    BOOST_REQUIRE_EXCEPTION(pushtx(txn),
                            eosio_assert_message_exception, eosio_assert_message_is("reserved 0 address cannot be used"));

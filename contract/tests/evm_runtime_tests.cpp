@@ -418,7 +418,17 @@ struct evm_runtime_tester : eosio_system_tester, silkworm::State {
       BOOST_REQUIRE_EQUAL(abi_serializer::to_abi(accnt.abi, abi), true);
       evm_runtime_abi.set_abi(abi, abi_serializer_max_time);
 
-      base_tester::push_action(ME, "init"_n, ME, mvo()("chainid", 15555));
+      base_tester::push_action(ME,
+                               "init"_n,
+                               ME,
+                               mvo()                                   //
+                               ("chainid", 15555)                      //
+                               ("fee_params",                          //
+                                mvo()                                  //
+                                ("gas_price", 150'000'000'000)         //
+                                ("miner_cut", 10'000)                  //
+                                ("ingress_bridge_fee", fc::variant())) //
+      );
    }
 
    std::string to_str(const fc::variant& o) {

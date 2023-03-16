@@ -25,10 +25,12 @@ include_directories(
 set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -Wno-deprecated-declarations")
 
 add_eosio_test_executable( unit_test
+    ${CMAKE_SOURCE_DIR}/basic_evm_tester.cpp
     ${CMAKE_SOURCE_DIR}/evm_runtime_tests.cpp
     ${CMAKE_SOURCE_DIR}/init_tests.cpp
     ${CMAKE_SOURCE_DIR}/native_token_tests.cpp
     ${CMAKE_SOURCE_DIR}/mapping_tests.cpp
+    ${CMAKE_SOURCE_DIR}/gas_fee_tests.cpp
     ${CMAKE_SOURCE_DIR}/main.cpp
     ${CMAKE_SOURCE_DIR}/silkworm/core/silkworm/rlp/encode.cpp
     ${CMAKE_SOURCE_DIR}/silkworm/core/silkworm/rlp/decode.cpp
@@ -38,6 +40,7 @@ add_eosio_test_executable( unit_test
     ${CMAKE_SOURCE_DIR}/silkworm/node/silkworm/common/stopwatch.cpp
     ${CMAKE_SOURCE_DIR}/silkworm/core/silkworm/common/util.cpp
     ${CMAKE_SOURCE_DIR}/silkworm/core/silkworm/common/endian.cpp
+    ${CMAKE_SOURCE_DIR}/silkworm/core/silkworm/execution/address.cpp
     ${CMAKE_SOURCE_DIR}/silkworm/core/silkworm/crypto/ecdsa.cpp
     ${CMAKE_SOURCE_DIR}/../external/ethash/lib/keccak/keccak.c
     ${CMAKE_SOURCE_DIR}/../external/ethash/lib/ethash/ethash.cpp
