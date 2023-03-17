@@ -24,7 +24,7 @@ struct mapping_evm_tester : basic_evm_tester {
       unsigned_int   version;
       uint64_t       chainid;
       time_point_sec genesis_time;
-      uint32_t       status;
+      //additional fields ignored in this test
    };
 
    time_point_sec get_genesis_time() {
@@ -35,7 +35,7 @@ struct mapping_evm_tester : basic_evm_tester {
    }
 };
 
-FC_REFLECT(mapping_evm_tester::config_table_row, (version)(chainid)(genesis_time)(status))
+FC_REFLECT(mapping_evm_tester::config_table_row, (version)(chainid)(genesis_time))
 
 BOOST_AUTO_TEST_SUITE(mapping_evm_tests)
 

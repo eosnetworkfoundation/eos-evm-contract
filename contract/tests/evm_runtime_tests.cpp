@@ -424,7 +424,7 @@ struct evm_runtime_tester : eosio_system_tester, silkworm::State {
       }
 
       BOOST_REQUIRE_EQUAL( success(), push_action(eosio::chain::config::system_account_name, "wasmcfg"_n, mvo()("settings", "high")) );
-      create_account_with_resources(ME, system_account_name, 5000000);
+      create_account_with_resources(ME, system_account_name, 6000000);
       set_authority( ME, "active"_n, {1, {{get_public_key(ME,"active"),1}}, {{{ME,"eosio.code"_n},1}}} );
 
       set_code(ME, contracts::evm_runtime_wasm());
@@ -571,6 +571,12 @@ struct evm_runtime_tester : eosio_system_tester, silkworm::State {
    action_result addone( const bytes& addy, name signer=ME ) { 
       return call(signer, "addone"_n, mvo()
          ("addy", addy)
+      );
+   }
+
+   action_result testbaldust( name testname ) {
+      return call(ME, "testbaldust"_n, mvo()
+         ("test", testname)
       );
    }
 
@@ -1124,4 +1130,25 @@ BOOST_FIXTURE_TEST_CASE( GeneralStateTests, evm_runtime_tester ) try {
    BOOST_REQUIRE_EQUAL(total_failed, 0);
 
 } FC_LOG_AND_RETHROW()
+
+BOOST_FIXTURE_TEST_CASE( balance_and_dust_tests, evm_runtime_tester ) try {
+   BOOST_REQUIRE_EQUAL(testbaldust("basic"_n),      success());
+
+   BOOST_REQUIRE_EQUAL(testbaldust("underflow1"_n), error("assertion failure with message: decrementing more than available"));
+   BOOST_REQUIRE_EQUAL(testbaldust("underflow2"_n), error("assertion failure with message: decrementing more than available"));
+   BOOST_REQUIRE_EQUAL(testbaldust("underflow3"_n), error("assertion failure with message: decrementing more than available"));
+   BOOST_REQUIRE_EQUAL(testbaldust("underflow4"_n), error("assertion failure with message: decrementing more than available"));
+   BOOST_REQUIRE_EQUAL(testbaldust("underflow5"_n), error("assertion failure with message: decrementing more than available"));
+
+   BOOST_REQUIRE_EQUAL(testbaldust("overflow1"_n),  error("assertion failure with message: accumulation overflow"));
+   BOOST_REQUIRE_EQUAL(testbaldust("overflow2"_n),  error("assertion failure with message: accumulation overflow"));
+   BOOST_REQUIRE_EQUAL(testbaldust("overflow3"_n),  success());
+   BOOST_REQUIRE_EQUAL(testbaldust("overflow4"_n),  error("assertion failure with message: accumulation overflow"));
+   BOOST_REQUIRE_EQUAL(testbaldust("overflow5"_n),  error("assertion failure with message: accumulation overflow"));
+   BOOST_REQUIRE_EQUAL(testbaldust("overflowa"_n),  error("assertion failure with message: accumulation overflow"));
+   BOOST_REQUIRE_EQUAL(testbaldust("overflowb"_n),  error("assertion failure with message: accumulation overflow"));
+   BOOST_REQUIRE_EQUAL(testbaldust("overflowc"_n),  error("assertion failure with message: accumulation overflow"));
+   BOOST_REQUIRE_EQUAL(testbaldust("overflowd"_n),  error("assertion failure with message: accumulation overflow"));
+} FC_LOG_AND_RETHROW()
+
 BOOST_AUTO_TEST_SUITE_END()
