@@ -324,7 +324,7 @@ void from_json(const nlohmann::json& json, Call& call) {
     if (json.count("value") != 0) {
         call.value = json.at("value").get<intx::uint256>();
     }
-    if (json.count("data") != 0) {
+    if (json.count("data") != 0 && !json.at("data").is_null()) {
         const auto json_data = json.at("data").get<std::string>();
         call.data = silkworm::from_hex(json_data);
     }
