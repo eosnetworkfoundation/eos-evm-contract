@@ -1,9 +1,4 @@
-#include "basic_evm_tester.hpp"
-
-#include <fc/io/raw_fwd.hpp>
-
-using namespace eosio::testing;
-using namespace evm_test;
+#include "native_token_tester.hpp"
 
 static const char do_nothing_wast[] = R"=====(
 (module

@@ -5,91 +5,65 @@
 #include <fc/io/raw_fwd.hpp>
 
 using namespace eosio::testing;
+using namespace evm_test;
 struct native_token_evm_tester : basic_evm_tester {
-   native_token_evm_tester(std::string native_smybol_str, bool doinit) : native_symbol(symbol::from_string(native_smybol_str)) {
-      if(doinit)
-         init(15555);
-      create_accounts({"eosio.token"_n, "alice"_n, "bob"_n, "carol"_n});
+   enum class init_mode
+   {
+      do_not_init,
+      init_without_ingress_bridge_fee,
+      init_with_ingress_bridge_fee,
+   };
+
+   native_token_evm_tester(std::string native_symbol_str, init_mode mode, uint64_t ingress_bridge_fee_amount = 0) :
+      basic_evm_tester(std::move(native_symbol_str))
+   {
+      std::vector<name> new_accounts = {"alice"_n, "bob"_n, "carol"_n};
+
+      create_accounts(new_accounts);
+
+      for(const name& recipient : new_accounts) {
+         transfer_token(faucet_account_name, recipient, make_asset(100'0000));
+      }
+
+      if (mode != init_mode::do_not_init) {
+         std::optional<asset> ingress_bridge_fee;
+         if (mode == init_mode::init_with_ingress_bridge_fee) {
+            ingress_bridge_fee.emplace(make_asset(ingress_bridge_fee_amount));
+         }
+
+         init(evm_chain_id,
+              suggested_gas_price,
+              suggested_miner_cut,
+              ingress_bridge_fee,
+              mode == init_mode::init_with_ingress_bridge_fee);
+      }
+
       produce_block();
-
-      set_code("eosio.token"_n, contracts::eosio_token_wasm());
-      set_abi("eosio.token"_n, contracts::eosio_token_abi().data());
-
-      push_action("eosio.token"_n, "create"_n, "eosio.token"_n, mvo()("issuer", "eosio.token"_n)
-                                                                     ("maximum_supply", asset(1'000'000'0000, native_symbol)));
-      for(const name& n : {"alice"_n, "bob"_n, "carol"_n})
-         push_action("eosio.token"_n, "issue"_n, "eosio.token"_n, mvo()("to", n)
-                                                                       ("quantity", asset(100'0000, native_symbol))
-                                                                       ("memo", ""));
-   }
-
-   transaction_trace_ptr transfer_token(name from, name to, asset quantity, std::string memo) {
-      return push_action("eosio.token"_n, "transfer"_n, from, mvo()("from", from)
-                                                                   ("to", to)
-                                                                   ("quantity", quantity)
-                                                                   ("memo", memo));
    }
 
    int64_t native_balance(name owner) const {
-      return get_currency_balance("eosio.token"_n, native_symbol, owner).get_amount();
+      return get_currency_balance(token_account_name, native_symbol, owner).get_amount();
    }
 
-   std::tuple<asset, uint64_t> vault_balance(name owner) const {
-      const vector<char> d = get_row_by_account("evm"_n, "evm"_n, "balances"_n, owner);
-      FC_ASSERT(d.size(), "EVM not open");
-      auto [_, amount, dust] = fc::raw::unpack<vault_balance_row>(d);
-      return std::make_tuple(amount, dust);
-   }
    int64_t vault_balance_token(name owner) const {
-      return std::get<0>(vault_balance(owner)).get_amount();
+      return vault_balance(owner).balance.get_amount();
    }
    uint64_t vault_balance_dust(name owner) const {
-      return std::get<1>(vault_balance(owner));
+      return vault_balance(owner).dust;
    }
 
-   transaction_trace_ptr open(name owner) {
-      return push_action("evm"_n, "open"_n, owner, mvo()("owner", owner));
-   }
-   transaction_trace_ptr close(name owner) {
-      return push_action("evm"_n, "close"_n, owner, mvo()("owner", owner));
-   }
-   transaction_trace_ptr withdraw(name owner, asset quantity) {
-      return push_action("evm"_n, "withdraw"_n, owner, mvo()("owner", owner)("quantity", quantity));
-   }
-
-   symbol native_symbol;
-   asset make_asset(int64_t amount) {
-      return asset(amount, native_symbol);
-   }
-
-   struct vault_balance_row {
-      name     owner;
-      asset    balance;
-      uint64_t dust = 0;
-   };
-
-   evmc::address make_reserved_address(uint64_t account) const {
-      return evmc_address({0xbb, 0xbb, 0xbb, 0xbb,
-                           0xbb, 0xbb, 0xbb, 0xbb,
-                           0xbb, 0xbb, 0xbb, 0xbb,
-                           static_cast<uint8_t>(account >> 56),
-                           static_cast<uint8_t>(account >> 48),
-                           static_cast<uint8_t>(account >> 40),
-                           static_cast<uint8_t>(account >> 32),
-                           static_cast<uint8_t>(account >> 24),
-                           static_cast<uint8_t>(account >> 16),
-                           static_cast<uint8_t>(account >> 8),
-                           static_cast<uint8_t>(account >> 0)});
+   balance_and_dust inevm() const
+   {
+      return fc::raw::unpack<balance_and_dust>(get_row_by_account("evm"_n, "evm"_n, "inevm"_n, "inevm"_n));
    }
 };
-FC_REFLECT(native_token_evm_tester::vault_balance_row, (owner)(balance)(dust))
 
 struct native_token_evm_tester_EOS : native_token_evm_tester {
-   native_token_evm_tester_EOS() : native_token_evm_tester("4,EOS", true) {}
+   native_token_evm_tester_EOS() : native_token_evm_tester("4,EOS", init_mode::init_with_ingress_bridge_fee) {}
 };
 struct native_token_evm_tester_SPOON : native_token_evm_tester {
-   native_token_evm_tester_SPOON() : native_token_evm_tester("4,SPOON", true) {}
+   native_token_evm_tester_SPOON() : native_token_evm_tester("4,SPOON", init_mode::init_without_ingress_bridge_fee) {}
 };
 struct native_token_evm_tester_noinit : native_token_evm_tester {
-   native_token_evm_tester_noinit() : native_token_evm_tester("4,EOS", false) {}
+   native_token_evm_tester_noinit() : native_token_evm_tester("4,EOS", init_mode::do_not_init) {}
 };

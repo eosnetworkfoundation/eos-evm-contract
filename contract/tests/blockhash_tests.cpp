@@ -6,14 +6,13 @@ struct blockhash_evm_tester : native_token_evm_tester_EOS {
 };
 
 struct evm_account {
-    uint64_t            id;
-    std::vector<char>   eth_address;
-    uint64_t            nonce;
-    std::vector<char>   balance;
-    std::vector<char>   code;
-    std::vector<char>   code_hash;
+    uint64_t                id;
+    std::vector<char>       eth_address;
+    uint64_t                nonce;
+    std::vector<char>       balance;
+    std::optional<uint64_t> code_id;
 };
-FC_REFLECT(evm_account, (id)(eth_address)(nonce)(balance)(code)(code_hash));
+FC_REFLECT(evm_account, (id)(eth_address)(nonce)(balance)(code_id));
 
 struct evm_storage {
    uint64_t id;
@@ -36,7 +35,7 @@ BOOST_FIXTURE_TEST_CASE(blockhash_tests, blockhash_evm_tester) try {
    silkworm::Transaction txn {
       .type = silkworm::Transaction::Type::kLegacy,
       .max_priority_fee_per_gas = 0,
-      .max_fee_per_gas = 1,
+      .max_fee_per_gas = 150'000'000'000,
       .gas_limit = 500000,
       .data = silkworm::from_hex(blockhash_bytecode).value()
    };
@@ -54,7 +53,7 @@ BOOST_FIXTURE_TEST_CASE(blockhash_tests, blockhash_evm_tester) try {
    silkworm::Transaction txn2 {
       .type = silkworm::Transaction::Type::kLegacy,
       .max_priority_fee_per_gas = 0,
-      .max_fee_per_gas = 1,
+      .max_fee_per_gas = 150'000'000'000,
       .gas_limit = 500000,
       .to = contract_addr,
       .data = silkworm::from_hex("0x0f59f83a").value()
