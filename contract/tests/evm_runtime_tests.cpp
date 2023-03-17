@@ -119,6 +119,24 @@ const table_id_object& find_or_create_table( chainbase::database& db, name code,
 }
 
 template <typename T, typename Object>
+static std::optional<Object> get_by_primary_key(chainbase::database& db, const name& scope, const T& o) {
+   const auto& tab = find_or_create_table(
+      db, "evm"_n, scope, Object::table_name(), "evm"_n
+   );
+
+   const auto* kv_obj = db.find<key_value_object, by_scope_primary>(
+      boost::make_tuple(tab.id, o)
+   );
+
+   BOOST_REQUIRE( kv_obj != nullptr );
+
+   return fc::raw::unpack<Object>(
+      kv_obj->value.data(),
+      kv_obj->value.size()
+   );
+}
+
+template <typename T, typename Object>
 static std::optional<Object> get_by_index(chainbase::database& db, const name& scope, const name& inx, const T& o) {
    
    const auto& tab_inx = find_or_create_table(
@@ -237,22 +255,13 @@ struct account {
    bytes       eth_address;
    uint64_t    nonce;
    bytes       balance;
-   bytes       code;
-   bytes       code_hash;
+   std::optional<uint64_t>       code_id;
 
-   bytes       old_code_hash;
 
    struct by_address {
       typedef index256_object index_object;
       static name index_name() {
          return account::index_name("by.address"_n);
-      }
-   };
-
-   struct by_codehash {
-      typedef index256_object index_object;
-      static name index_name() {
-         return account::index_name("by.codehash"_n);
       }
    };
 
@@ -262,26 +271,11 @@ struct account {
       return res;
    }
 
-   evmc::bytes32 get_code_hash()const {
-      evmc::bytes32 res;
-      std::copy(code_hash.begin(), code_hash.end(), res.bytes);
-      return res;
-   }
-
    static name table_name() { return "account"_n; }
    static name index_name(const name& n) {
       uint64_t index_table_name = table_name().to_uint64_t() & 0xFFFFFFFFFFFFFFF0ULL;
 
-      //0=>by.address, 1=>by.codehash
-      if( n == "by.address"_n ) {
-         return name{index_table_name | 0};
-      } else if( n == "by.codehash"_n ) {
-         return name{index_table_name | 1};
-      }
-
-      dlog("index name not found: ${a}", ("a",n.to_string()));
-      BOOST_REQUIRE(false);
-      return name{0};
+      return name{index_table_name | 0};
    }
 
    static name index_name(uint64_t n) {
@@ -290,27 +284,50 @@ struct account {
 
    static std::optional<account> get_by_address(chainbase::database& db, const evmc::address& address) {
       auto r = get_by_index<evmc::address, account>(db, "evm"_n, "by.address"_n, address);
-      if(r) r->old_code_hash = r->code_hash;
       return r;
-   }
-
-   static std::optional<account> get_by_code_hash(chainbase::database& db, const evmc::bytes32& code_hash) {
-      auto r = get_by_index<evmc::bytes32, account>(db, "evm"_n, "by.codehash"_n, code_hash);
-      if(r) r->old_code_hash = r->code_hash;
-      return r;
-   }
-
-   Account as_silkworm_account() {
-      return Account{
-         nonce,
-         intx::be::load<u256>(get_balance()),
-         get_code_hash(),
-         0 //TODO: ??
-      };
    }
 
 };
-FC_REFLECT(account, (id)(eth_address)(nonce)(balance)(code)(code_hash));
+FC_REFLECT(account, (id)(eth_address)(nonce)(balance)(code_id));
+
+struct account_code {
+   uint64_t    id;
+   uint32_t    ref_count;
+   bytes       code;
+   bytes       code_hash;
+
+
+   struct by_codehash {
+      typedef index256_object index_object;
+      static name index_name() {
+         return account_code::index_name("by.codehash"_n);
+      }
+   };
+
+   evmc::bytes32 get_code_hash()const {
+      evmc::bytes32 res;
+      std::copy(code_hash.begin(), code_hash.end(), res.bytes);
+      return res;
+   }
+
+   static name table_name() { return "accountcode"_n; }
+   static name index_name(const name& n) {
+      uint64_t index_table_name = table_name().to_uint64_t() & 0xFFFFFFFFFFFFFFF0ULL;
+
+     return name{index_table_name | 0};
+   }
+
+   static name index_name(uint64_t n) {
+      return index_name(name{n});
+   }
+
+   static std::optional<account_code> get_by_code_hash(chainbase::database& db, const evmc::bytes32& code_hash) {
+      auto r = get_by_index<evmc::bytes32, account_code>(db, "evm"_n, "by.codehash"_n, code_hash);
+      return r;
+   }
+
+};
+FC_REFLECT(account_code, (id)(ref_count)(code)(code_hash));
 
 struct storage {
    uint64_t id;
@@ -578,19 +595,38 @@ struct evm_runtime_tester : eosio_system_tester, silkworm::State {
       auto& db = const_cast<chainbase::database&>(control->db());
       auto accnt = account::get_by_address(db, address);
       if(!accnt) return {};
-      return accnt->as_silkworm_account();
+
+      if (accnt->code_id.has_value()) {
+         auto r = get_by_primary_key<uint64_t, account_code>(db, "evm"_n, accnt->code_id.value());
+         if (r) {
+            evmc::bytes32 res;
+            std::copy(r.value().code_hash.begin(), r.value().code_hash.end(), res.bytes);
+            return Account{
+               accnt->nonce,
+               intx::be::load<u256>(accnt->get_balance()),
+               res,
+               0 //TODO: ??
+            };
+         }
+      }
+      return Account{
+            accnt->nonce,
+            intx::be::load<u256>(accnt->get_balance()),
+            kEmptyHash,
+            0 //TODO: ??
+      };
    };
 
    mutable bytes read_code_buffer;
    ByteView read_code(const evmc::bytes32& code_hash) const noexcept {
       auto& db = const_cast<chainbase::database&>(control->db());
-      auto accnt = account::get_by_code_hash(db, code_hash);
-      if(!accnt) {
+      auto accntcode = account_code::get_by_code_hash(db, code_hash);
+      if(!accntcode) {
          dlog("no code for hash ${ch}", ("ch",to_bytes(code_hash)));
          return ByteView{};
       }
       //dlog("${a} ${c} ${ch} ${ch2}", ("a",accnt->eth_address)("c",accnt->code)("ch2",accnt->code_hash)("ch",to_bytes(code_hash)));
-      read_code_buffer = accnt->code;
+      read_code_buffer = accntcode->code;
       return ByteView{(const uint8_t*)read_code_buffer.data(), read_code_buffer.size()};
    }
 
@@ -889,6 +925,8 @@ struct evm_runtime_tester : eosio_system_tester, silkworm::State {
          const auto nonce_str{j["nonce"].get<std::string>()};
          account.nonce = std::stoull(nonce_str, nullptr, /*base=*/16);
 
+         update_account(address, /*initial=*/std::nullopt, account);
+
          const Bytes code{from_hex(j["code"].get<std::string>()).value()};
          if (!code.empty()) {
                account.incarnation = kDefaultIncarnation;
@@ -898,8 +936,6 @@ struct evm_runtime_tester : eosio_system_tester, silkworm::State {
                
                update_account_code(address, account.incarnation, account.code_hash, code);
          }
-
-         update_account(address, /*initial=*/std::nullopt, account);
 
          for (const auto& storage : j["storage"].items()) {
                Bytes key{from_hex(storage.key()).value()};

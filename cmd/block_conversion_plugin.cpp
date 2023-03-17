@@ -88,7 +88,7 @@ class block_conversion_plugin_impl : std::enable_shared_from_this<block_conversi
          new_block.header.difficulty        = 1;
          new_block.header.number            = num;
          new_block.header.gas_limit         = 0x7ffffffffff;
-         new_block.header.timestamp         = bm.value().evm_block_num_to_evm_timestamp(num)/1e6;
+         new_block.header.timestamp         = bm.value().evm_block_num_to_evm_timestamp(num);
          new_block.header.transactions_root = silkworm::kEmptyRoot;
          //new_block.header.mix_hash
          //new_block.header.nonce           
