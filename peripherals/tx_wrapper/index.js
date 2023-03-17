@@ -142,11 +142,14 @@ async function eth_estimateGas(params) {
       }
     );
   } catch(err) {
-		const m = err.details[0].message.match(/assertion failure with message: GAS:\[(\d+),(\d+)\]/);
-		if(m) {
-			console.log("estimated: ", m[2]);
-      return '0x'+parseInt(m[2]).toString(16);
-		}
+    if (err.details && err.details[0] && err.details[0].messge) {
+      const m = err.details[0].message.match(/assertion failure with message: GAS:\[(\d+),(\d+)\]/);
+      if(m) {
+        console.log("estimated: ", m[2]);
+        return '0x'+parseInt(m[2]).toString(16);
+      }
+    }
+		
 	  console.log("default: 21k");
 	  return "0x5208"; //21000
   }
