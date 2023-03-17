@@ -203,13 +203,14 @@ try:
     abiFile="evm_runtime.abi"
     Utils.Print("Publish evm_runtime contract")
     prodNode.publishContract(evmAcc, contractDir, wasmFile, abiFile, waitForTransBlock=True)
-    
-    trans = prodNode.pushMessage(evmAcc.name, "init", '{"chainid":15555}', '-p evmevmevmevm')
-    prodNode.waitForTransBlockIfNeeded(trans[1], True)
 
     # add eosio.code permission
     cmd="set account permission evmevmevmevm active --add-code -p evmevmevmevm@active"
     prodNode.processCleosCmd(cmd, cmd, silentErrors=True, returnType=ReturnType.raw)
+
+    trans = prodNode.pushMessage(evmAcc.name, "init", '{"chainid":15555, "fee_params": {"gas_price": "150000000000", "miner_cut": 10000, "ingress_bridge_fee": null}}', '-p evmevmevmevm')
+
+    prodNode.waitForTransBlockIfNeeded(trans[1], True)
 
     transId=prodNode.getTransId(trans[1])
     blockNum = prodNode.getBlockNumByTransId(transId)
@@ -240,6 +241,11 @@ try:
         "nonce": hex(1000),
         "timestamp": hex(int(calendar.timegm(datetime.strptime(block["timestamp"].split(".")[0], '%Y-%m-%dT%H:%M:%S').timetuple())))
     }
+
+    Utils.Print("Send small balance to special balance to allow the bridge to work")
+    transferAmount="1.0000 {0}".format(CORE_SYMBOL)
+    Print("Transfer funds %s from account %s to %s" % (transferAmount, cluster.eosioAccount.name, evmAcc.name))
+    nonProdNode.transferFunds(cluster.eosioAccount, evmAcc, transferAmount, evmAcc.name, waitForTransBlock=True)
 
     # accounts: {
     #    mnemonic: "test test test test test test test test test test test junk",
@@ -396,7 +402,7 @@ try:
     def default():
         def forward_request(req):
             if req['method'] == "eth_sendRawTransaction":
-                actData = {"ram_payer":"evmevmevmevm", "rlptx":req['params'][0][2:]}
+                actData = {"miner":"evmevmevmevm", "rlptx":req['params'][0][2:]}
                 prodNode1.pushMessage(evmAcc.name, "pushtx", json.dumps(actData), '-p evmevmevmevm')
                 return {
                     "id": req['id'],
