@@ -524,6 +524,13 @@ ACTION evm_contract::clearall() {
         eosio::print("db size:", uint64_t(db_size), "\n");
         itr = accounts.erase(itr);
     }
+
+    account_code_table codes(_self, _self.value);
+    auto itrc = codes.begin();
+    while(itrc != codes.end()) {
+        itrc = codes.erase(itrc);
+    }
+
     gc(std::numeric_limits<uint32_t>::max());
 
     auto account_size = std::distance(accounts.cbegin(), accounts.cend());
@@ -595,7 +602,7 @@ ACTION evm_contract::setbal(const bytes& addy, const bytes& bal) {
     if(itr == inx.end()) {
         accounts.emplace(get_self(), [&](auto& row){
             row.id = accounts.available_primary_key();;
-            row.code_hash = to_bytes(kEmptyHash);
+            row.code_id = std::nullopt;
             row.eth_address = addy;
             row.balance = bal;
         });
