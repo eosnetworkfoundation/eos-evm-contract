@@ -221,7 +221,7 @@ Receipt evm_contract::execute_tx( eosio::name miner, Block& block, Transaction& 
     // Calculate the miner portion of the actual gas fee (if necessary):
     std::optional<intx::uint256> gas_fee_miner_portion;
     if (miner) {
-        uint64_t tx_gas_used = ep.cumulative_gas_used(); // Only transaction in the "block" so cumulative_gas_used is the tx gas_used.
+        uint64_t tx_gas_used = receipt.cumulative_gas_used; // Only transaction in the "block" so cumulative_gas_used is the tx gas_used.
         intx::uint512 gas_fee = intx::uint256(tx_gas_used) * tx.max_fee_per_gas;
         check(gas_fee < std::numeric_limits<intx::uint256>::max(), "too much gas");
         gas_fee *= _config.get().miner_cut;
@@ -308,11 +308,8 @@ void evm_contract::pushtx( eosio::name miner, const bytes& rlptx ) {
     evm_common::block_mapping bm(current_config.genesis_time.sec_since_epoch());
 
     Block block;
-    block.header.beneficiary      = make_reserved_address(get_self().value);
-    block.header.difficulty       = 1;
-    block.header.number           = bm.timestamp_to_evm_block_num(eosio::current_time_point().time_since_epoch().count());
-    block.header.gas_limit        = 0x7ffffffffff;
-    block.header.timestamp        = bm.evm_block_num_to_evm_timestamp(block.header.number);
+    evm_common::prepare_block_header(block.header, bm, get_self().value, 
+        bm.timestamp_to_evm_block_num(eosio::current_time_point().time_since_epoch().count()));
 
     silkworm::consensus::TrustEngine engine{*found_chain_config->second};
 

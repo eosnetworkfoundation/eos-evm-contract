@@ -29,6 +29,8 @@ from TestHarness.testUtils import ReturnType
 from TestHarness.testUtils import unhandledEnumType
 from core_symbol import CORE_SYMBOL
 
+from antelope_name import convert_name_to_value
+
 ###############################################################
 # nodeos_trust_evm_test
 #
@@ -231,28 +233,6 @@ def makeReservedEvmAddress(account):
                c_uint8(account >>  0).value]
     return "0x" + bytes(bytearr).hex()
 
-def charToSymbol(c: str):
-    assert len(c) == 1
-    if c >= 'a' and c <= 'z':
-        return ord(c) - ord('a') + 6
-    if c >= '1' and c <= '5':
-        return ord(c) - ord('1') + 1
-    return 0
-
-def nameStrToInt(s: str):
-    n = 0
-    i = 0
-    for i, c in enumerate(s):
-        if i >= 12:
-            break
-        n |= (charToSymbol(c) & 0x1f) << (64 - (5 * (i + 1)))
-        i = i + 1
-
-    assert i > 0
-    if i < len(s) and i == 12:
-        n |= charToSymbol(s[12]) & 0x0F
-    return n
-
 try:
     TestHelper.printSystemInfo("BEGIN")
 
@@ -357,7 +337,7 @@ try:
         "extraData": "TrustEVM",
         "gasLimit": "0x7ffffffffff",
         "mixHash": "0x"+block["id"],
-        "nonce": hex(1000),
+        "nonce": f'{convert_name_to_value(evmAcc.name):#0x}',
         "timestamp": hex(int(calendar.timegm(datetime.strptime(block["timestamp"].split(".")[0], '%Y-%m-%dT%H:%M:%S').timetuple())))
     }
 
@@ -597,7 +577,7 @@ try:
 
     # EVM -> EOS
     #   0x9E126C57330FA71556628e0aabd6B6B6783d99fA private key: 0xba8c9ff38e4179748925335a9891b969214b37dc3723a1754b8b849d3eea9ac0
-    toAdd = makeReservedEvmAddress(nameStrToInt(testAcc.name))
+    toAdd = makeReservedEvmAddress(convert_name_to_value(testAcc.name))
     evmSendKey = "ba8c9ff38e4179748925335a9891b969214b37dc3723a1754b8b849d3eea9ac0"
     amount=13.1313
     transferAmount="13.1313 {0}".format(CORE_SYMBOL)

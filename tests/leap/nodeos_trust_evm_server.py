@@ -24,6 +24,7 @@ from TestHarness.TestHelper import AppArgs
 from TestHarness.testUtils import ReturnType
 from core_symbol import CORE_SYMBOL
 
+from antelope_name import convert_name_to_value
 
 ###############################################################
 # nodeos_trust_evm_server
@@ -238,7 +239,7 @@ try:
         "extraData": "TrustEVM",
         "gasLimit": "0x7ffffffffff",
         "mixHash": "0x"+block["id"],
-        "nonce": hex(1000),
+        "nonce": f'{convert_name_to_value(evmAcc.name):#0x}',
         "timestamp": hex(int(calendar.timegm(datetime.strptime(block["timestamp"].split(".")[0], '%Y-%m-%dT%H:%M:%S').timetuple())))
     }
 
