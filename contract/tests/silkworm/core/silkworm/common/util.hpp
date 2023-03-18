@@ -106,6 +106,20 @@ inline ethash::hash256 keccak256(ByteView view) { return ethash::keccak256(view.
 // Splits a string by delimiter and returns a vector of tokens
 std::vector<std::string> split(std::string_view source, std::string_view delimiter);
 
+inline evmc::address make_reserved_address(uint64_t account) {
+    return evmc_address({0xbb, 0xbb, 0xbb, 0xbb,
+                         0xbb, 0xbb, 0xbb, 0xbb,
+                         0xbb, 0xbb, 0xbb, 0xbb,
+                         static_cast<uint8_t>(account >> 56),
+                         static_cast<uint8_t>(account >> 48),
+                         static_cast<uint8_t>(account >> 40),
+                         static_cast<uint8_t>(account >> 32),
+                         static_cast<uint8_t>(account >> 24),
+                         static_cast<uint8_t>(account >> 16),
+                         static_cast<uint8_t>(account >> 8),
+                         static_cast<uint8_t>(account >> 0)});
+}
+
 }  // namespace silkworm
 
 #endif  // SILKWORM_COMMON_UTIL_HPP_
