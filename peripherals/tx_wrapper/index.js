@@ -78,8 +78,8 @@ async function push_tx(strRlptx) {
             }
           ],
           data: {
-            ram_payer : process.env.EOS_SENDER,
-            rlptx     : strRlptx
+            miner : process.env.EOS_SENDER,
+            rlptx : strRlptx
           },
         },
       ],

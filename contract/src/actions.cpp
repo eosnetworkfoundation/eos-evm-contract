@@ -34,35 +34,72 @@ namespace silkworm {
 
 namespace evm_runtime {
 
+static constexpr uint32_t hundred_percent = 100'000;
+
 using namespace silkworm;
 
-void evm_contract::init(const uint64_t chainid) {
-    eosio::require_auth(get_self());
+void set_fee_parameters(evm_contract::config& current_config,
+                        const evm_contract::fee_parameters& fee_params,
+                        bool allow_any_to_be_unspecified)
+{
+   if (fee_params.gas_price.has_value()) {
+      current_config.gas_price = *fee_params.gas_price;
+   } else {
+      check(allow_any_to_be_unspecified, "All required fee parameters not specified: missing gas_price");
+   }
 
-    check( !_config.exists(), "contract already initialized" );
-    check( !!lookup_known_chain(chainid), "unknown chainid" );
+   if (fee_params.miner_cut.has_value()) {
+      check(*fee_params.miner_cut <= hundred_percent, "miner_cut cannot exceed 100,000 (100%)");
 
-    _config.set({
-        .version = 0,
-        .chainid = chainid,
-        .genesis_time = eosio::current_time_point() // implicitly converts from Antelope timestamp to EVM compatible timestamp
-    }, get_self());
+      current_config.miner_cut = *fee_params.miner_cut;
+   } else {
+      check(allow_any_to_be_unspecified, "All required fee parameters not specified: missing miner_cut");
+   }
 
-    inevm_singleton(get_self(), get_self().value).get_or_create(get_self());
+   if (fee_params.ingress_bridge_fee.has_value()) {
+      check(fee_params.ingress_bridge_fee->symbol == token_symbol, "unexpected bridge symbol");
+      check(fee_params.ingress_bridge_fee->amount >= 0, "ingress bridge fee cannot be negative");
 
-    open(get_self());
+      current_config.ingress_bridge_fee = *fee_params.ingress_bridge_fee;
+   }
 }
 
-void evm_contract::setingressfee(asset ingress_bridge_fee) {
-    assert_inited();
-    require_auth(get_self());
+void evm_contract::init(const uint64_t chainid, const fee_parameters& fee_params)
+{
+   eosio::require_auth(get_self());
 
-    check( ingress_bridge_fee.symbol == token_symbol, "unexpected bridge symbol" );
-    check( ingress_bridge_fee.amount >= 0, "ingress bridge fee cannot be negative");
+   check(!_config.exists(), "contract already initialized");
+   check(!!lookup_known_chain(chainid), "unknown chainid");
 
-    config current_config = _config.get();
-    current_config.ingress_bridge_fee = ingress_bridge_fee;
-    _config.set(current_config, get_self());
+   // Convert current time to EVM compatible block timestamp used as genesis time by rounding down to nearest second.
+   time_point_sec genesis_time = eosio::current_time_point();
+
+   config new_config = {
+      .version = 0,
+      .chainid = chainid,
+      .genesis_time = genesis_time,
+   };
+
+   // Other fee parameters in new_config are still left at their (undesired) default values.
+   // Correct those values now using the fee_params passed in as an argument to the init function.
+
+   set_fee_parameters(new_config, fee_params, false); // enforce that all fee parameters are specified
+
+   _config.set(new_config, get_self());
+
+   inevm_singleton(get_self(), get_self().value).get_or_create(get_self());
+
+   open(get_self());
+}
+
+void evm_contract::setfeeparams(const fee_parameters& fee_params)
+{
+   assert_inited();
+   require_auth(get_self());
+
+   config current_config = _config.get();
+   set_fee_parameters(current_config, fee_params, true); // do not enforce that all fee parameters are specified
+   _config.set(current_config, get_self());
 }
 
 void evm_contract::addegress(const std::vector<name>& accounts) {
@@ -122,23 +159,30 @@ void check_result( ValidationResult r, const Transaction& txn, const char* desc 
     eosio::check( false, desc );
 }
 
-Receipt evm_contract::execute_tx( Block& block, const bytes& rlptx, silkworm::ExecutionProcessor& ep ) {
+Receipt evm_contract::execute_tx( eosio::name miner, Block& block, Transaction& tx, silkworm::ExecutionProcessor& ep ) {
     //when being called as an inline action, clutch in allowance for reserved addresses & signatures by setting from_self=true
     const bool from_self = get_sender() == get_self();
 
-    std::optional<balances> balance_table;
+    balances balance_table(get_self(), get_self().value);
+
+    if (miner == get_self()) {
+        // If the miner is the contract itself, then there is no need to send the miner its cut.
+        miner = {};
+    }
+
+    if (miner) {
+        // Ensure the miner has a balance open early.
+        balance_table.get(miner.value, "no balance open for miner");
+    }
+
+    bool deducted_miner_cut = false;
+
     std::optional<inevm_singleton> inevm;
     auto populate_bridge_accessors = [&]() {
-        if(balance_table)
+        if(inevm)
             return;
-        balance_table.emplace(get_self(), get_self().value);
         inevm.emplace(get_self(), get_self().value);
     };
-
-    Transaction tx;
-    ByteView bv{(const uint8_t*)rlptx.data(), rlptx.size()};
-    eosio::check(rlp::decode(bv,tx) == DecodingResult::kOk && bv.empty(), "unable to decode transaction");
-    LOGTIME("EVM TX DECODE");
 
     tx.from.reset();
     tx.recover_sender();
@@ -154,7 +198,7 @@ Receipt evm_contract::execute_tx( Block& block, const bytes& rlptx, silkworm::Ex
         const intx::uint256 value_with_max_gas = tx.value + (intx::uint256)max_gas_cost;
 
         populate_bridge_accessors();
-        balance_table->modify(balance_table->get(ingress_account.value), eosio::same_payer, [&](balance& b){
+        balance_table.modify(balance_table.get(ingress_account.value), eosio::same_payer, [&](balance& b){
             b.balance -= value_with_max_gas;
         });
         inevm->set(inevm->get() += value_with_max_gas, eosio::same_payer);
@@ -173,6 +217,17 @@ Receipt evm_contract::execute_tx( Block& block, const bytes& rlptx, silkworm::Ex
 
     Receipt receipt;
     ep.execute_transaction(tx, receipt);
+
+    // Calculate the miner portion of the actual gas fee (if necessary):
+    std::optional<intx::uint256> gas_fee_miner_portion;
+    if (miner) {
+        uint64_t tx_gas_used = receipt.cumulative_gas_used; // Only transaction in the "block" so cumulative_gas_used is the tx gas_used.
+        intx::uint512 gas_fee = intx::uint256(tx_gas_used) * tx.max_fee_per_gas;
+        check(gas_fee < std::numeric_limits<intx::uint256>::max(), "too much gas");
+        gas_fee *= _config.get().miner_cut;
+        gas_fee /= hundred_percent;
+        gas_fee_miner_portion.emplace(static_cast<intx::uint256>(gas_fee));
+    }
 
     if(from_self)
         eosio::check(receipt.success, "ingress bridge actions must succeed");
@@ -194,9 +249,14 @@ Receipt evm_contract::execute_tx( Block& block, const bytes& rlptx, silkworm::Ex
                 continue;
             total_egress += reserved_account.balance;
 
-            if(auto it = balance_table->find(egress_account.value); it != balance_table->end()) {
-                balance_table->modify(balance_table->get(egress_account.value), eosio::same_payer, [&](balance& b){
+            if(auto it = balance_table.find(egress_account.value); it != balance_table.end()) {
+                balance_table.modify(balance_table.get(egress_account.value), eosio::same_payer, [&](balance& b){
                     b.balance += reserved_account.balance;
+                    if (gas_fee_miner_portion.has_value() && egress_account == get_self()) {
+                        check(!deducted_miner_cut, "unexpected error: contract account appears twice in reserved objects");
+                        b.balance -= *gas_fee_miner_portion;
+                        deducted_miner_cut = true;
+                    }
                 });
             }
             else {
@@ -221,32 +281,50 @@ Receipt evm_contract::execute_tx( Block& block, const bytes& rlptx, silkworm::Ex
             inevm->set(inevm->get() -= total_egress, eosio::same_payer);
     }
 
+    // Send miner portion of the gas fee, if any, to the balance of the miner:
+    if (gas_fee_miner_portion.has_value() && *gas_fee_miner_portion != 0) {
+        check(deducted_miner_cut, "unexpected error: contract account did not receive any funds through its reserved address");
+        balance_table.modify(balance_table.get(miner.value), eosio::same_payer, [&](balance& b){
+            b.balance += *gas_fee_miner_portion;
+        });
+    }
+
     LOGTIME("EVM EXECUTE");
     return receipt;
 }
 
-void evm_contract::pushtx( eosio::name ram_payer, const bytes& rlptx ) {
+void evm_contract::pushtx( eosio::name miner, const bytes& rlptx ) {
     LOGTIME("EVM START");
 
     assert_unfrozen();
-    std::optional<std::pair<const std::string, const ChainConfig*>> found_chain_config = lookup_known_chain(_config.get().chainid);
-    check( found_chain_config.has_value(), "failed to find expected chain config" );
-    eosio::require_auth(ram_payer);
 
-    evm_common::block_mapping bm(_config.get().genesis_time.sec_since_epoch());
+    eosio::check((get_sender() != get_self()) || (miner == get_self()),
+                 "unexpected error: EVM contract generated inline pushtx without setting itself as the miner");
+
+    const auto& current_config = _config.get();
+    std::optional<std::pair<const std::string, const ChainConfig*>> found_chain_config = lookup_known_chain(current_config.chainid);
+    check( found_chain_config.has_value(), "failed to find expected chain config" );
+
+    evm_common::block_mapping bm(current_config.genesis_time.sec_since_epoch());
 
     Block block;
-    block.header.difficulty  = 1;
-    block.header.gas_limit   = 0x7ffffffffff;
-    block.header.number      = bm.timestamp_to_evm_block_num(eosio::current_time_point().time_since_epoch().count());
-    block.header.timestamp   = bm.evm_block_num_to_evm_timestamp(block.header.number);
+    evm_common::prepare_block_header(block.header, bm, get_self().value, 
+        bm.timestamp_to_evm_block_num(eosio::current_time_point().time_since_epoch().count()));
 
     silkworm::consensus::TrustEngine engine{*found_chain_config->second};
 
-    evm_runtime::state state{get_self(), ram_payer};
+    evm_runtime::state state{get_self(), get_self()};
     silkworm::ExecutionProcessor ep{block, engine, state, *found_chain_config->second};
 
-    auto receipt = execute_tx(block, rlptx, ep);
+    Transaction tx;
+    ByteView bv{(const uint8_t*)rlptx.data(), rlptx.size()};
+    eosio::check(rlp::decode(bv,tx) == DecodingResult::kOk && bv.empty(), "unable to decode transaction");
+    LOGTIME("EVM TX DECODE");
+
+    check(tx.max_priority_fee_per_gas == tx.max_fee_per_gas, "max_priority_fee_per_gas must be equal to max_fee_per_gas");
+    check(tx.max_fee_per_gas >= current_config.gas_price, "gas price is too low");
+
+    auto receipt = execute_tx(miner, block, tx, ep);
 
     engine.finalize(ep.state(), ep.evm().block(), ep.evm().revision());
     ep.state().write_to_db(ep.evm().block().header.number);
@@ -327,8 +405,10 @@ void evm_contract::handle_evm_transfer(eosio::asset quantity, const std::string&
         b.balance.balance += quantity;
     });
 
-    //substract off the ingress bridge fee from the quantity that will be bridged
-    quantity -= _config.get().ingress_bridge_fee;
+    const auto& current_config = _config.get();
+
+    //subtract off the ingress bridge fee from the quantity that will be bridged
+    quantity -= current_config.ingress_bridge_fee;
     eosio::check(quantity.amount > 0, "must bridge more than ingress bridge fee");
 
     const std::optional<Bytes> address_bytes = from_hex(memo);
@@ -340,8 +420,8 @@ void evm_contract::handle_evm_transfer(eosio::asset quantity, const std::string&
     const Transaction txn {
         .type = Transaction::Type::kLegacy,
         .nonce = get_and_increment_nonce(get_self()),
-        .max_priority_fee_per_gas = 0,
-        .max_fee_per_gas = 0,
+        .max_priority_fee_per_gas = current_config.gas_price,
+        .max_fee_per_gas = current_config.gas_price,
         .gas_limit = 21000,
         .to = to_evmc_address(*address_bytes),
         .value = value,
@@ -394,7 +474,7 @@ bool evm_contract::gc(uint32_t max) {
 }
 
 #ifdef WITH_TEST_ACTIONS
-ACTION evm_contract::testtx( const std::optional<bytes>& orlptx, const evm_runtime::test::block_info& bi ) {
+[[eosio::action]] void evm_contract::testtx( const std::optional<bytes>& orlptx, const evm_runtime::test::block_info& bi ) {
     assert_unfrozen();
 
     eosio::require_auth(get_self());
@@ -407,13 +487,17 @@ ACTION evm_contract::testtx( const std::optional<bytes>& orlptx, const evm_runti
     silkworm::ExecutionProcessor ep{block, engine, state, evm_runtime::test::kTestNetwork};
 
     if(orlptx) {
-        execute_tx(block, *orlptx, ep);
+        Transaction tx;
+        ByteView bv{(const uint8_t*)orlptx->data(), orlptx->size()};
+        eosio::check(rlp::decode(bv,tx) == DecodingResult::kOk && bv.empty(), "unable to decode transaction");
+
+        execute_tx(eosio::name{}, block, tx, ep);
     }
     engine.finalize(ep.state(), ep.evm().block(), ep.evm().revision());
     ep.state().write_to_db(ep.evm().block().header.number);
 }
 
-ACTION evm_contract::dumpstorage(const bytes& addy) {
+[[eosio::action]] void evm_contract::dumpstorage(const bytes& addy) {
     assert_inited();
 
     eosio::require_auth(get_self());
@@ -447,7 +531,7 @@ ACTION evm_contract::dumpstorage(const bytes& addy) {
     eosio::print(" = ", cnt, "\n");
 }
 
-ACTION evm_contract::dumpall() {
+[[eosio::action]] void evm_contract::dumpall() {
     assert_inited();
 
     eosio::require_auth(get_self());
@@ -497,7 +581,7 @@ ACTION evm_contract::dumpall() {
 }
 
 
-ACTION evm_contract::clearall() {
+[[eosio::action]] void evm_contract::clearall() {
     assert_unfrozen();
 
     eosio::require_auth(get_self());
@@ -539,7 +623,7 @@ ACTION evm_contract::clearall() {
     eosio::print("CLEAR end\n");
 }
 
-ACTION evm_contract::updatecode( const bytes& address, uint64_t incarnation, const bytes& code_hash, const bytes& code) {
+[[eosio::action]] void evm_contract::updatecode( const bytes& address, uint64_t incarnation, const bytes& code_hash, const bytes& code) {
     assert_unfrozen();
 
     eosio::require_auth(get_self());
@@ -549,7 +633,7 @@ ACTION evm_contract::updatecode( const bytes& address, uint64_t incarnation, con
     state.update_account_code(to_address(address), incarnation, to_bytes32(code_hash), bvcode);
 }
 
-ACTION evm_contract::updatestore(const bytes& address, uint64_t incarnation, const bytes& location, const bytes& initial, const bytes& current) {
+[[eosio::action]] void evm_contract::updatestore(const bytes& address, uint64_t incarnation, const bytes& location, const bytes& initial, const bytes& current) {
     assert_unfrozen();
 
     eosio::require_auth(get_self());
@@ -566,7 +650,7 @@ ACTION evm_contract::updatestore(const bytes& address, uint64_t incarnation, con
     state.update_storage(to_address(address), incarnation, to_bytes32(location), to_bytes32(initial), to_bytes32(current));
 }
 
-ACTION evm_contract::updateaccnt(const bytes& address, const bytes& initial, const bytes& current) {
+[[eosio::action]] void evm_contract::updateaccnt(const bytes& address, const bytes& initial, const bytes& current) {
     assert_unfrozen();
 
     eosio::require_auth(get_self());
@@ -590,7 +674,7 @@ ACTION evm_contract::updateaccnt(const bytes& address, const bytes& initial, con
     state.update_account(to_address(address), oinitial, ocurrent);
 }
 
-ACTION evm_contract::setbal(const bytes& addy, const bytes& bal) {
+[[eosio::action]] void evm_contract::setbal(const bytes& addy, const bytes& bal) {
     assert_unfrozen();
 
     eosio::require_auth(get_self());
@@ -613,7 +697,7 @@ ACTION evm_contract::setbal(const bytes& addy, const bytes& bal) {
     }
 }
 
-ACTION evm_contract::testbaldust(const name test) {
+[[eosio::action]] void evm_contract::testbaldust(const name test) {
     if(test == "basic"_n) {
         balance_with_dust b;
         //                  ↱minimum EOS

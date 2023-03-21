@@ -29,6 +29,8 @@ from TestHarness.testUtils import ReturnType
 from TestHarness.testUtils import unhandledEnumType
 from core_symbol import CORE_SYMBOL
 
+from antelope_name import convert_name_to_value
+
 ###############################################################
 # nodeos_trust_evm_test
 #
@@ -105,7 +107,6 @@ def interact_with_storage_contract(dest, nonce):
         gasP=getGasPrice()
         signed_trx = w3.eth.account.sign_transaction(dict(
             nonce=nonce,
-            #        maxFeePerGas=150000000000, #150 GWei
             gas=100000,       #100k Gas
             gasPrice=gasP,
             to=Web3.toChecksumAddress(dest),
@@ -114,8 +115,8 @@ def interact_with_storage_contract(dest, nonce):
             chainId=evmChainId
         ), evmSendKey)
 
-        actData = {"ram_payer":"evmevmevmevm", "rlptx":Web3.toHex(signed_trx.rawTransaction)[2:]}
-        retValue = prodNode.pushMessage(evmAcc.name, "pushtx", json.dumps(actData), '-p evmevmevmevm')
+        actData = {"miner":minerAcc.name, "rlptx":Web3.toHex(signed_trx.rawTransaction)[2:]}
+        retValue = prodNode.pushMessage(evmAcc.name, "pushtx", json.dumps(actData), '-p {0}'.format(minerAcc.name))
         assert retValue[0], "pushtx to ETH contract failed."
         Utils.Print("\tBlock#", retValue[1]["processed"]["block_num"])
         row0=prodNode.getTableRow(evmAcc.name, 3, "storage", 0)
@@ -232,28 +233,6 @@ def makeReservedEvmAddress(account):
                c_uint8(account >>  0).value]
     return "0x" + bytes(bytearr).hex()
 
-def charToSymbol(c: str):
-    assert len(c) == 1
-    if c >= 'a' and c <= 'z':
-        return ord(c) - ord('a') + 6
-    if c >= '1' and c <= '5':
-        return ord(c) - ord('1') + 1
-    return 0
-
-def nameStrToInt(s: str):
-    n = 0
-    i = 0
-    for i, c in enumerate(s):
-        if i >= 12:
-            break
-        n |= (charToSymbol(c) & 0x1f) << (64 - (5 * (i + 1)))
-        i = i + 1
-
-    assert i > 0
-    if i < len(s) and i == 12:
-        n |= charToSymbol(s[12]) & 0x0F
-    return n
-
 try:
     TestHelper.printSystemInfo("BEGIN")
 
@@ -293,6 +272,7 @@ try:
     evmAcc.name = "evmevmevmevm"
     testAcc = accounts[1]
     txWrapAcc = accounts[2]
+    minerAcc = txWrapAcc
 
     testWalletName="test"
 
@@ -315,7 +295,7 @@ try:
         nonProdNode.transferFunds(cluster.eosioAccount, account, transferAmount, "test transfer", waitForTransBlock=True)
         if account.name == evmAcc.name:
             # stake more for evmAcc so it has a smaller balance, during setup of addys below the difference will be transferred in
-            trans=nonProdNode.delegatebw(account, 20000000.0000 + numAddys*1000000.0000, 20000000.0000, waitForTransBlock=True, exitOnError=True)
+            trans=nonProdNode.delegatebw(account, 20000000.0000 + numAddys*1000000.0000, 20000001.0000, waitForTransBlock=True, exitOnError=True)
         else:
             trans=nonProdNode.delegatebw(account, 20000000.0000, 20000000.0000, waitForTransBlock=True, exitOnError=True)
 
@@ -324,7 +304,12 @@ try:
     abiFile="evm_runtime.abi"
     Utils.Print("Publish evm_runtime contract")
     prodNode.publishContract(evmAcc, contractDir, wasmFile, abiFile, waitForTransBlock=True)
-    trans = prodNode.pushMessage(evmAcc.name, "init", '{"chainid":15555}', '-p evmevmevmevm')
+
+    # add eosio.code permission
+    cmd="set account permission evmevmevmevm active --add-code -p evmevmevmevm@active"
+    prodNode.processCleosCmd(cmd, cmd, silentErrors=True, returnType=ReturnType.raw)
+
+    trans = prodNode.pushMessage(evmAcc.name, "init", '{{"chainid":15555, "fee_params": {{"gas_price": "10000000000", "miner_cut": 100000, "ingress_bridge_fee": "0.0000 {0}"}}}}'.format(CORE_SYMBOL), '-p evmevmevmevm')
     prodNode.waitForTransBlockIfNeeded(trans[1], True)
     transId=prodNode.getTransId(trans[1])
     blockNum = prodNode.getBlockNumByTransId(transId)
@@ -352,13 +337,17 @@ try:
         "extraData": "TrustEVM",
         "gasLimit": "0x7ffffffffff",
         "mixHash": "0x"+block["id"],
-        "nonce": hex(1000),
+        "nonce": f'{convert_name_to_value(evmAcc.name):#0x}',
         "timestamp": hex(int(calendar.timegm(datetime.strptime(block["timestamp"].split(".")[0], '%Y-%m-%dT%H:%M:%S').timetuple())))
     }
 
-    # add eosio.code permission
-    cmd="set account permission evmevmevmevm active --add-code -p evmevmevmevm@active"
-    prodNode.processCleosCmd(cmd, cmd, silentErrors=True, returnType=ReturnType.raw)
+    Utils.Print("Send small balance to special balance to allow the bridge to work")
+    transferAmount="1.0000 {0}".format(CORE_SYMBOL)
+    Print("Transfer funds %s from account %s to %s" % (transferAmount, cluster.eosioAccount.name, evmAcc.name))
+    nonProdNode.transferFunds(cluster.eosioAccount, evmAcc, transferAmount, evmAcc.name, waitForTransBlock=True)
+
+    Utils.Print("Open balance for miner")
+    trans=prodNode.pushMessage(evmAcc.name, "open", '[{0}]'.format(minerAcc.name), '-p {0}'.format(minerAcc.name))
 
     #
     # Setup tx_wrapper
@@ -398,7 +387,6 @@ try:
     gasP = getGasPrice()
     signed_trx = w3.eth.account.sign_transaction(dict(
         nonce=nonce,
-#        maxFeePerGas=150000000000, #150 GWei
         gas=100000,       #100k Gas
         gasPrice=gasP,
         to=Web3.toChecksumAddress(toAdd),
@@ -407,8 +395,8 @@ try:
         chainId=evmChainId
     ), evmSendKey)
 
-    actData = {"ram_payer":"evmevmevmevm", "rlptx":Web3.toHex(signed_trx.rawTransaction)[2:]}
-    trans = prodNode.pushMessage(evmAcc.name, "pushtx", json.dumps(actData), '-p evmevmevmevm')
+    actData = {"miner":minerAcc.name, "rlptx":Web3.toHex(signed_trx.rawTransaction)[2:]}
+    trans = prodNode.pushMessage(evmAcc.name, "pushtx", json.dumps(actData), '-p {0}'.format(minerAcc.name))
     prodNode.waitForTransBlockIfNeeded(trans[1], True)
 
     #
@@ -417,7 +405,7 @@ try:
 
     # incorrect nonce
     Utils.Print("Send balance again, should fail with wrong nonce")
-    retValue = prodNode.pushMessage(evmAcc.name, "pushtx", json.dumps(actData), '-p evmevmevmevm', silentErrors=True, force=True)
+    retValue = prodNode.pushMessage(evmAcc.name, "pushtx", json.dumps(actData), '-p {0}'.format(minerAcc.name), silentErrors=True)
     assert not retValue[0], f"push trx should have failed: {retValue}"
 
     # correct nonce
@@ -425,7 +413,6 @@ try:
     gasP = getGasPrice()
     signed_trx = w3.eth.account.sign_transaction(dict(
         nonce=nonce,
-        #        maxFeePerGas=150000000000, #150 GWei
         gas=100000,       #100k Gas
         gasPrice=gasP,
         to=Web3.toChecksumAddress(toAdd),
@@ -434,9 +421,9 @@ try:
         chainId=evmChainId
     ), evmSendKey)
 
-    actData = {"ram_payer":"evmevmevmevm", "rlptx":Web3.toHex(signed_trx.rawTransaction)[2:]}
+    actData = {"miner":minerAcc.name, "rlptx":Web3.toHex(signed_trx.rawTransaction)[2:]}
     Utils.Print("Send balance again, with correct nonce")
-    retValue = prodNode.pushMessage(evmAcc.name, "pushtx", json.dumps(actData), '-p evmevmevmevm', silentErrors=True, force=True)
+    retValue = prodNode.pushMessage(evmAcc.name, "pushtx", json.dumps(actData), '-p {0}'.format(minerAcc.name), silentErrors=True)
     assert retValue[0], f"push trx should have succeeded: {retValue}"
 
     # incorrect chainid
@@ -445,7 +432,6 @@ try:
     gasP = getGasPrice()
     signed_trx = w3.eth.account.sign_transaction(dict(
         nonce=nonce,
-        #        maxFeePerGas=150000000000, #150 GWei
         gas=100000,       #100k Gas
         gasPrice=gasP,
         to=Web3.toChecksumAddress(toAdd),
@@ -454,9 +440,9 @@ try:
         chainId=evmChainId
     ), evmSendKey)
 
-    actData = {"ram_payer":"evmevmevmevm", "rlptx":Web3.toHex(signed_trx.rawTransaction)[2:]}
+    actData = {"miner":minerAcc.name, "rlptx":Web3.toHex(signed_trx.rawTransaction)[2:]}
     Utils.Print("Send balance again, with invalid chainid")
-    retValue = prodNode.pushMessage(evmAcc.name, "pushtx", json.dumps(actData), '-p evmevmevmevm', silentErrors=True, force=True)
+    retValue = prodNode.pushMessage(evmAcc.name, "pushtx", json.dumps(actData), '-p {0}'.format(minerAcc.name), silentErrors=True)
     assert not retValue[0], f"push trx should have failed: {retValue}"
 
     # correct values for continuing
@@ -480,15 +466,14 @@ try:
     gasP = getGasPrice()
     signed_trx = w3.eth.account.sign_transaction(dict(
         nonce=nonce,
-        #        maxFeePerGas=150000000000, #150 GWei
         gas=1000000,       #5M Gas
         gasPrice=gasP,
         data=Web3.toBytes(hexstr='608060405234801561001057600080fd5b50610150806100206000396000f3fe608060405234801561001057600080fd5b50600436106100365760003560e01c80632e64cec11461003b5780636057361d14610059575b600080fd5b610043610075565b60405161005091906100a1565b60405180910390f35b610073600480360381019061006e91906100ed565b61007e565b005b60008054905090565b8060008190555050565b6000819050919050565b61009b81610088565b82525050565b60006020820190506100b66000830184610092565b92915050565b600080fd5b6100ca81610088565b81146100d557600080fd5b50565b6000813590506100e7816100c1565b92915050565b600060208284031215610103576101026100bc565b5b6000610111848285016100d8565b9150509291505056fea2646970667358fe12209ffe32fe5779018f7ee58886c856a4cfdf550f2df32cec944f57716a3abf4a5964736f6c63430008110033'),
         chainId=evmChainId
     ), evmSendKey)
 
-    actData = {"ram_payer":"evmevmevmevm", "rlptx":Web3.toHex(signed_trx.rawTransaction)[2:]}
-    retValue = prodNode.pushMessage(evmAcc.name, "pushtx", json.dumps(actData), '-p evmevmevmevm', silentErrors=True, force=True)
+    actData = {"miner":minerAcc.name, "rlptx":Web3.toHex(signed_trx.rawTransaction)[2:]}
+    retValue = prodNode.pushMessage(evmAcc.name, "pushtx", json.dumps(actData), '-p {0}'.format(minerAcc.name), silentErrors=True)
     assert retValue[0], f"push trx should have succeeded: {retValue}"
     nonce = interact_with_storage_contract(makeContractAddress(fromAdd, nonce), nonce)
 
@@ -519,9 +504,9 @@ try:
         Utils.errorExit("Unexpected starting conditions. Excepted %s, evm actual: %s, test actual %s" % (expectedAmount, evmAccActualAmount, testAccActualAmount))
 
     # set ingress bridge fee
-    data="[\"0.0100 {0}\"]".format(CORE_SYMBOL)
-    opts="--permission evmevmevmevm@active"
-    trans=prodNode.pushMessage("evmevmevmevm", "setingressfee", data, opts)
+    Utils.Print("Set ingress bridge fee")
+    data='[{{"gas_price": null, "miner_cut": null, "ingress_bridge_fee": "0.0100 {}"}}]'.format(CORE_SYMBOL)
+    trans=prodNode.pushMessage(evmAcc.name, "setfeeparams", data, '-p {0}'.format(evmAcc.name))
 
     rows=prodNode.getTable(evmAcc.name, evmAcc.name, "balances")
     Utils.Print("\tBefore transfer table rows:", rows)
@@ -533,7 +518,7 @@ try:
 
     row0=prodNode.getTableRow(evmAcc.name, evmAcc.name, "balances", 0)
     Utils.Print("\tAfter transfer table row:", row0)
-    assert(row0["balance"]["balance"] == "0.0100 {0}".format(CORE_SYMBOL)) # should have fee at end of transaction
+    assert(row0["balance"]["balance"] == "1.0100 {0}".format(CORE_SYMBOL)) # should have fee at end of transaction
     testAccActualAmount=prodNode.getAccountEosBalanceStr(evmAcc.name)
     Utils.Print("\tEVM  Account balance %s" % testAccActualAmount)
     expectedAmount="60000097.5321 {0}".format(CORE_SYMBOL)
@@ -544,9 +529,9 @@ try:
     Utils.Print("\tTest Account balance %s" % testAccActualAmount)
     if testAccActualAmount != expectedAmount:
         Utils.errorExit("Transfer verification failed. Excepted %s, actual: %s" % (expectedAmount, testAccActualAmount))
-    row4=prodNode.getTableRow(evmAcc.name, evmAcc.name, "account", 4) # 4th balance of this integration test
-    assert(row4["eth_address"] == "f0ce7bab13c99ba0565f426508a7cd8f4c247e5a")
-    assert(row4["balance"] == "000000000000000000000000000000000000000000000005496419417a1f4000") # 0x5496419417a1f4000 => 97522100000000000000 (97.5321 - 0.0100)
+    row3=prodNode.getTableRow(evmAcc.name, evmAcc.name, "account", 3) # 3rd balance of this integration test
+    assert(row3["eth_address"] == "f0ce7bab13c99ba0565f426508a7cd8f4c247e5a")
+    assert(row3["balance"] == "000000000000000000000000000000000000000000000005496419417a1f4000") # 0x5496419417a1f4000 => 97522100000000000000 (97.5321 - 0.0100)
 
     # EOS -> EVM to the same address
     transferAmount="10.0000 {0}".format(CORE_SYMBOL)
@@ -554,7 +539,7 @@ try:
     prodNode.transferFunds(testAcc, evmAcc, transferAmount, "0xF0cE7BaB13C99bA0565f426508a7CD8f4C247E5a", waitForTransBlock=True)
     row0=prodNode.getTableRow(evmAcc.name, evmAcc.name, "balances", 0)
     Utils.Print("\tAfter transfer table row:", row0)
-    assert(row0["balance"]["balance"] == "0.0200 {0}".format(CORE_SYMBOL)) # should have fee from both transfers
+    assert(row0["balance"]["balance"] == "1.0200 {0}".format(CORE_SYMBOL)) # should have fee from both transfers
     evmAccActualAmount=prodNode.getAccountEosBalanceStr(evmAcc.name)
     Utils.Print("\tEVM  Account balance %s" % evmAccActualAmount)
     expectedAmount="60000107.5321 {0}".format(CORE_SYMBOL)
@@ -565,9 +550,9 @@ try:
     Utils.Print("\tTest Account balance %s" % testAccActualAmount)
     if testAccActualAmount != expectedAmount:
         Utils.errorExit("Transfer verification failed. Excepted %s, actual: %s" % (expectedAmount, testAccActualAmount))
-    row4=prodNode.getTableRow(evmAcc.name, evmAcc.name, "account", 4) # 4th balance of this integration test
-    assert(row4["eth_address"] == "f0ce7bab13c99ba0565f426508a7cd8f4c247e5a")
-    assert(row4["balance"] == "000000000000000000000000000000000000000000000005d407b55394464000") # 0x5d407b55394464000 => 107512100000000000000 (97.5321 + 10.000 - 0.0100 - 0.0100)
+    row3=prodNode.getTableRow(evmAcc.name, evmAcc.name, "account", 3) # 3rd balance of this integration test
+    assert(row3["eth_address"] == "f0ce7bab13c99ba0565f426508a7cd8f4c247e5a")
+    assert(row3["balance"] == "000000000000000000000000000000000000000000000005d407b55394464000") # 0x5d407b55394464000 => 107512100000000000000 (97.5321 + 10.000 - 0.0100 - 0.0100)
 
     # EOS -> EVM to diff address
     transferAmount="42.4242 {0}".format(CORE_SYMBOL)
@@ -575,7 +560,7 @@ try:
     prodNode.transferFunds(testAcc, evmAcc, transferAmount, "0x9E126C57330FA71556628e0aabd6B6B6783d99fA", waitForTransBlock=True)
     row0=prodNode.getTableRow(evmAcc.name, evmAcc.name, "balances", 0)
     Utils.Print("\tAfter transfer table row:", row0)
-    assert(row0["balance"]["balance"] == "0.0300 {0}".format(CORE_SYMBOL)) # should have fee from all three transfers
+    assert(row0["balance"]["balance"] == "1.0300 {0}".format(CORE_SYMBOL)) # should have fee from all three transfers
     evmAccActualAmount=prodNode.getAccountEosBalanceStr(evmAcc.name)
     Utils.Print("\tEVM  Account balance %s" % evmAccActualAmount)
     expectedAmount="60000149.9563 {0}".format(CORE_SYMBOL)
@@ -586,13 +571,13 @@ try:
     Utils.Print("\tTest Account balance %s" % testAccActualAmount)
     if testAccActualAmount != expectedAmount:
         Utils.errorExit("Transfer verification failed. Excepted %s, actual: %s" % (expectedAmount, testAccActualAmount))
-    row5=prodNode.getTableRow(evmAcc.name, evmAcc.name, "account", 5) # 5th balance of this integration test
-    assert(row5["eth_address"] == "9e126c57330fa71556628e0aabd6b6b6783d99fa")
-    assert(row5["balance"] == "0000000000000000000000000000000000000000000000024c9d822e105f8000") # 0x24c9d822e105f8000 => 42414200000000000000 (42.4242 - 0.0100)
+    row4=prodNode.getTableRow(evmAcc.name, evmAcc.name, "account", 4) # 4th balance of this integration test
+    assert(row4["eth_address"] == "9e126c57330fa71556628e0aabd6b6b6783d99fa")
+    assert(row4["balance"] == "0000000000000000000000000000000000000000000000024c9d822e105f8000") # 0x24c9d822e105f8000 => 42414200000000000000 (42.4242 - 0.0100)
 
     # EVM -> EOS
     #   0x9E126C57330FA71556628e0aabd6B6B6783d99fA private key: 0xba8c9ff38e4179748925335a9891b969214b37dc3723a1754b8b849d3eea9ac0
-    toAdd = makeReservedEvmAddress(nameStrToInt(testAcc.name))
+    toAdd = makeReservedEvmAddress(convert_name_to_value(testAcc.name))
     evmSendKey = "ba8c9ff38e4179748925335a9891b969214b37dc3723a1754b8b849d3eea9ac0"
     amount=13.1313
     transferAmount="13.1313 {0}".format(CORE_SYMBOL)
@@ -601,7 +586,6 @@ try:
     gasP = getGasPrice()
     signed_trx = w3.eth.account.sign_transaction(dict(
         nonce=nonce,
-        #        maxFeePerGas=150000000000, #150 GWei
         gas=100000,       #100k Gas
         gasPrice=gasP,
         to=Web3.toChecksumAddress(toAdd),
@@ -609,13 +593,13 @@ try:
         data=b'',
         chainId=evmChainId
     ), evmSendKey)
-    actData = {"ram_payer":"evmevmevmevm", "rlptx":Web3.toHex(signed_trx.rawTransaction)[2:]}
-    trans = prodNode.pushMessage(evmAcc.name, "pushtx", json.dumps(actData), '-p evmevmevmevm', silentErrors=True, force=True)
+    actData = {"miner":minerAcc.name, "rlptx":Web3.toHex(signed_trx.rawTransaction)[2:]}
+    trans = prodNode.pushMessage(evmAcc.name, "pushtx", json.dumps(actData), '-p {0}'.format(minerAcc.name), silentErrors=True)
     prodNode.waitForTransBlockIfNeeded(trans[1], True)
-    row5=prodNode.getTableRow(evmAcc.name, evmAcc.name, "account", 5) # 5th balance of this integration test
-    Utils.Print("\taccount row5: ", row5)
-    assert(row5["eth_address"] == "9e126c57330fa71556628e0aabd6b6b6783d99fa")
-    assert(row5["balance"] == "0000000000000000000000000000000000000000000000019661c2670d48edf8") # 0x19661c2670d48edf8 => 29282899999999979000 (42.4242 - 0.0100 - 13.131313 - gas 21000wei)
+    row4=prodNode.getTableRow(evmAcc.name, evmAcc.name, "account", 4) # 4th balance of this integration test
+    Utils.Print("\taccount row4: ", row4)
+    assert(row4["eth_address"] == "9e126c57330fa71556628e0aabd6b6b6783d99fa")
+    assert(row4["balance"] == "000000000000000000000000000000000000000000000001966103689de22000") # 0x1966103689de22000 => 29282690000000000000 (42.4242 - 0.0100 - 13.1313 - 21000 * 10^10)
     expectedAmount="60000136.8250 {0}".format(CORE_SYMBOL)
     evmAccActualAmount=prodNode.getAccountEosBalanceStr(evmAcc.name)
     Utils.Print("\tEVM  Account balance %s" % evmAccActualAmount)
@@ -635,7 +619,6 @@ try:
     gasP = getGasPrice()
     signed_trx = w3.eth.account.sign_transaction(dict(
         nonce=nonce,
-        #        maxFeePerGas=150000000000, #150 GWei
         gas=100000,       #100k Gas
         gasPrice=gasP,
         to=Web3.toChecksumAddress(toAdd),
@@ -643,13 +626,13 @@ try:
         data=b'',
         chainId=evmChainId
     ), evmSendKey)
-    actData = {"ram_payer":"evmevmevmevm", "rlptx":Web3.toHex(signed_trx.rawTransaction)[2:]}
-    trans = prodNode.pushMessage(evmAcc.name, "pushtx", json.dumps(actData), '-p evmevmevmevm', silentErrors=True, force=True)
+    actData = {"miner":minerAcc.name, "rlptx":Web3.toHex(signed_trx.rawTransaction)[2:]}
+    trans = prodNode.pushMessage(evmAcc.name, "pushtx", json.dumps(actData), '-p {0}'.format(minerAcc.name), silentErrors=True)
     prodNode.waitForTransBlockIfNeeded(trans[1], True)
-    row5=prodNode.getTableRow(evmAcc.name, evmAcc.name, "account", 5) # 5th balance of this integration test
-    Utils.Print("\taccount row5: ", row5)
-    assert(row5["eth_address"] == "9e126c57330fa71556628e0aabd6b6b6783d99fa")
-    assert(row5["balance"] == "00000000000000000000000000000000000000000000000188810bb365e49bf0") # 0x188810bb365e49bf0 => 28282899999999958000 (42.4242 - 0.0100 - 13.131313 - 1.0000 - 2*gas 21000wei)
+    row4=prodNode.getTableRow(evmAcc.name, evmAcc.name, "account", 4) # 4th balance of this integration test
+    Utils.Print("\taccount row4: ", row4)
+    assert(row4["eth_address"] == "9e126c57330fa71556628e0aabd6b6b6783d99fa")
+    assert(row4["balance"] == "000000000000000000000000000000000000000000000001887f8db687170000") # 0x1887f8db687170000 => 28282480000000000000 (42.4242 - 0.0100 - 13.1313 - 1.0000 - 2 * 21000 * 10^10)
     expectedAmount="60000135.8250 {0}".format(CORE_SYMBOL)
     evmAccActualAmount=prodNode.getAccountEosBalanceStr(evmAcc.name)
     Utils.Print("\tEVM  Account balance %s" % evmAccActualAmount)
