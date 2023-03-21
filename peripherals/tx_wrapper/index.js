@@ -111,50 +111,6 @@ function zero_pad(hexstr) {
   return res.length % 2 ? '0'+res : res;
 }
 
-async function eth_estimateGas(params) {
-  // TODO: get estimation from evm runtime
-  const data = {
-    from  : params[0].from.substr(2),
-    to    : params[0].to.substr(2),
-    value : zero_pad(params[0].value),
-    data  : params[0].data || ""
-  };
-  
-	try {
-    const result = await api.transact(
-      {
-        actions: [
-          {
-            account: process.env.EOS_EVM_ACCOUNT,
-            name: "estimate",
-            authorization: [{
-                actor      : process.env.EOS_EVM_ACCOUNT,
-                permission : "active",
-              }
-            ],
-            data: data
-          },
-        ],
-      },
-      {
-        blocksBehind: 3,
-        expireSeconds: 3000,
-      }
-    );
-  } catch(err) {
-    if (err.details && err.details[0] && err.details[0].messge) {
-      const m = err.details[0].message.match(/assertion failure with message: GAS:\[(\d+),(\d+)\]/);
-      if(m) {
-        console.log("estimated: ", m[2]);
-        return '0x'+parseInt(m[2]).toString(16);
-      }
-    }
-		
-	  console.log("default: 21k");
-	  return "0x5208"; //21000
-  }
-}
-
 // Setting up the RPC server
 const rpcServer = new RpcServer({
   path: "/",
@@ -174,7 +130,6 @@ const rpcServer = new RpcServer({
 
 rpcServer.setMethod("eth_sendRawTransaction", eth_sendRawTransaction);
 rpcServer.setMethod("eth_gasPrice", eth_gasPrice);
-rpcServer.setMethod("eth_estimateGas", eth_estimateGas);
 
 // Main loop
 rpcServer.listen(+process.env.PORT, process.env.HOST).then(() => {
