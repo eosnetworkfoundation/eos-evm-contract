@@ -10,22 +10,6 @@ struct blockhash_evm_tester : basic_evm_tester {
    }
 };
 
-struct evm_account {
-    uint64_t                id;
-    std::vector<char>       eth_address;
-    uint64_t                nonce;
-    std::vector<char>       balance;
-    std::optional<uint64_t> code_id;
-};
-FC_REFLECT(evm_account, (id)(eth_address)(nonce)(balance)(code_id));
-
-struct evm_storage {
-   uint64_t id;
-   std::vector<char> key;
-   std::vector<char> value;
-};
-FC_REFLECT(evm_storage, (id)(key)(value));
-
 BOOST_AUTO_TEST_SUITE(blockhash_evm_tests)
 BOOST_FIXTURE_TEST_CASE(blockhash_tests, blockhash_evm_tester) try {
 
