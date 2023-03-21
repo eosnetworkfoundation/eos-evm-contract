@@ -920,7 +920,7 @@ This determines the value of the "timestamp" field in EVM genesis.
 
 Set the "mixHash" field to be "0x + Antelope starting block id", e.g.  "0x000000026d392f1bfeddb000555bcb03ca6e31a54c0cf9edc23cede42bda17e6"
 
-Set the "nonce" field with "0x3e8". This is re-purposed to be the block time (in mill-second) of the EVM chain.
+Set the "nonce" field to be the hex encoding of the value of the Antelope name of the account on which the EVM contract is deployed. So if the `evmevmevmevm` account name is used, then set the nonce to "0x56e4adc95b92b720". If the `eosio.evm` account name is used, then set the nonce to "0x56e4adc95b92b720". This is re-purposed to be the block time (in mill-second) of the EVM chain.
 
 In the "alloc" part, setup the genesis EVM account balance.
 
@@ -949,7 +949,7 @@ Final EVM genesis example:
         "extraData": "TrustEVM",
         "gasLimit": "0x7ffffffffff",
         "mixHash": "0x000000026d392f1bfeddb000555bcb03ca6e31a54c0cf9edc23cede42bda17e6",
-        "nonce": "0x3e8",
+        "nonce": "0x56e4adc95b92b720",
         "timestamp": "0x63773b2a"
     }
 ```

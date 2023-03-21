@@ -91,7 +91,7 @@ while current_nonce - starting_nonce < len(to_acc_bals):
     batch_end = i + batch_size
 
     print("distribute {} to account {}, nonce {}".format(to_acc_bals[i][1], to_acc_bals[i][0], starting_nonce + i))
-    act_data = {"ram_payer":EOS_SENDER, "rlptx":to_acc_bals[i][2]}
+    act_data = {"miner":EOS_SENDER, "rlptx":to_acc_bals[i][2]}
     result = subprocess.run(["./cleos", "-u", NODEOS_ENDPOINT, "push", "action", EVM_CONTRACT, "pushtx", json.dumps(act_data), "-p", EOS_SENDER, "-s", "-j", "-d"], capture_output=True, text=True)
     txn_json = json.loads(result.stdout)
     i = i + 1
@@ -99,7 +99,7 @@ while current_nonce - starting_nonce < len(to_acc_bals):
 
     while i < batch_end and i < len(to_acc_bals):
         print("distribute {} to account {}, nonce {}".format(to_acc_bals[i][1], to_acc_bals[i][0], starting_nonce + i))
-        act_data = {"ram_payer":EOS_SENDER, "rlptx":to_acc_bals[i][2]}
+        act_data = {"miner":EOS_SENDER, "rlptx":to_acc_bals[i][2]}
         act_json = json.loads(json.dumps(txn_json["actions"][0]))
         act_json["data"] = act_data
         txn_json["actions"].append(act_json)
