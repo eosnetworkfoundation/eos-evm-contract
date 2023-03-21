@@ -405,7 +405,7 @@ try:
 
     # incorrect nonce
     Utils.Print("Send balance again, should fail with wrong nonce")
-    retValue = prodNode.pushMessage(evmAcc.name, "pushtx", json.dumps(actData), '-p {0}'.format(minerAcc.name), silentErrors=True, force=True)
+    retValue = prodNode.pushMessage(evmAcc.name, "pushtx", json.dumps(actData), '-p {0}'.format(minerAcc.name), silentErrors=True)
     assert not retValue[0], f"push trx should have failed: {retValue}"
 
     # correct nonce
@@ -423,7 +423,7 @@ try:
 
     actData = {"miner":minerAcc.name, "rlptx":Web3.toHex(signed_trx.rawTransaction)[2:]}
     Utils.Print("Send balance again, with correct nonce")
-    retValue = prodNode.pushMessage(evmAcc.name, "pushtx", json.dumps(actData), '-p {0}'.format(minerAcc.name), silentErrors=True, force=True)
+    retValue = prodNode.pushMessage(evmAcc.name, "pushtx", json.dumps(actData), '-p {0}'.format(minerAcc.name), silentErrors=True)
     assert retValue[0], f"push trx should have succeeded: {retValue}"
 
     # incorrect chainid
@@ -442,7 +442,7 @@ try:
 
     actData = {"miner":minerAcc.name, "rlptx":Web3.toHex(signed_trx.rawTransaction)[2:]}
     Utils.Print("Send balance again, with invalid chainid")
-    retValue = prodNode.pushMessage(evmAcc.name, "pushtx", json.dumps(actData), '-p {0}'.format(minerAcc.name), silentErrors=True, force=True)
+    retValue = prodNode.pushMessage(evmAcc.name, "pushtx", json.dumps(actData), '-p {0}'.format(minerAcc.name), silentErrors=True)
     assert not retValue[0], f"push trx should have failed: {retValue}"
 
     # correct values for continuing
@@ -473,7 +473,7 @@ try:
     ), evmSendKey)
 
     actData = {"miner":minerAcc.name, "rlptx":Web3.toHex(signed_trx.rawTransaction)[2:]}
-    retValue = prodNode.pushMessage(evmAcc.name, "pushtx", json.dumps(actData), '-p {0}'.format(minerAcc.name), silentErrors=True, force=True)
+    retValue = prodNode.pushMessage(evmAcc.name, "pushtx", json.dumps(actData), '-p {0}'.format(minerAcc.name), silentErrors=True)
     assert retValue[0], f"push trx should have succeeded: {retValue}"
     nonce = interact_with_storage_contract(makeContractAddress(fromAdd, nonce), nonce)
 
@@ -594,7 +594,7 @@ try:
         chainId=evmChainId
     ), evmSendKey)
     actData = {"miner":minerAcc.name, "rlptx":Web3.toHex(signed_trx.rawTransaction)[2:]}
-    trans = prodNode.pushMessage(evmAcc.name, "pushtx", json.dumps(actData), '-p {0}'.format(minerAcc.name), silentErrors=True, force=True)
+    trans = prodNode.pushMessage(evmAcc.name, "pushtx", json.dumps(actData), '-p {0}'.format(minerAcc.name), silentErrors=True)
     prodNode.waitForTransBlockIfNeeded(trans[1], True)
     row4=prodNode.getTableRow(evmAcc.name, evmAcc.name, "account", 4) # 4th balance of this integration test
     Utils.Print("\taccount row4: ", row4)
@@ -627,7 +627,7 @@ try:
         chainId=evmChainId
     ), evmSendKey)
     actData = {"miner":minerAcc.name, "rlptx":Web3.toHex(signed_trx.rawTransaction)[2:]}
-    trans = prodNode.pushMessage(evmAcc.name, "pushtx", json.dumps(actData), '-p {0}'.format(minerAcc.name), silentErrors=True, force=True)
+    trans = prodNode.pushMessage(evmAcc.name, "pushtx", json.dumps(actData), '-p {0}'.format(minerAcc.name), silentErrors=True)
     prodNode.waitForTransBlockIfNeeded(trans[1], True)
     row4=prodNode.getTableRow(evmAcc.name, evmAcc.name, "account", 4) # 4th balance of this integration test
     Utils.Print("\taccount row4: ", row4)
