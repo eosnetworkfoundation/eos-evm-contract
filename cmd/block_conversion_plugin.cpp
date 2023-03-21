@@ -52,20 +52,27 @@ class block_conversion_plugin_impl : std::enable_shared_from_this<block_conversi
             return;
          }
 
-         uint64_t block_interval_ms = silkworm::endian::load_big_u64(genesis_header->nonce.data());
-         // TODO: Consider redefining genesis nonce to be in units of seconds rather than milliseconds? Or just hardcode to 1 second?
+         bm.emplace(genesis_header->timestamp, 1); // Hardcoded to 1 second block interval
 
-         if (block_interval_ms == 0  || block_interval_ms % 1000 != 0) {
-            SILK_CRIT << "Genesis nonce is invalid. Must be a positive multiple of 1000 representing the block interval in milliseconds. " 
-                         "Instead got: " << block_interval_ms;
+         SILK_INFO << "Block interval (in seconds): " << bm->block_interval;
+         SILK_INFO << "Genesis timestamp (in seconds since Unix epoch): " << bm->genesis_timestamp;
+
+         // The nonce in the genesis header encodes the name of the Antelope account on which the EVM contract has been deployed.
+         // This name is necessary to determine which reserved address to use as the beneficiary of the blocks.
+         evm_contract_name = silkworm::endian::load_big_u64(genesis_header->nonce.data());
+
+         SILK_INFO << "Genesis nonce (as hex): " << silkworm::to_hex(evm_contract_name, true);
+         SILK_INFO << "Genesis nonce (as Antelope name): " << eosio::name{evm_contract_name}.to_string();
+
+         if (evm_contract_name == 0  || (evm_contract_name == 1000)) {
+            // TODO: Remove the (evm_contract_name == 1000) condition once we feel comfortable other tests and scripts have been 
+            //       updated to reflect this new meaning of the nonce (used to be block interval in milliseconds).
+
+            SILK_CRIT << "Genesis nonce does not represent a valid Antelope account name. "
+                         "It must be the name of the account on which the EVM contract is deployed";
             sys::error("Invalid genesis nonce");
             return;
          }
-
-         bm.emplace(genesis_header->timestamp, block_interval_ms/1e3);
-
-         SILK_INFO << "Block interval: " << bm->block_interval;
-         SILK_INFO << "Genesis timestamp: " << bm->genesis_timestamp;
       }
 
       evmc::bytes32 compute_transaction_root(const silkworm::BlockBody& body) {
@@ -84,11 +91,8 @@ class block_conversion_plugin_impl : std::enable_shared_from_this<block_conversi
 
       silkworm::Block new_block(uint64_t num, const evmc::bytes32& parent_hash) {
          silkworm::Block new_block;
+         evm_common::prepare_block_header(new_block.header, bm.value(), evm_contract_name, num);
          new_block.header.parent_hash       = parent_hash;
-         new_block.header.difficulty        = 1;
-         new_block.header.number            = num;
-         new_block.header.gas_limit         = 0x7ffffffffff;
-         new_block.header.timestamp         = bm.value().evm_block_num_to_evm_timestamp(num)/1e6;
          new_block.header.transactions_root = silkworm::kEmptyRoot;
          //new_block.header.mix_hash
          //new_block.header.nonce           
@@ -239,6 +243,7 @@ class block_conversion_plugin_impl : std::enable_shared_from_this<block_conversi
       channels::evm_blocks::channel_type&           evm_blocks_channel;
       channels::native_blocks::channel_type::handle native_blocks_subscription;
       std::optional<evm_common::block_mapping>      bm;
+      uint64_t                                      evm_contract_name = 0;
 };
 
 block_conversion_plugin::block_conversion_plugin() : my(new block_conversion_plugin_impl()) {}

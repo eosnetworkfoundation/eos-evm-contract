@@ -83,6 +83,17 @@ task("emit-event", "Emit event")
     console.log("############################################ EMIT #######");
 });
 
+task("test-blockhash", "Test blockhash")
+  .addParam("contract", "Blockhash contract address")
+  .setAction(async (taskArgs) => {
+    const Blockhash = await ethers.getContractFactory('Blockhash')
+    const blockhash = Blockhash.attach(taskArgs.contract).connect(await ethers.getSigner(0));
+
+    const res = await blockhash.go();
+    console.log("############################################ GO #######");
+    console.log(res);
+});
+
 task("storage-loop", "Store incremental values to the storage contract")
   .addParam("contract", "Token contract address")
   .setAction(async (taskArgs) => {

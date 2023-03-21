@@ -7,11 +7,11 @@
 #include <eosio/name.hpp>
 
 struct pushtx {
-   eosio::name          ram_payer;
+   eosio::name          miner;
    std::vector<uint8_t> rlpx;
 };
 
-EOSIO_REFLECT(pushtx, ram_payer, rlpx)
+EOSIO_REFLECT(pushtx, miner, rlpx)
 class block_conversion_plugin : public appbase::plugin<block_conversion_plugin> {
    public:
       APPBASE_PLUGIN_REQUIRES((sys_plugin)(ship_receiver_plugin)(engine_plugin));

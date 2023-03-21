@@ -1,14 +1,26 @@
 #include "basic_evm_tester.hpp"
 
+using namespace evm_test;
+
 BOOST_AUTO_TEST_SUITE(evm_init_tests)
 BOOST_FIXTURE_TEST_CASE(check_init, basic_evm_tester) try {
    //all of these should fail since the contract hasn't been init'd yet
 
-   BOOST_REQUIRE_EXCEPTION(push_action("evm"_n, "pushtx"_n, "evm"_n, mvo()("ram_payer", "evm"_n)("rlptx", bytes())),
+   BOOST_REQUIRE_EXCEPTION(push_action("evm"_n, "pushtx"_n, "evm"_n, mvo()("miner", "evm"_n)("rlptx", bytes())),
                            eosio_assert_message_exception,
                            [](const eosio_assert_message_exception& e) {return testing::expect_assert_message(e, "assertion failure with message: contract not initialized");});
 
-   BOOST_REQUIRE_EXCEPTION(push_action("evm"_n, "open"_n, "evm"_n, mvo()("owner", "evm"_n)("ram_payer", "evm"_n)),
+   BOOST_REQUIRE_EXCEPTION(push_action("evm"_n, "setfeeparams"_n, "evm"_n, mvo()("fee_params", mvo()("gas_price", 1)("miner_cut", 0)("ingress_bridge_fee", fc::variant()))),
+                           eosio_assert_message_exception,
+                           [](const eosio_assert_message_exception& e) {return testing::expect_assert_message(e, "assertion failure with message: contract not initialized");});
+   BOOST_REQUIRE_EXCEPTION(push_action("evm"_n, "addegress"_n, "evm"_n, mvo()("accounts", std::vector<name>())),
+                           eosio_assert_message_exception,
+                           [](const eosio_assert_message_exception& e) {return testing::expect_assert_message(e, "assertion failure with message: contract not initialized");});
+   BOOST_REQUIRE_EXCEPTION(push_action("evm"_n, "removeegress"_n, "evm"_n, mvo()("accounts", std::vector<name>())),
+                           eosio_assert_message_exception,
+                           [](const eosio_assert_message_exception& e) {return testing::expect_assert_message(e, "assertion failure with message: contract not initialized");});
+
+   BOOST_REQUIRE_EXCEPTION(push_action("evm"_n, "open"_n, "evm"_n, mvo()("owner", "evm"_n)("miner", "evm"_n)),
                            eosio_assert_message_exception,
                            [](const eosio_assert_message_exception& e) {return testing::expect_assert_message(e, "assertion failure with message: contract not initialized");});
    BOOST_REQUIRE_EXCEPTION(push_action("evm"_n, "close"_n, "evm"_n, mvo()("owner", "evm"_n)),
@@ -70,11 +82,11 @@ BOOST_FIXTURE_TEST_CASE(check_freeze, basic_evm_tester) try {
 
    push_action("evm"_n, "freeze"_n, "evm"_n, mvo()("value", true));
 
-   BOOST_REQUIRE_EXCEPTION(push_action("evm"_n, "pushtx"_n, "evm"_n, mvo()("ram_payer", "evm"_n)("rlptx", bytes())),
+   BOOST_REQUIRE_EXCEPTION(push_action("evm"_n, "pushtx"_n, "evm"_n, mvo()("miner", "evm"_n)("rlptx", bytes())),
                            eosio_assert_message_exception,
                            [](const eosio_assert_message_exception& e) {return testing::expect_assert_message(e, "assertion failure with message: contract is frozen");});
 
-   BOOST_REQUIRE_EXCEPTION(push_action("evm"_n, "open"_n, "evm"_n, mvo()("owner", "evm"_n)("ram_payer", "evm"_n)),
+   BOOST_REQUIRE_EXCEPTION(push_action("evm"_n, "open"_n, "evm"_n, mvo()("owner", "evm"_n)("miner", "evm"_n)),
                            eosio_assert_message_exception,
                            [](const eosio_assert_message_exception& e) {return testing::expect_assert_message(e, "assertion failure with message: contract is frozen");});
    BOOST_REQUIRE_EXCEPTION(push_action("evm"_n, "close"_n, "evm"_n, mvo()("owner", "evm"_n)),
@@ -120,17 +132,18 @@ BOOST_FIXTURE_TEST_CASE(check_freeze, basic_evm_tester) try {
    push_action("evm"_n, "freeze"_n, "evm"_n, mvo()("value", false));
    produce_block();
 
-   BOOST_REQUIRE_EXCEPTION(push_action("evm"_n, "pushtx"_n, "evm"_n, mvo()("ram_payer", "evm"_n)("rlptx", bytes())),
+   BOOST_REQUIRE_EXCEPTION(push_action("evm"_n, "pushtx"_n, "evm"_n, mvo()("miner", "evm"_n)("rlptx", bytes())),
                            eosio_assert_message_exception,
                            [](const eosio_assert_message_exception& e) {return testing::expect_assert_message(e, "assertion failure with message: unable to decode transaction");});
 
-   BOOST_REQUIRE_EXCEPTION(push_action("evm"_n, "withdraw"_n, "evm"_n, mvo()("owner", "evm"_n)("quantity", asset())),
+   create_account("spoon"_n);
+   BOOST_REQUIRE_EXCEPTION(push_action("evm"_n, "withdraw"_n, "spoon"_n, mvo()("owner", "spoon"_n)("quantity", asset())),
                            eosio_assert_message_exception,
                            [](const eosio_assert_message_exception& e) {return testing::expect_assert_message(e, "assertion failure with message: account is not open");});
 
-   push_action("evm"_n, "open"_n, "evm"_n, mvo()("owner", "evm"_n)("ram_payer", "evm"_n));
+   push_action("evm"_n, "open"_n, "spoon"_n, mvo()("owner", "spoon"_n));
 
-   push_action("evm"_n, "close"_n, "evm"_n, mvo()("owner", "evm"_n));
+   push_action("evm"_n, "close"_n, "spoon"_n, mvo()("owner", "spoon"_n));
 
    // Test of transfer notification w/o init is handled in native_token_evm_tests/transfer_notifier_without_init test as it requires additional setup
 
