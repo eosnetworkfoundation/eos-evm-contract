@@ -1411,7 +1411,7 @@ boost::asio::awaitable<void> EthereumRpcApi::handle_eth_get_logs(const nlohmann:
 
         SILKRPC_DEBUG << "block_numbers.cardinality(): " << block_numbers.cardinality() << "\n";
 
-        if (filter.topics.has_value()) {
+        if (filter.topics.has_value() && !filter.topics.value().empty()) {
             auto topics_bitmap = co_await get_topics_bitmap(tx_database, filter.topics.value(), start, end);
             SILKRPC_TRACE << "topics_bitmap: " << topics_bitmap.toString() << "\n";
             if (topics_bitmap.isEmpty()) {
