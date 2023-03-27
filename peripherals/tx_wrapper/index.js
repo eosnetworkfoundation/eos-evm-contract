@@ -1,6 +1,7 @@
 const { Api, JsonRpc, RpcError } = require("eosjs");
 const { JsSignatureProvider } = require("eosjs/dist/eosjs-jssig"); // development only
-const fetch = require("node-fetch"); // node only; not needed in browsers
+// const fetch = require("node-fetch"); // node only; not needed in browsers
+const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 const { TextEncoder, TextDecoder } = require("util"); // node only; native TextEncoder/Decoder
 
 const RpcServer = require("http-jsonrpc-server");
@@ -77,8 +78,8 @@ async function push_tx(strRlptx) {
             }
           ],
           data: {
-            ram_payer : process.env.EOS_SENDER,
-            rlptx     : strRlptx
+            miner : process.env.EOS_SENDER,
+            rlptx : strRlptx
           },
         },
       ],
@@ -100,56 +101,34 @@ async function eth_sendRawTransaction(params) {
   return '0x'+keccak256(Buffer.from(rlptx, "hex")).toString("hex");
 }
 
+var lastGetTableCallTime = 0
+var gasPrice = "0x1";
 async function eth_gasPrice(params) {
-  // TODO: get price from somewhere
-  return "0x2540BE400";
+  if ( (new Date() - lastGetTableCallTime) >= 500 ) {
+    try {
+      const result = await rpc.get_table_rows({
+        json: true,                // Get the response as json
+        code: process.env.EOS_EVM_ACCOUNT,      // Contract that we target
+        scope: process.env.EOS_EVM_ACCOUNT,     // Account that owns the data
+        table: 'config',           // Table name
+        limit: 1,                  // Maximum number of rows that we want to get
+        reverse: false,            // Optional: Get reversed data
+        show_payer: false          // Optional: Show ram payer
+      });
+      console.log("result:", result);
+      gasPrice = "0x" + parseInt(result.rows[0].gas_price).toString(16);
+      lastGetTableCallTime = new Date();
+    } catch(e) {
+      console.log("Error getting gas price from nodeos: " + e);
+    }
+  }
+  return gasPrice;
 }
 
 function zero_pad(hexstr) {
   if(!hexstr) return "";
   const res = hexstr.substr(2);
   return res.length % 2 ? '0'+res : res;
-}
-
-async function eth_estimateGas(params) {
-  // TODO: get estimation from evm runtime
-  const data = {
-    from  : params[0].from.substr(2),
-    to    : params[0].to.substr(2),
-    value : zero_pad(params[0].value),
-    data  : params[0].data || ""
-  };
-  
-	try {
-    const result = await api.transact(
-      {
-        actions: [
-          {
-            account: process.env.EOS_EVM_ACCOUNT,
-            name: "estimate",
-            authorization: [{
-                actor      : process.env.EOS_EVM_ACCOUNT,
-                permission : "active",
-              }
-            ],
-            data: data
-          },
-        ],
-      },
-      {
-        blocksBehind: 3,
-        expireSeconds: 3000,
-      }
-    );
-  } catch(err) {
-		const m = err.details[0].message.match(/assertion failure with message: GAS:\[(\d+),(\d+)\]/);
-		if(m) {
-			console.log("estimated: ", m[2]);
-      return '0x'+parseInt(m[2]).toString(16);
-		}
-	  console.log("default: 21k");
-	  return "0x5208"; //21000
-  }
 }
 
 // Setting up the RPC server
@@ -171,7 +150,6 @@ const rpcServer = new RpcServer({
 
 rpcServer.setMethod("eth_sendRawTransaction", eth_sendRawTransaction);
 rpcServer.setMethod("eth_gasPrice", eth_gasPrice);
-rpcServer.setMethod("eth_estimateGas", eth_estimateGas);
 
 // Main loop
 rpcServer.listen(+process.env.PORT, process.env.HOST).then(() => {

@@ -39,8 +39,6 @@ The compilation result should be these two files:
 - evm_runtime.wasm
 - evm_runtime.abi
 
-<b> Ensure action "setbal" exists in evm_runtime.abi </b>
-
 Compiled binaries from this repo:
 
 - trustevm-node: silkworm node process that receive data from the main Antelope chain and convert to the EVM chain
@@ -359,26 +357,25 @@ Deploy evm_runtime contract, wasm and abi file, to account evmevmevmevm:
 ./cleos set abi evmevmevmevm ../TrustEVM/contract/build/evm_runtime/evm_runtime.abi
 ```
 
-Set chain ID & native token configuration
+Set chain ID & native token configuration (in this example, gas price is 150 Gwei, miner_cut is 10%)
 ```
-./cleos push action evmevmevmevm init '{"chainid": 15555}'
-```
-
-#### Set Initial Balance For Genesis ETH Accounts
-
-In this document we use `0x2787b98fc4e731d0456b3941f0b3fe2e01439961` (private key `a3f1b69da92a0233ce29485d3049a4ace39e8d384bbc2557e3fc60940ce4e954` as genesis. Developers can use one or more other genesis ETH accounts.
-
-<b>Notice that the balance string must be in hex and must be exactly 64 bytes long (representing a full 256-bit integer value). Failure to meet such criteria will result in incorrect balance calculation in transfers. </b>
-
-```shell
-./cleos push action evmevmevmevm setbal '{"addy":"2787b98fc4e731d0456b3941f0b3fe2e01439961", "bal":"0000000000000000000000000000000100000000000000000000000000000000"}' -p evmevmevmevm
+./cleos push action evmevmevmevm init "{\"chainid\":15555,\"fee_params\":{\"gas_price\":150000000000,\"miner_cut\":10000,\"ingress_bridge_fee\":\"0.0100 EOS
+\"}}" -p evmevmevmevm
 ```
 
-Repeat this action for all genesis accounts.
-
+after the init action we need a small amount of token (1 EOS) to be transferred into the contract account (with memo=contract account), for example:
+```
+./cleos transfer eosio evmevmevmevm "1.0000 EOS" "evmevmevmevm"
+```
 Now EVM initialization is completed. 
 
-#### Verify EVM account balances 
+
+#### Bridging tokens (EOS->EVM) and Verify EVM account balances 
+
+to bridge in token (EOS->EVM), use native Antelope transfer with memo equals to ETH address, for example:
+```
+./cleos transfer eosio evmevmevmevm "1000000.0000 EOS" "0x2787b98fc4e731d0456b3941f0b3fe2e01439961"
+```
 
 To verify all EVM account balances directly on the Antelope node run the following command and replace your contract name "evmevmevmevm" if needed:
 
@@ -427,6 +424,11 @@ We use `a123` for example (public key EOS8kE63z4NcZatvVWY4jxYdtLg6UEA123raMGwS6Q
 
 ```shell
 ./cleos create account eosio a123 EOS8kE63z4NcZatvVWY4jxYdtLg6UEA123raMGwS6QDKwpQ69eGcP EOS8kE63z4NcZatvVWY4jxYdtLg6UEA123raMGwS6QDKwpQ69eGcP
+```
+
+run the open action on evm contract to open the account balance row:
+```
+./cleos push action evmevmevmevm open '{"owner":"a123"}' -p a123
 ```
 
 #### Prepare The .env File
@@ -882,7 +884,27 @@ Antelope block 8 & 9 -> EVM virtual block 4
 
 #### Set The Correct EVM Genesis
 
-Once we have decided the starting block number, the next step is to build up the correct genesis for the virtual Ethereum chain. Take this as example.
+check the current config table:
+```
+./cleos get table evmevmevmevm evmevmevmevm config
+{
+  "rows": [{
+      "version": 0,
+      "chainid": 15555,
+      "genesis_time": "2022-11-18T07:58:34",
+      "ingress_bridge_fee": "0.0100 EOS",
+      "gas_price": "150000000000",
+      "miner_cut": 10000,
+      "status": 0
+    }
+  ],
+  "more": false,
+  "next_key": ""
+}
+```
+
+take the above example, we need to findout the Antelope block number x whose the timestamp equals to 2022-11-18T07:58:34.
+Once we have decided the starting block number x, the next step is to build up the correct genesis for the virtual Ethereum chain. Take this as example.
 
 Antelope block 2:
 
@@ -920,22 +942,22 @@ This determines the value of the "timestamp" field in EVM genesis.
 
 Set the "mixHash" field to be "0x + Antelope starting block id", e.g.  "0x000000026d392f1bfeddb000555bcb03ca6e31a54c0cf9edc23cede42bda17e6"
 
-Set the "nonce" field with "0x3e8". This is re-purposed to be the block time (in mill-second) of the EVM chain.
+Set the "nonce" field to be the hex encoding of the value of the Antelope name of the account on which the EVM contract is deployed. So if the `evmevmevmevm` account name is used, then set the nonce to "0x56e4adc95b92b720". If the `eosio.evm` account name is used, then set the nonce to "0x56e4adc95b92b720". This is re-purposed to be the block time (in mill-second) of the EVM chain.
 
-In the "alloc" part, setup the genesis EVM account balance.
+In the "alloc" part, setup the genesis EVM account balance (should be all zeros)
 
 Final EVM genesis example:
 
 ```json
-    {
+{
         "alloc": {
-            "2787b98fc4e731d0456b3941f0b3fe2e01439961": {
-                "balance": "0x100000000000000000000000000000000" 
+            "0x0000000000000000000000000000000000000000": {
+                "balance": "0x0000000000000000000000000000000000000000000000000000000000000000"
             }
         },
         "coinbase": "0x0000000000000000000000000000000000000000",
         "config": {
-            "chainId": 15555,
+            "chainId": 15556,
             "homesteadBlock": 0,
             "eip150Block": 0,
             "eip155Block": 0,
@@ -943,15 +965,16 @@ Final EVM genesis example:
             "constantinopleBlock": 0,
             "petersburgBlock": 0,
             "istanbulBlock": 0,
-            "noproof": {}
+            "trust": {}
         },
         "difficulty": "0x01",
         "extraData": "TrustEVM",
         "gasLimit": "0x7ffffffffff",
         "mixHash": "0x000000026d392f1bfeddb000555bcb03ca6e31a54c0cf9edc23cede42bda17e6",
-        "nonce": "0x3e8",
+        "nonce": "0x56e4adc95b92b720",
         "timestamp": "0x63773b2a"
     }
+
 ```
 
 #### Start The TrustEVM Process

@@ -20,7 +20,7 @@ if (WITH_LOGTIME)
 endif()
 
 add_compile_definitions(ANTELOPE)
-add_compile_definitions(PROJECT_VERSION="0.2.1")
+add_compile_definitions(PROJECT_VERSION="0.3.0")
 
 # ethash
 list(APPEND SOURCES 
@@ -87,5 +87,5 @@ target_compile_options(evm_runtime PUBLIC --no-missing-ricardian-clause)
 if (WITH_LARGE_STACK)
     target_link_options(evm_runtime PUBLIC --stack-size=50000000)
 else()
-    target_link_options(evm_runtime PUBLIC --stack-size=20480)
+    target_link_options(evm_runtime PUBLIC --stack-size=19984)
 endif()

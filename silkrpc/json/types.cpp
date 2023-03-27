@@ -33,6 +33,10 @@ namespace silkrpc {
 std::string to_hex_no_leading_zeros(silkworm::ByteView bytes) {
     static const char* kHexDigits{"0123456789abcdef"};
 
+    if (bytes.length() == 0) {
+        return "0";
+    }
+
     std::string out{};
     out.reserve(2 * bytes.length());
 
@@ -69,6 +73,9 @@ std::string to_quantity(silkworm::ByteView bytes) {
 }
 
 std::string to_quantity(uint64_t number) {
+    if (number == 0) {
+        return "0x0";
+    }
     return "0x" + to_hex_no_leading_zeros(number);
 }
 
