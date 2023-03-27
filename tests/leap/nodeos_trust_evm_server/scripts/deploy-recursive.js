@@ -7,13 +7,13 @@
 const hre = require("hardhat");
 
 async function main() {
-  const Token = await hre.ethers.getContractFactory("Token");
-  const token = await Token.deploy("Yuniper","YUN");
-
-  await token.deployed();
+  const Recursive = await hre.ethers.getContractFactory("Recursive");
+  const recursive = await Recursive.connect(await ethers.getSigner(0)).deploy();
+  
+  await recursive.deployed();
 
   console.log(
-    `Token deployed to ${token.address}`
+    `Recursive contract deployed to ${recursive.address}`
   );
 }
 

@@ -410,6 +410,15 @@ try:
                     "jsonrpc": "2.0",
                     "result": '0x'+keccak(unhexlify(req['params'][0][2:])).hex()
                 }
+
+            if req['method'] == "eth_gasPrice":
+                gas_price=int(prodNode1.getTable(evmAcc.name, evmAcc.name, "config")['rows'][0]['gas_price'])
+                return {
+                    "id": req['id'],
+                    "jsonrpc": "2.0",
+                    "result": f'{gas_price:#0x}'
+                }
+
             return requests.post(readEndpoint, json.dumps(req), headers={"Content-Type":"application/json"}).json()
 
         request_data = request.get_json()

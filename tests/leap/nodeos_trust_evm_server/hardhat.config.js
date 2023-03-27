@@ -40,8 +40,8 @@ task("transfer", "Send ERC20 tokens")
   .setAction(async (taskArgs) => {
     const Token = await ethers.getContractFactory('Token')
     const token = Token.attach(taskArgs.contract)
-    const res = await token.connect(await ethers.getSigner(taskArgs.from)).transfer(taskArgs.to, ethers.utils.parseEther(taskArgs.amount.toString()),{gasLimit:50000});
-    console.log(res);
+    const res = await token.connect(await ethers.getSigner(taskArgs.from)).transfer(taskArgs.to, ethers.utils.parseEther(taskArgs.amount.toString()));
+    console.log(res.hash);
 });
 
 task("send-loop", "Send ERC20 token in a loop")
@@ -172,8 +172,8 @@ task("swap4eth", "Swap exact tokens for ETH")
 .addParam("weth9", "The weth9 contract address")
 .addParam("router", "The router contract address")
 .setAction(async (taskArgs) => {
+
   const signer = await ethers.getSigner(0);
-  //console.log(signer);
 
   const Token = await ethers.getContractFactory('Token')
   const token = Token.attach(taskArgs.erc20)
@@ -181,31 +181,72 @@ task("swap4eth", "Swap exact tokens for ETH")
   const ROUTER = require("@uniswap/v2-periphery/build/UniswapV2Router02.json");
   const WETH9 = require("@uniswap/v2-periphery/build/WETH9.json");
 
-  //await ethers.getSigner
   const Router = new ethers.ContractFactory(ROUTER.abi, ROUTER.bytecode);
   const router = Router.attach(taskArgs.router).connect(signer);
 
   const Weth9 = new ethers.ContractFactory(WETH9.abi, WETH9.bytecode);
   const weth9 = Weth9.attach(taskArgs.weth9).connect(signer);
 
-  const AMOUNT_WETH9 = eth(1000);
-  const AMOUNT_TOKEN = eth(1000);
+  //TODO: check allowance
+  await token.approve(router.address, eth(1));
 
-  await weth9.approve(router.address, AMOUNT_WETH9);
-  await token.approve(router.address, AMOUNT_TOKEN);
-
-  const receipt = await router.addLiquidityETH(
-    token.address,
-    eth(1000),
-    eth(1000),
-    eth(100),
-    signer.address,
-    ethers.constants.MaxUint256,
-    { value: eth(1000) }
+  const receipt = await router.swapExactTokensForETH(
+    eth(1), //amountIn
+    0,      //amountOutMin
+    [token.address, weth9.address], //path
+    signer.address, //to
+    Date.now() + 1000*60*10,
   );
 
-  console.log(receipt);
+  console.log(receipt.hash);
+});
 
+task("approve", "")
+.addParam("erc20", "erc20 contract")
+.addParam("router", "The router contract address")
+.addParam("amount", "amount to approve")
+.setAction(async (taskArgs) => {
+  const signer = await ethers.getSigner(0);
+  const Token = await ethers.getContractFactory('Token')
+  const token = Token.attach(taskArgs.erc20);
+
+  const ROUTER = require("@uniswap/v2-periphery/build/UniswapV2Router02.json");
+  const Router = new ethers.ContractFactory(ROUTER.abi, ROUTER.bytecode);
+  const router = Router.attach(taskArgs.router).connect(signer);
+
+  const receipt = await token.approve(router.address, eth(taskArgs.amount));
+  console.log(receipt.hash);
+});
+
+task("swap", "swap two erc20")
+.addParam("path", "erc20 contract address path")
+.addParam("router", "The router contract address")
+.addParam("amount", "Amount-in")
+.setAction(async (taskArgs) => {
+  const signer = await ethers.getSigner(0);
+
+  const Token = await ethers.getContractFactory('Token')
+  
+  var tokens = [];
+  taskArgs.path.split(',').forEach((address) => {
+    tokens.push({token:Token.attach(address)})
+  });
+
+  const ROUTER = require("@uniswap/v2-periphery/build/UniswapV2Router02.json");
+  const WETH9 = require("@uniswap/v2-periphery/build/WETH9.json");
+
+  const Router = new ethers.ContractFactory(ROUTER.abi, ROUTER.bytecode);
+  const router = Router.attach(taskArgs.router).connect(signer);
+
+  const receipt = await router.swapExactTokensForTokens(
+    eth(taskArgs.amount),     //amountIn
+    0,                        //amountOutMin
+    taskArgs.path.split(','), //path
+    signer.address, //to
+    Date.now() + 1000*60*10,
+  );
+
+  console.log(receipt.hash);
 });
 
 
@@ -246,10 +287,23 @@ task("add-liquidity", "Adds liquidity to an ERC-20⇄WETH pool with ETH")
       { value: eth(1000) }
     );
 
-    console.log(receipt);
+    console.log(receipt.hash);
 
 });
 
+task("call-recursive", "Call recursive contract")
+  .addParam("contract", "The contract address")
+  .addParam("depth", "Call depth")
+  .setAction(async (taskArgs) => {
+    const signer = await ethers.getSigner(0);
+    //console.log(signer);
+
+    const Recursive = await ethers.getContractFactory('Recursive')
+    const recursive = Recursive.attach(taskArgs.contract)
+    
+    const receipt = await recursive.start(taskArgs.depth);
+    console.log(receipt.hash);
+});
 
 
 
