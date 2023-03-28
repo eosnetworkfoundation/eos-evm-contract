@@ -1,6 +1,6 @@
 require("@nomicfoundation/hardhat-toolbox");
 require("@nomiclabs/hardhat-web3");
-require("@b10k.io/hardhat-uniswap-v2-deploy-plugin");
+require("@onmychain/hardhat-uniswap-v2-deploy-plugin");
 
 // task action function receives the Hardhat Runtime Environment as second argument
 task("accounts", "Prints accounts", async (_, { web3 }) => {
@@ -9,6 +9,10 @@ task("accounts", "Prints accounts", async (_, { web3 }) => {
 
 task("blockNumber", "Prints the current block number", async (_, { web3 }) => {
   console.log(await web3.eth.getBlockNumber());
+});
+
+task("gasPrice", "Prints the current gas price", async (_, { web3 }) => {
+  console.log(await web3.eth.getGasPrice());
 });
 
 task("block", "Prints block")
@@ -31,6 +35,20 @@ task("nonce", "Prints an account's nonce")
     const nonce = await ethers.provider.getTransactionCount(taskArgs.account);
     console.log(nonce);
 });
+
+task("native-transfer", "Send native tokens")
+  .addParam("from", "from account")
+  .addParam("to", "to account")
+  .addParam("amount", "amount to trasfer")
+  .setAction(async (taskArgs) => {
+    const signer = await ethers.getSigner(taskArgs.from);
+    const res = await signer.sendTransaction({
+      to: taskArgs.to,
+      value: eth(taskArgs.amount)
+    });
+    console.log(res.hash);
+});
+
 
 task("transfer", "Send ERC20 tokens")
   .addParam("from", "from account")
@@ -312,7 +330,7 @@ module.exports = {
   defaultNetwork: "ltrust",
   networks: {
     ltrust: {
-      url: "http://localhost:5000",
+      url: "http://149.28.109.237:5000",
       accounts: {
         mnemonic: "test test test test test test test test test test test junk",
         path: "m/44'/60'/0'/0",
