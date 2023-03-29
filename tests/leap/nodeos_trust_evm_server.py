@@ -66,6 +66,8 @@ appArgs=AppArgs()
 appArgs.add(flag="--trust-evm-contract-root", type=str, help="TrustEVM contract build dir", default=None)
 appArgs.add(flag="--genesis-json", type=str, help="File to save generated genesis json", default="trust-evm-genesis.json")
 appArgs.add(flag="--read-endpoint", type=str, help="EVM read enpoint (trustevm-rpc)", default="http://localhost:8881")
+appArgs.add(flag="--use-eos-vm-oc", type=str, help="Use eos-vm-jit as runtime + OC", default=0)
+
 
 args=TestHelper.parse_args({"--keep-logs","--dump-error-details","-v","--leave-running","--clean-run" }, applicationSpecificArgs=appArgs)
 debug=args.v
@@ -76,6 +78,7 @@ killAll=args.clean_run
 trustEvmContractRoot=args.trust_evm_contract_root
 gensisJson=args.genesis_json
 readEndpoint=args.read_endpoint
+useEosVmOC=args.use_eos_vm_oc
 
 assert trustEvmContractRoot is not None, "--trust-evm-contract-root is required"
 
@@ -114,6 +117,8 @@ try:
     # producer nodes will be mapped to 0 through totalProducerNodes-1, so the number totalProducerNodes will be the non-producing node
     specificExtraNodeosArgs[totalProducerNodes]="--plugin eosio::test_control_api_plugin  "
     extraNodeosArgs="--contracts-console"
+    if useEosVmOC:
+        extraNodeosArgs += " --wasm-runtime eos-vm-jit --eos-vm-oc-enable"
 
     Print("Stand up cluster")
     if cluster.launch(topo="bridge", pnodes=totalProducerNodes,

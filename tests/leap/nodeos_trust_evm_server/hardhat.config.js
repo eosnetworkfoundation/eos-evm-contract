@@ -330,7 +330,7 @@ module.exports = {
   defaultNetwork: "ltrust",
   networks: {
     ltrust: {
-      url: "http://149.28.109.237:5000",
+      url: "http://localhost:5000",
       accounts: {
         mnemonic: "test test test test test test test test test test test junk",
         path: "m/44'/60'/0'/0",
@@ -348,7 +348,32 @@ module.exports = {
         count: 80,
         passphrase: "",
       },
-    }
+    },
+    ttrust2: {
+      url: "https://api-testnet2.trust.one",
+      accounts: {
+        mnemonic: "test test test test test test test test test test test junk",
+        path: "m/44'/60'/0'/0",
+        initialIndex: 0,
+        count: 80,
+        passphrase: "",
+      },
+    },
   },
-  solidity: "0.8.17",
+  solidity: {
+    compilers : [
+      {
+        version: "0.8.17",
+      },
+      {
+        version: "0.5.16",
+        settings: {
+          "optimizer": {
+            "enabled": false,
+            "runs": 200,
+          }
+        },
+      }
+    ]
+  }
 };

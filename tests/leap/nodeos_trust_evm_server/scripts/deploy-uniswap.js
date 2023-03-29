@@ -9,10 +9,9 @@ async function main() {
   const deployer = hre.UniswapV2Deployer;
   const { factory, router, weth9 } = await deployer.deploy(signer);
 
-  console.log("factory, router, weth9 => deployed");
-  console.log("router: ", router.address);
-  console.log("factory: ", factory.address);
-  console.log("weth9: ", weth9.address);
+  console.log("Router deployed: ", router.address);
+  console.log("Factory deployed: ", factory.address);
+  console.log("WETH9 deployed: ", weth9.address);
 
   const totalTokes = 26;
   var tokens=[];
@@ -42,8 +41,7 @@ async function main() {
       Date.now() + 1000*60*10,
     );
 
-    console.log(tokens[i].symbol + "/" + tokens[i+1].symbol + " added");
-    console.log(receipt.hash)
+    console.log("Liquidity added to pool " + tokens[i].symbol + "/" + tokens[i+1].symbol);
   }
 
 
