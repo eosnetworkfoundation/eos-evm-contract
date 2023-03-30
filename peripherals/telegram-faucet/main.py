@@ -2,6 +2,7 @@ import os
 import binascii
 from datetime import datetime, timedelta
 from telegram import Update
+from telegram.helpers import escape_markdown
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 import requests
 import inflect
@@ -13,7 +14,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 TELEGRAM_TOKEN   = os.environ.get("TELEGRAM_TOKEN","")
-TELEGRAM_CHAT_ID = int(os.environ.get("TELEGRAM_CHAT_ID","0"))
+TELEGRAM_CHAT_ID = int(os.environ.get("TELEGRAM_CHAT_ID",""))
 PRIVATE_KEY      = os.environ.get("PRIVATE_KEY","")
 ENDPOINT         = os.environ.get("ENDPOINT","")
 DB_PATH          = os.environ.get("DB_PATH","data.db")
@@ -95,9 +96,10 @@ async def testcoins(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 "params": ["0x"+rawtx],"id":1}).json()['result']
 
             logger.debug("sending {txid}", txid=txid)
-            await update.message.reply_text(f'{to_send} EOS (testnet) sent\n{EXPLORER}/tx/{txid}')
+            await update.message.reply_markdown(f'{escape_markdown(str(to_send))} EOS (testnet) [sent]({EXPLORER}/tx/{txid})')
             db.commit()
     except:
+        logger.exception("Unexpected error occurred:")
         await update.message.reply_text(f'An error ocurred while sending the transaction')
 
 
