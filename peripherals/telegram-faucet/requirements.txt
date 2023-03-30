@@ -1,0 +1,7 @@
+web3
+sqlitedict
+python-telegram-bot
+python-dotenv
+inflect
+requests
+loguru
