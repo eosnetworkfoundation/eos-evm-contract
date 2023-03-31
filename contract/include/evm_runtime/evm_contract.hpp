@@ -36,8 +36,8 @@ public:
    /**
     * @brief Initialize EVM contract
     *
-    * @param chainid Chain ID of the EVM. Choose 15555 for a production network.
-    *                For test networks, choose either 15556 for a public test network or 25555 for a local test
+    * @param chainid Chain ID of the EVM. Choose 17777 for a production network.
+    *                For test networks, choose either 15555 for a public test network or 25555 for a local test
     * network.
     * @param fee_params See documentation of fee_parameters struct.
     */
