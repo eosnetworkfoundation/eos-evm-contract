@@ -259,6 +259,11 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
             sys::error("Unable to read canonical header");
             return;
          }
+         SILK_INFO << "get_head_canonical_header: "
+                     << "#" << head_header->number
+                     << ", hash:" << silkworm::to_hex(head_header->hash())
+                     << ", mixHash:" << silkworm::to_hex(head_header->mix_hash);
+
          auto start_from = utils::to_block_num(head_header->mix_hash.bytes) + 1;
          SILK_INFO << "Canonical header start from block: " << start_from;
 
