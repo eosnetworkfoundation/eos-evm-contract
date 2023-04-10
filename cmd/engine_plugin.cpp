@@ -95,6 +95,17 @@ class engine_plugin_impl : std::enable_shared_from_this<engine_plugin_impl> {
          return silkworm::db::read_canonical_header(txn, head_num);
       }
 
+      std::optional<silkworm::Block> get_head_block() {
+         auto header = get_head_canonical_header();
+         if(!header) return {};
+
+         silkworm::db::ROTxn txn(db_env);
+         silkworm::Block block;
+         auto res = read_block_by_number(txn, header->number, false, block);
+         if(!res) return {};
+         return block;
+      }
+
       std::optional<silkworm::BlockHeader> get_genesis_header() {
          silkworm::db::ROTxn txn(db_env);
          return silkworm::db::read_canonical_header(txn, 0);
@@ -154,8 +165,13 @@ void engine_plugin::plugin_shutdown() {
 mdbx::env* engine_plugin::get_db() {
    return &my->db_env;
 }
+
 std::optional<silkworm::BlockHeader> engine_plugin::get_head_canonical_header() {
    return my->get_head_canonical_header();
+}
+
+std::optional<silkworm::Block> engine_plugin::get_head_block() {
+   return my->get_head_block();
 }
 
 std::optional<silkworm::BlockHeader> engine_plugin::get_genesis_header() {
