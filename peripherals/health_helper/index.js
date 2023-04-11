@@ -1,13 +1,7 @@
 var http = require('http');
 
-url_string = process.env.RPC_ENDPOINT;
-if (!url_string) {
-    console.log('Must provide RPC_ENDPOINT!')
-    process.exit(1)
-}
-
-const url = new URL(url_string)
-const listen_port = process.env.LISTEN_PORT || 8080
+const url = process.env.RPC_ENDPOINT || 'http://localhost:80'
+const listen_port = process.env.LISTEN_PORT || 8000
 const check_interval = process.env.CHECK_INTERVAL || 5000
 const stale_threshold = process.env.STALE_THRESHOLD || 60
 
