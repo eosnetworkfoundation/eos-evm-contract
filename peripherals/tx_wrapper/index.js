@@ -168,6 +168,20 @@ const rpcServer = new RpcServer({
 rpcServer.setMethod("eth_sendRawTransaction", eth_sendRawTransaction);
 rpcServer.setMethod("eth_gasPrice", eth_gasPrice);
 
+process.on('SIGTERM', function onSigterm () {
+  console.info('Got SIGTERM. Graceful shutdown start', new Date().toISOString())
+  shutdown();
+})
+
+function shutdown() {
+  rpcServer.close(function onServerClosed (err) {
+    if (err) {
+      console.error(err)
+    }
+    process.exit()
+  })
+}
+
 // Main loop
 rpcServer.listen(+process.env.PORT, process.env.HOST).then(() => {
   console.log(
