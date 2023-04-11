@@ -1,7 +1,7 @@
 const { Api, JsonRpc, RpcError } = require("eosjs");
 const { JsSignatureProvider } = require("eosjs/dist/eosjs-jssig"); // development only
-// const fetch = require("node-fetch"); // node only; not needed in browsers
-const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
+const fetch = require("node-fetch"); // node only; not needed in browsers
+//const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 const { TextEncoder, TextDecoder } = require("util"); // node only; native TextEncoder/Decoder
 
 const RpcServer = require("http-jsonrpc-server");
@@ -51,16 +51,32 @@ if (!process.env.PORT || !validateNum(process.env.PORT, 1, 65535)) {
 }
 
 // Setting up EOS
-const rpc = new JsonRpc(process.env.EOS_RPC, { fetch });
+rpc_list = process.env.EOS_RPC.split("|");
+console.log("number of RPC endpoints = " + rpc_list.length + ", using " + rpc_list[0]);
+rpc_index = 0;
+
+rpc = new JsonRpc(rpc_list[rpc_index], { fetch });
 const defaultPrivateKey = process.env.EOS_KEY;
 const signatureProvider = new JsSignatureProvider([defaultPrivateKey]);
 
-const api = new Api({
+api = new Api({
   rpc,
   signatureProvider,
   textDecoder: new TextDecoder(),
   textEncoder: new TextEncoder(),
 });
+
+function next_rpc_endpoint() {
+  rpc_index = (rpc_index + 1) % rpc_list.length;
+  console.log("changing RPC endpoint to " + rpc_list[rpc_index]);
+  rpc = new JsonRpc(rpc_list[rpc_index], { fetch });
+  api = new Api({
+    rpc,
+    signatureProvider,
+    textDecoder: new TextDecoder(),
+    textEncoder: new TextEncoder(),
+  });
+}
 
 // EOS Helpers
 async function push_tx(strRlptx) {
@@ -120,6 +136,7 @@ async function eth_gasPrice(params) {
       lastGetTableCallTime = new Date();
     } catch(e) {
       console.log("Error getting gas price from nodeos: " + e);
+      next_rpc_endpoint();
     }
   }
   return gasPrice;
