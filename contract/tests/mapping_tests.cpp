@@ -242,7 +242,7 @@ try {
 
    // Now actually commit the init action into a block to do further testing on top of that state in later blocks.
    {
-      control->start_block(control->head_block_time() + fc::milliseconds(500), 0);
+      control->start_block(control->head_block_time() + fc::milliseconds(500), 0, {}, controller::block_status::incomplete);
       BOOST_REQUIRE_EQUAL(control->pending_block_time().sec_since_epoch(), bm.genesis_timestamp);
 
       init();

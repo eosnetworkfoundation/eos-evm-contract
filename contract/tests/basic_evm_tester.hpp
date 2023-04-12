@@ -247,7 +247,7 @@ public:
    // object.
    explicit speculative_block_starter(Tester& tester, uint32_t time_gap_sec = 0) : t(tester)
    {
-      t.control->start_block(t.control->head_block_time() + fc::milliseconds(500 + 1000 * time_gap_sec), 0);
+      t.control->start_block(t.control->head_block_time() + fc::milliseconds(500 + 1000 * time_gap_sec), 0, {}, controller::block_status::incomplete);
    }
 
    speculative_block_starter(speculative_block_starter&& other) : t(other.t) { other.canceled = true; }
