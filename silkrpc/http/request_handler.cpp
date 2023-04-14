@@ -55,36 +55,83 @@ boost::asio::awaitable<void> RequestHandler::handle_request(const http::Request&
         }
 
         const auto request_json = nlohmann::json::parse(request.content);
-        request_id = request_json["id"];
-        if (!request_json.contains("method")) {
-            reply.content = make_json_error(request_id, -32600, "method missing").dump() + "\n";
-            reply.status = http::Reply::bad_request;
-            reply.headers.reserve(2);
-            reply.headers.emplace_back(http::Header{"Content-Length", std::to_string(reply.content.size())});
-            reply.headers.emplace_back(http::Header{"Content-Type", "application/json"});
-            SILKRPC_INFO << "handle_request t=" << clock_time::since(start) << "ns\n";
-            co_return;
+        if (!request_json.is_array()) {
+            request_id = request_json["id"];
+            if (!request_json.contains("method")) {
+                reply.content = make_json_error(request_id, -32600, "method missing").dump() + "\n";
+                reply.status = http::Reply::bad_request;
+                reply.headers.reserve(2);
+                reply.headers.emplace_back(http::Header{"Content-Length", std::to_string(reply.content.size())});
+                reply.headers.emplace_back(http::Header{"Content-Type", "application/json"});
+                SILKRPC_INFO << "handle_request t=" << clock_time::since(start) << "ns\n";
+                co_return;
+            }
+
+            const auto method = request_json["method"].get<std::string>();
+            const auto handle_method_opt = rpc_api_table_.find_handler(method);
+            if (!handle_method_opt) {
+                reply.content = make_json_error(request_id, -32601, "the method " + method + " does not exist/is not available").dump() + "\n";
+                reply.status = http::Reply::not_implemented;
+                reply.headers.reserve(2);
+                reply.headers.emplace_back(http::Header{"Content-Length", std::to_string(reply.content.size())});
+                reply.headers.emplace_back(http::Header{"Content-Type", "application/json"});
+                SILKRPC_INFO << "handle_request t=" << clock_time::since(start) << "ns\n";
+                co_return;
+            }
+            const auto handle_method = handle_method_opt.value();
+
+            nlohmann::json reply_json;
+            co_await (rpc_api_.*handle_method)(request_json, reply_json);
+
+            reply.content = reply_json.dump(
+                /*indent=*/-1, /*indent_char=*/' ', /*ensure_ascii=*/false, nlohmann::json::error_handler_t::replace) + "\n";
+            reply.status = http::Reply::ok;
         }
+        else {
+            auto handle_single_request = [&](nlohmann::json request_json) {
+                
+            };
 
-        const auto method = request_json["method"].get<std::string>();
-        const auto handle_method_opt = rpc_api_table_.find_handler(method);
-        if (!handle_method_opt) {
-            reply.content = make_json_error(request_id, -32601, "the method " + method + " does not exist/is not available").dump() + "\n";
-            reply.status = http::Reply::not_implemented;
-            reply.headers.reserve(2);
-            reply.headers.emplace_back(http::Header{"Content-Length", std::to_string(reply.content.size())});
-            reply.headers.emplace_back(http::Header{"Content-Type", "application/json"});
-            SILKRPC_INFO << "handle_request t=" << clock_time::since(start) << "ns\n";
-            co_return;
+            const auto r_size = request_json.size();
+            if (r_size > 32) {
+                reply.content = "[]\n";
+                // Return 413 Content Too Large
+                reply.status = http::Reply::too_large;
+            } else {
+                auto reply_array = nlohmann::json::array();
+                // TODO: some of the API may have special routine to support batch request.
+                // The for loop here should just be a default routine.
+                for(auto i = 0; i <= r_size; ++i) {
+                    auto request_id = request_json[i]["id"];
+                    if (!request_json[i].contains("method")) {
+                        // Do not return error for the whole batch if there's error in single request.
+                        nlohmann::json reply_json = make_json_error(request_id, -32600, "method missing");
+                        reply_array.push_back(reply_json);
+                        continue;
+                    }
+
+                    const auto method = request_json[i]["method"].get<std::string>();
+                    const auto handle_method_opt = rpc_api_table_.find_handler(method);
+                    if (!handle_method_opt) {
+                        // Do not return error for the whole batch if there's error in single request.
+                        nlohmann::json reply_json = make_json_error(request_id, -32601, "the method " + method + " does not exist/is not available");
+                        reply_array.push_back(reply_json);
+                        continue;
+                    }
+
+                    const auto handle_method = handle_method_opt.value();
+                    nlohmann::json reply_json;
+                    // Still allow exception to stop the whole batch as exceptions are rare.
+                    // We can catch exception here this becomes a problem.
+                    co_await (rpc_api_.*handle_method)(request_json[i], reply_json);
+
+                    reply_array.push_back(reply_json);
+                }
+                
+                reply.content = reply_array.dump(
+                        /*indent=*/-1, /*indent_char=*/' ', /*ensure_ascii=*/false, nlohmann::json::error_handler_t::replace) + "\n";
+            }            
         }
-        const auto handle_method = handle_method_opt.value();
-
-        nlohmann::json reply_json;
-        co_await (rpc_api_.*handle_method)(request_json, reply_json);
-
-        reply.content = reply_json.dump(
-            /*indent=*/-1, /*indent_char=*/' ', /*ensure_ascii=*/false, nlohmann::json::error_handler_t::replace) + "\n";
-        reply.status = http::Reply::ok;
     } catch (const std::exception& e) {
         SILKRPC_ERROR << "exception: " << e.what() << "\n";
         reply.content = make_json_error(request_id, 100, e.what()).dump() + "\n";
