@@ -64,6 +64,12 @@ if not success then
   return
 end
 
+-- detect array, send batch requests to "test"
+if not empty(body[1]) then
+  ngx.var.proxy = 'test'
+  return
+end
+
 local method = body['method']
 local version = body['jsonrpc']
 
