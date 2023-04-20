@@ -1,4 +1,4 @@
-name: TrustEVM Node CI
+name: EOS EVM Node CI
 
 on:
   push:
@@ -32,7 +32,7 @@ jobs:
         run: cat .github/workflows/node.md >> $GITHUB_STEP_SUMMARY
 
   build:
-    name: TrustEVM Node Build
+    name: EOS EVM Node Build
     runs-on: ubuntu-20.04
 
     steps:
@@ -50,7 +50,7 @@ jobs:
           submodules: 'recursive'
           token: ${{ steps.auth.outputs.token }}
 
-      - name: Build TrustEVM Node
+      - name: Build EOS EVM Node
         run: .github/workflows/build-node.sh
         env:
           CC: gcc-10
