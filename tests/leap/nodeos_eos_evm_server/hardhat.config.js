@@ -255,9 +255,9 @@ task("add-liquidity", "Adds liquidity to an ERC-20⇄WETH pool with ETH")
 
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
-  defaultNetwork: "ltrust",
+  defaultNetwork: "EOSEVMLocalTestnet",
   networks: {
-    ltrust: {
+    EOSEVMLocalTestnet: {
       url: "http://localhost:5000",
       accounts: {
         mnemonic: "test test test test test test test test test test test junk",
@@ -267,8 +267,8 @@ module.exports = {
         passphrase: "",
       },
     },
-    ttrust: {
-      url: "https://api-testnet.trust.one",
+    EOSEVMTestnet: {
+      url: "https://api.testnet.evm.eosnetwork.com",
       accounts: {
         mnemonic: "test test test test test test test test test test test junk",
         path: "m/44'/60'/0'/0",

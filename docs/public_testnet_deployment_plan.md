@@ -2,11 +2,11 @@
 
 
 This document describes how to enable EVM support for public testnets, such as Jungle testnet, without token economy.
-For local testnet deployments, refer to the [Enable EVM Support For Local Testnet](https://github.com/eosnetworkfoundation/TrustEVM/blob/main/docs/local_testnet_deployment_plan.md) guide.
+For local testnet deployments, refer to the [Enable EVM Support For Local Testnet](https://github.com/eosnetworkfoundation/eos-evm/blob/main/docs/local_testnet_deployment_plan.md) guide.
 
 To enable EVM support, the following procedures must be performed by:
 - [Block Producers](#for-block-producers)
-- [TrustEVM team](#for-trustevm-team)
+- [EOS EVM team](#for-eos-evm-team)
 - [EVM Service Providers](#for-evm-service-providers)
 
 ## For Block Producers
@@ -346,9 +346,9 @@ The following protocol features are required to support EVM in Antelope:
 ]
 ```
 
-## For TrustEVM Team
+## For EOS EVM Team
 
-The TrustEVM Team must perform the following steps:
+The EOS EVM Team must perform the following steps:
 
 ### 1. Create The EVM Account
 
@@ -371,7 +371,7 @@ Later in this procedure you must use the `setbal` smart contract action to set t
 
 Compile the `debug` version of the EVM smart contract and note the wasm and abi path, e.g. `EVM_DEBUG_PATH`.
 
-For details on how to compile the EVM smart contract see the [Compilation And Testing Guide](https://github.com/eosnetworkfoundation/TrustEVM/blob/main/docs/compilation_and_testing_guide.md).
+For details on how to compile the EVM smart contract see the [Compilation And Testing Guide](https://github.com/eosnetworkfoundation/eos-evm/blob/main/docs/compilation_and_testing_guide.md).
 
 Run the following `cleos` commands to deploy the `debug` version of the EVM contract to the EVM account:
 
@@ -388,7 +388,7 @@ The EVM contract will not allow any actions except `init` until its chain id & n
 
 ### 3. Setup The Initial EVM Token Balance
 
-We need to set the EVM token balance for the initial ETH account, which is specially managed by TrustEVM team.
+We need to set the EVM token balance for the initial ETH account, which is specially managed by EOS EVM team.
 
 For example:
 ```sh
@@ -402,7 +402,7 @@ For example:
 
 Compile the `release` version of the EVM smart contract and note the wasm and abi path, e.g. `EVM_RELEASE_PATH`.
 
-For details on how to compile the EVM smart contract see the [Compilation And Testing Guide](https://github.com/eosnetworkfoundation/TrustEVM/blob/main/docs/compilation_and_testing_guide.md).
+For details on how to compile the EVM smart contract see the [Compilation And Testing Guide](https://github.com/eosnetworkfoundation/eos-evm/blob/main/docs/compilation_and_testing_guide.md).
 
 Run the following `cleos` commands to deploy the `release` version of the EVM contract to the EVM account:
 
@@ -415,7 +415,7 @@ Run the following `cleos` commands to deploy the `release` version of the EVM co
 
 Send EVM tokens from the initial account to participant accounts.
 
-Use the token distribution script, [distribute_to_accounts.py](https://github.com/eosnetworkfoundation/TrustEVM/blob/main/peripherals/token_distribution/distribute_to_accounts.py), to distribute tokens to the initial EVM accounts:
+Use the token distribution script, [distribute_to_accounts.py](https://github.com/eosnetworkfoundation/eos-evm/blob/main/peripherals/token_distribution/distribute_to_accounts.py), to distribute tokens to the initial EVM accounts:
 
 #### Prepare The Account Balance CSV File
 
@@ -473,7 +473,7 @@ Ensure the sender account has enough balance to distribute to all the accounts i
 
 ##### Locate the starting_nonce variable
 
-Open token distribution script, [distribute_to_accounts.py](https://github.com/eosnetworkfoundation/TrustEVM/blob/main/peripherals/token_distribution/distribute_to_accounts.py), in your editor and search for the `starting_nonce` variable. It should look similar to the code lines below: 
+Open token distribution script, [distribute_to_accounts.py](https://github.com/eosnetworkfoundation/eos-evm/blob/main/peripherals/token_distribution/distribute_to_accounts.py), in your editor and search for the `starting_nonce` variable. It should look similar to the code lines below: 
 
 ```python
 # staring_nonce is the nonce number that maps to the transfer of the first account in the list
@@ -484,7 +484,7 @@ starting_nonce = 3
 
 ##### Update the starting_nonce variable
 
-In the token distribution script, [distribute_to_accounts.py](https://github.com/eosnetworkfoundation/TrustEVM/blob/main/peripherals/token_distribution/distribute_to_accounts.py), update the `starting_nonce` value to match your current sender account's nonce number. The nonce number is to mark the progress of distribution. You should not change the `starting_nonce` once it is correctly set. Save the script.
+In the token distribution script, [distribute_to_accounts.py](https://github.com/eosnetworkfoundation/eos-evm/blob/main/peripherals/token_distribution/distribute_to_accounts.py), update the `starting_nonce` value to match your current sender account's nonce number. The nonce number is to mark the progress of distribution. You should not change the `starting_nonce` once it is correctly set. Save the script.
 
 #### Prepare Account And Keys
 
@@ -498,7 +498,7 @@ For example:
 
 #### Verify Other Parameters In The Script
 
-In the token distribution script, [distribute_to_accounts.py](https://github.com/eosnetworkfoundation/TrustEVM/blob/main/peripherals/token_distribution/distribute_to_accounts.py), these parameters should read as follows:
+In the token distribution script, [distribute_to_accounts.py](https://github.com/eosnetworkfoundation/eos-evm/blob/main/peripherals/token_distribution/distribute_to_accounts.py), these parameters should read as follows:
 ```python
 EVM_CONTRACT    = os.getenv("EVM_CONTRACT", "evmevmevmevm")
 NODEOS_ENDPOINT = os.getenv("NODEOS_ENDPOINT", "http://127.0.0.1:8888")
@@ -538,7 +538,7 @@ Make sure the current nonce number has been increased by x, where x is the numbe
 
 ## For EVM Service Providers
 
-This part is very similar to the [Enable EVM Support For Local Testnet](https://github.com/eosnetworkfoundation/TrustEVM/blob/main/docs/local_testnet_deployment_plan.md) guide.
+This part is very similar to the [Enable EVM Support For Local Testnet](https://github.com/eosnetworkfoundation/eos-evm/blob/main/docs/local_testnet_deployment_plan.md) guide.
 EVM service providers will need to provide ETH compatible EVM services as follows:
 
 ### 1. Run an Antelope Node
@@ -550,26 +550,26 @@ Example command:
 ./build/programs/nodeos/nodeos --data-dir=./data-dir  --config-dir=./data-dir --genesis-json=./data-dir/genesis.json --disable-replay-opts --read-mode=irreversible
 ```
 
-### 2. Run a TrustEVM Node
+### 2. Run eos-evm-node
 
-Run at least one TrustEVM node, a.k.a. silkworm node, to sync with the Antelope node.
+Run at least one eos-evm-node, a.k.a. silkworm node, to sync with the Antelope node.
 
-Refer to the *Start up TrustEVM-node (silkworm node)* section in the [Enable EVM For Local Testnet](https://github.com/eosnetworkfoundation/TrustEVM/blob/main/docs/local_testnet_deployment_plan.md#5-start-up-trustevm-node-silkworm-node) guide for more details.
-
-```sh
-./build/cmd/trustevm-node --chain-data ./chain-data  --plugin block_conversion_plugin --plugin blockchain_plugin --nocolor 1 --verbosity=5
-```
-
-### 3. Run a TrustEVM-RPC Node
-
-Run at least one TrustEVM-RPC, a.k.a. silkworm rpc, process to sync with the TrustEVM node.
-The TrustEVM-RPC must be deployed on the same machine with TrustEVM-node, as it needs to access the same chain-data folder.
+Refer to the *Start up eos-evm-node (silkworm node)* section in the [Enable EVM For Local Testnet](https://github.com/eosnetworkfoundation/eos-evm/blob/main/docs/local_testnet_deployment_plan.md#5-start-up-eos-evm-node-silkworm-node) guide for more details.
 
 ```sh
-./build/cmd/trustevm-rpc --trust-evm-node=127.0.0.1:8080 --chaindata=./chain-data 
+./build/cmd/eos-evm-node --chain-data ./chain-data  --plugin block_conversion_plugin --plugin blockchain_plugin --nocolor 1 --verbosity=5
 ```
 
-Refer to the *Start up TrustEVM-RPC (silkworm RPC)* section in the [Enable EVM For Local Testnet](https://github.com/eosnetworkfoundation/TrustEVM/blob/main/docs/local_testnet_deployment_plan.md#6-start-up-trustevm-rpc-silkworm-rpc) guide for more RPC setup details.
+### 3. Run eos-evm-rpc
+
+Run at least one eos-evm-rpc, a.k.a. silkworm rpc, process to sync with the eos-evm-node.
+The eos-evm-rpc must be deployed on the same machine with eos-evm-node, as it needs to access the same chain-data folder.
+
+```sh
+./build/cmd/eos-evm-rpc --eos-evm-node=127.0.0.1:8080 --chaindata=./chain-data 
+```
+
+Refer to the *Start up eos-evm-rpc (silkworm RPC)* section in the [Enable EVM For Local Testnet](https://github.com/eosnetworkfoundation/eos-evm/blob/main/docs/local_testnet_deployment_plan.md#6-start-up-eos-evm-rpc-silkworm-rpc) guide for more RPC setup details.
 
 ### 4. Ensure Enough Resources
 
@@ -595,7 +595,7 @@ In the above environment settings, the Transaction Wrapper is set to:
 - Listen to `127.0.0.1:18888` Antelope endpoint
 - Use the `5JURSKS1BrJ1TagNBw1uVSzTQL2m9eHGkjknWeZkjSt33Awtior` key to wrap and sign the incoming ETH trasnactions into Antelope transactions and push them into the Antelope RPC endpoint `http://127.0.0.1:8888`
 
-Use the `index.js` file from https://github.com/eosnetworkfoundation/TrustEVM/tree/main/peripherals/tx_wrapper:
+Use the `index.js` file from https://github.com/eosnetworkfoundation/eos-evm/tree/main/peripherals/tx_wrapper:
 
 ```sh
 node index.js
@@ -603,9 +603,9 @@ node index.js
 
 ### 6. Run a Proxy Service
 
-Run at least one Proxy service to separate the read service to TrustEVM-RPC node and the write service to Transaction Wrapper.
+Run at least one Proxy service to separate the read service to eos-evm-rpc node and the write service to Transaction Wrapper.
 
-Refer to the *Setup proxy to separate read requests and write requests* section in the [Enable EVM For Local Testnet](https://github.com/eosnetworkfoundation/TrustEVM/blob/main/docs/local_testnet_deployment_plan.md#7-setup-proxy-to-separate-read-requests-and-write-requests) guide for details.
+Refer to the *Setup proxy to separate read requests and write requests* section in the [Enable EVM For Local Testnet](https://github.com/eosnetworkfoundation/eos-evm/blob/main/docs/local_testnet_deployment_plan.md#7-setup-proxy-to-separate-read-requests-and-write-requests) guide for details.
 
 ## RPC Provider Architecture
 
@@ -621,7 +621,7 @@ Refer to the *Setup proxy to separate read requests and write requests* section 
          |       +-----------+                     v       [3]
          |             |                   +-----------------+
          |             |                   |                 |
-         |             +------------------>|  TrustEVM Node  +
+         |             +------------------>|  EOS EVM Node   +
          |                     READ        |                 |
          |                                 +-----------------+
 ```
@@ -640,7 +640,7 @@ Refer to the *Setup proxy to separate read requests and write requests* section 
 - AMD Ryzen 9 5950X (*or other CPU with good single threaded performance*)
 - 4TB NVMe
 
-### TrustEVM Node
+### eos-evm-node
 
 - 64 GB
 - AMD Ryzen 9 5950X (*or other CPU with good single threaded performance*)
