@@ -42,7 +42,7 @@ HunterGate(
 )
 
 project(trustevm_node)
-set(PROJECT_VERSION 0.4.0)
+set(PROJECT_VERSION 0.4.1)
 
 string(REGEX MATCH "([0-9]+)\\.([0-9]+)\\.([0-9]+)" _ ${PROJECT_VERSION})
 set(PROJECT_VERSION_MAJOR ${CMAKE_MATCH_1})
