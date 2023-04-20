@@ -32,9 +32,9 @@ from core_symbol import CORE_SYMBOL
 from antelope_name import convert_name_to_value
 
 ###############################################################
-# nodeos_trust_evm_test
+# nodeos_eos_evm_test
 #
-# Set up a TrustEVM env and run simple tests.
+# Set up a EOS EVM env and run simple tests.
 #
 # Need to install:
 #   web3      - pip install web3
@@ -50,13 +50,13 @@ from antelope_name import convert_name_to_value
 #                               npm install http-jsonrpc-server
 #                               npm install dotenv
 #                               npm install is-valid-hostname
-# --trust-evm-build-root should point to the root of TrustEVM build dir
-# --trust-evm-contract-root should point to root of TrustEVM contract build dir
+# --eos-evm-build-root should point to the root of EOS EVM build dir
+# --eos-evm-contract-root should point to root of EOS EVM contract build dir
 #
 # Example:
 #  cd ~/ext/leap/build
 #  edit tests/core_symbol.py to be EOS
-#  ~/ext/TrustEVM/tests/leap/nodeos_trust_evm_test.py --trust-evm-contract-root ~/ext/TrustEVM/contract/build --trust-evm-build-root ~/ext/TrustEVM/build --use-tx-wrapper ~/ext/TrustEVM/peripherals/tx_wrapper --leave-running
+#  ~/ext/eos-evm/tests/leap/nodeos_eos_evm_test.py --eos-evm-contract-root ~/ext/eos-evm/contract/build --eos-evm-build-root ~/ext/eos-evm/build --use-tx-wrapper ~/ext/eos-evm/peripherals/tx_wrapper --leave-running
 #
 #  Launches wallet at port: 9899
 #    Example: bin/cleos --wallet-url http://127.0.0.1:9899 ...
@@ -67,9 +67,9 @@ Print=Utils.Print
 errorExit=Utils.errorExit
 
 appArgs=AppArgs()
-appArgs.add(flag="--trust-evm-contract-root", type=str, help="TrustEVM contract build dir", default=None)
-appArgs.add(flag="--trust-evm-build-root", type=str, help="TrustEVM build dir", default=None)
-appArgs.add(flag="--genesis-json", type=str, help="File to save generated genesis json", default="trust-evm-genesis.json")
+appArgs.add(flag="--eos-evm-contract-root", type=str, help="EOS EVM contract build dir", default=None)
+appArgs.add(flag="--eos-evm-build-root", type=str, help="EOS EVM build dir", default=None)
+appArgs.add(flag="--genesis-json", type=str, help="File to save generated genesis json", default="eos-evm-genesis.json")
 appArgs.add(flag="--use-tx-wrapper", type=str, help="tx_wrapper to use to send trx to nodeos", default=None)
 
 args=TestHelper.parse_args({"--keep-logs","--dump-error-details","-v","--leave-running","--clean-run" }, applicationSpecificArgs=appArgs)
@@ -78,13 +78,13 @@ killEosInstances= not args.leave_running
 dumpErrorDetails=args.dump_error_details
 keepLogs=args.keep_logs
 killAll=args.clean_run
-trustEvmContractRoot=args.trust_evm_contract_root
-trustEvmBuildRoot=args.trust_evm_build_root
+eosEvmContractRoot=args.eos_evm_contract_root
+eosEvmBuildRoot=args.eos_evm_build_root
 gensisJson=args.genesis_json
 useTrxWrapper=args.use_tx_wrapper
 
-assert trustEvmContractRoot is not None, "--trust-evm-contract-root is required"
-assert trustEvmBuildRoot is not None, "--trust-evm-build-root is required"
+assert eosEvmContractRoot is not None, "--eos-evm-contract-root is required"
+assert eosEvmBuildRoot is not None, "--eos-evm-build-root is required"
 
 szabo = 1000000000000
 seed=1
@@ -299,7 +299,7 @@ try:
         else:
             trans=nonProdNode.delegatebw(account, 20000000.0000, 20000000.0000, waitForTransBlock=True, exitOnError=True)
 
-    contractDir=trustEvmContractRoot + "/evm_runtime"
+    contractDir=eosEvmContractRoot + "/evm_runtime"
     wasmFile="evm_runtime.wasm"
     abiFile="evm_runtime.abi"
     Utils.Print("Publish evm_runtime contract")
@@ -334,7 +334,7 @@ try:
             "trust": {}
         },
         "difficulty": "0x01",
-        "extraData": "TrustEVM",
+        "extraData": "EOSEVM",
         "gasLimit": "0x7ffffffffff",
         "mixHash": "0x"+block["id"],
         "nonce": f'{convert_name_to_value(evmAcc.name):#0x}',
@@ -486,8 +486,8 @@ try:
     Utils.Print("Generated EVM json genesis file in: %s" % gensisJson)
     Utils.Print("")
     Utils.Print("You can now run:")
-    Utils.Print("  trustevm-node --plugin=blockchain_plugin --ship-endpoint=127.0.0.1:8999 --genesis-json=%s --chain-data=/tmp/data --verbosity=5" % gensisJson)
-    Utils.Print("  trustevm-rpc --trust-evm-node=127.0.0.1:8080 --http-port=0.0.0.0:8881 --chaindata=/tmp/data --api-spec=eth,debug,net,trace")
+    Utils.Print("  eos-evm-node --plugin=blockchain_plugin --ship-endpoint=127.0.0.1:8999 --genesis-json=%s --chain-data=/tmp/data --verbosity=5" % gensisJson)
+    Utils.Print("  eos-evm-rpc --eos-evm-node=127.0.0.1:8080 --http-port=0.0.0.0:8881 --chaindata=/tmp/data --api-spec=eth,debug,net,trace")
     Utils.Print("")
 
     #
@@ -645,15 +645,15 @@ try:
         Utils.errorExit("Transfer verification failed. Excepted %s, actual: %s" % (expectedAmount, testAccActualAmount))
 
 
-    # Launch trustevm-node
+    # Launch eos-evm-node
     dataDir = Utils.DataDir + "eos_evm"
-    nodeStdOutDir = dataDir + "/trustevm-node.stdout"
-    nodeStdErrDir = dataDir + "/trustevm-node.stderr"
+    nodeStdOutDir = dataDir + "/eos-evm-node.stdout"
+    nodeStdErrDir = dataDir + "/eos-evm-node.stderr"
     shutil.rmtree(dataDir, ignore_errors=True)
     os.makedirs(dataDir)
     outFile = open(nodeStdOutDir, "w")
     errFile = open(nodeStdErrDir, "w")
-    cmd = "%s/cmd/trustevm-node --plugin=blockchain_plugin --ship-endpoint=127.0.0.1:8999 --genesis-json=%s --chain-data=%s --verbosity=5 --nocolor=1 --plugin=rpc_plugin --trust-evm-node=127.0.0.1:8080 --http-port=0.0.0.0:8881 --api-spec=eth,debug,net,trace --chaindata=%s" % (trustEvmBuildRoot, gensisJson, dataDir, dataDir)
+    cmd = "%s/cmd/eos-evm-node --plugin=blockchain_plugin --ship-endpoint=127.0.0.1:8999 --genesis-json=%s --chain-data=%s --verbosity=5 --nocolor=1 --plugin=rpc_plugin --eos-evm-node=127.0.0.1:8080 --http-port=0.0.0.0:8881 --api-spec=eth,debug,net,trace --chaindata=%s" % (eosEvmBuildRoot, gensisJson, dataDir, dataDir)
     Utils.Print("Launching: %s" % cmd)
     evmNodePOpen=Utils.delayedCheckOutput(cmd, stdout=outFile, stderr=errFile)
 
@@ -671,7 +671,7 @@ try:
     lines = stdErrFile.readlines()
     for line in lines:
         if line.find("ERROR") != -1 or line.find("CRIT") != -1:
-            Utils.Print("  Found ERROR in trustevm log: ", line)
+            Utils.Print("  Found ERROR in EOS EVM log: ", line)
             foundErr = True
 
     testSuccessful= not foundErr

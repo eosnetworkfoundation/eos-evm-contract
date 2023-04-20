@@ -41,7 +41,7 @@ HunterGate(
   FILEPATH "${CMAKE_SOURCE_DIR}/cmake/Hunter/config.cmake"
 )
 
-project(trustevm_node)
+project(eos_evm_node)
 set(PROJECT_VERSION 0.4.0)
 
 string(REGEX MATCH "([0-9]+)\\.([0-9]+)\\.([0-9]+)" _ ${PROJECT_VERSION})

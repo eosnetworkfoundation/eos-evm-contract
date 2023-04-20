@@ -72,7 +72,7 @@ class engine_plugin_impl : std::enable_shared_from_this<engine_plugin_impl> {
          node_settings.network_id = node_settings.chain_config->chain_id;
 
          eth.reset(new silkworm::EthereumBackEnd(node_settings, &db_env));
-         eth->set_node_name("Trust Node");
+         eth->set_node_name("EOS EVM Node");
          SILK_INFO << "Created Ethereum Backend with network id <" << node_settings.network_id << ">, etherbase <" << node_settings.etherbase->bytes << ">";
 
          server.reset(new silkworm::rpc::BackEndKvServer(server_settings, *eth.get()));

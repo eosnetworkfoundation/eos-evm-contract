@@ -13,7 +13,7 @@ struct blockhash_evm_tester : basic_evm_tester {
 BOOST_AUTO_TEST_SUITE(blockhash_evm_tests)
 BOOST_FIXTURE_TEST_CASE(blockhash_tests, blockhash_evm_tester) try {
 
-   // tests/leap/nodeos_trust_evm_server/contracts/Blockhash.sol
+   // tests/leap/nodeos_eos_evm_server/contracts/Blockhash.sol
    const std::string blockhash_bytecode = 
       "608060405234801561001057600080fd5b506102e8806100206000396000f3fe608060405234801561001057600080fd5b5060"
       "04361061007c5760003560e01c8063c059239b1161005b578063c059239b146100c7578063c835de3c146100e5578063edb572"

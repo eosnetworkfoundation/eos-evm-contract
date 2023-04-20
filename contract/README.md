@@ -1,23 +1,3 @@
-# EVM runtime contract
+# EOS EVM Contract
 
-### Build Contract
-```
-git clone //https://github.com/eosnetworkfoundation/TrustEVM
-cd TrustEVM/contract
-git submodule update --init --recursive
-mkdir build
-cd build
-cmake ..
-make -j4
-```
-
-
-# Build unit tests
-Contract must be built using `-DWITH_TEST_ACTIONS`
-```
-cd tests
-mkdir build
-cd build
-cmake -Deosio_DIR=/path-to-mandel/build/lib/cmake/eosio ..
-make -j4 unit_test
-```
+To build, see instructions in the [README](../README.md) at the root of the project.
