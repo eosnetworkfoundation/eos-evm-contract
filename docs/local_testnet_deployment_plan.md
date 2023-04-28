@@ -405,7 +405,7 @@ Notice that the value `000000000000000000000000000000010000000000000000000000000
 
 ### 4. Setup The Transaction Wrapper Service
 
-Setup the transaction wrapper service to wrap ETH write requests into Antelope transactions.
+Setup the transaction wrapper service to wrap EVM transactions into Antelope transactions. This is also required in mainnet for service providers who want to be EVM transaction miners and get miner rewards in EOS.
 
 #### Install The Necessary nodejs Tools
 
@@ -416,7 +416,7 @@ npm install eosjs
 npm install ethereumjs-util
 ```
 
-#### Create Sender Antelope Account
+#### Create Sender Antelope Account (miner account)
 
 Create an additional Antelope account, a.k.a. the sender account, as the wrapper account for signing wrapped Antelope transactions.
 
@@ -436,15 +436,17 @@ run the open action on evm contract to open the account balance row:
 Prepare the `.env` file to configure Antelope RPC endpoint, listening port, EVM contract account, sender account and other details:
 
 ```txt
-EOS_RPC="http://127.0.0.1:8888"
+EOS_RPC="http://127.0.0.1:8888|http://192.168.1.100:8888"
 EOS_KEY="5JURSKS1BrJ1TagNBw1uVSzTQL2m9eHGkjknWeZkjSt33Awtior"
 HOST="127.0.0.1"
 PORT="18888"
 EOS_EVM_ACCOUNT="evmevmevmevm"
 EOS_SENDER="a123"
+EOS_PERMISSION="active"
+EXPIRE_SEC=60
 ```
 
-In this environment settings, Tx Wrapper will listen to 127.0.0.1:18888, use `5JURSKS1BrJ1TagNBw1uVSzTQL2m9eHGkjknWeZkjSt33Awtior` to wrap and sign the in-coming ETH trasnactions into Antelope transactions, and then push them into the Antelope RPC endpoint http://127.0.0.1:8888
+In the above environment settings, Tx Wrapper will listen to 127.0.0.1:18888, use `5JURSKS1BrJ1TagNBw1uVSzTQL2m9eHGkjknWeZkjSt33Awtior` to wrap and sign the in-coming ETH trasnactions into Antelope transactions (contract=evmevmevmevm, action_name=pushtx, with expire second set to 60 and using permission a123@active), and then push them into the Antelope RPC endpoint http://127.0.0.1:8888. If the endpoint http://127.0.0.1:8888 is unavailable, it will try the next endpoint http://192.168.1.100:8888.
 
 #### Start Tx Wrapper Service
 
