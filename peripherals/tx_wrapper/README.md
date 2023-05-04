@@ -17,6 +17,8 @@ EOS_KEY="5KQwrPbwdL6PhXujxW37FSSQZ1JiwsST4cqQzDeyXtP79zkvFD3"
 # the listening IP & port of this service
 HOST="127.0.0.1"
 PORT="3335"
+EOS_PERMISSION="active"
+EXPIRE_SEC=60
 ```
 Then
 ```
