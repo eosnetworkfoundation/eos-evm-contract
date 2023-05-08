@@ -450,7 +450,7 @@ void evm_contract::transfer(eosio::name from, eosio::name to, eosio::asset quant
         eosio::check(false, "memo must be either 0x EVM address or already opened account name to credit deposit to");
 }
 
-void evm_contract::withdraw(eosio::name owner, eosio::asset quantity) {
+void evm_contract::withdraw(eosio::name owner, eosio::asset quantity, const eosio::binary_extension<eosio::name> &to) {
     assert_unfrozen();
     require_auth(owner);
 
@@ -463,7 +463,7 @@ void evm_contract::withdraw(eosio::name owner, eosio::asset quantity) {
     });
 
     token::transfer_action transfer_act(token_account, {{get_self(), "active"_n}});
-    transfer_act.send(get_self(), owner, quantity, std::string("Withdraw from EVM balance"));
+    transfer_act.send(get_self(), to.has_value() ? *to : owner, quantity, std::string("Withdraw from EVM balance"));
 }
 
 bool evm_contract::gc(uint32_t max) {
