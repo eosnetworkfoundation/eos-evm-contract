@@ -145,13 +145,3 @@ private:
 
 } // namespace evm_runtime
 
-namespace std {
-template <typename DataStream>
-DataStream& operator<<(DataStream& ds, const std::basic_string<uint8_t>& bs)
-{
-   ds << (unsigned_int)bs.size();
-   if (bs.size())
-      ds.write((const char*)bs.data(), bs.size());
-   return ds;
-}
-} // namespace std
