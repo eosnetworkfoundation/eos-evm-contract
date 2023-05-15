@@ -156,7 +156,7 @@ void check_result( ValidationResult r, const Transaction& txn, const char* desc 
     }
 
     eosio::print( "ERR: ", uint64_t(r), "\n" );
-    eosio::check( false, desc );
+    eosio::check( false, std::string(desc)+ ": " + std::to_string(uint64_t(r)));
 }
 
 Receipt evm_contract::execute_tx( eosio::name miner, Block& block, Transaction& tx, silkworm::ExecutionProcessor& ep ) {
