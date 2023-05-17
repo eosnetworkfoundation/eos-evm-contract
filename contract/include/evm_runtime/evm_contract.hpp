@@ -1,5 +1,6 @@
 #include <eosio/eosio.hpp>
 #include <eosio/asset.hpp>
+#include <eosio/binary_extension.hpp>
 #include <eosio/singleton.hpp>
 
 #include <evm_runtime/types.hpp>
@@ -76,7 +77,7 @@ public:
    [[eosio::on_notify(TOKEN_ACCOUNT_NAME "::transfer")]] void
    transfer(eosio::name from, eosio::name to, eosio::asset quantity, std::string memo);
 
-   [[eosio::action]] void withdraw(eosio::name owner, eosio::asset quantity);
+   [[eosio::action]] void withdraw(eosio::name owner, eosio::asset quantity, const eosio::binary_extension<eosio::name> &to);
 
    /// @return true if all garbage has been collected
    [[eosio::action]] bool gc(uint32_t max);
