@@ -14,6 +14,10 @@ This repository in particular hosts the source to build three significant compon
 2. EOS EVM Node and RPC: These are programs, EOS EVM Node (`eos-evm-node` executable) and EOS EVM RPC (`eos-evm-rpc` executable), that are based on Silkworm and which together allow a node to service a subset of the RPC methods supported in the Ethereum JSON-RPC which involve reading the state of the (virtual) EVM blockchain enabled by the EOS EVM Contract. The `eos-evm-node` program relies on a SHiP connection to a [Leap](https://github.com/AntelopeIO/leap) node that is connected to the blockchain network hosting the desired EOS EVM Contract (i.e. the EOS network in the case of the EOS EVM Mainnet).
 3. TX-Wrapper: This is a Node.js application which specifically services two RPC methods of the Ethereum JSON-RPC: `eth_sendRawTransaction` and `eth_gasPrice`. It relies on chain API access to a [Leap](https://github.com/AntelopeIO/leap) node connected to the blockchain network hosting the desired EOS EVM Contract. The source code for TX-Wrapper can be found in the `peripherals/tx_wrapper` directory.
 
+Beyond code, there are additional useful resources relevant to the EOS EVM project.
+1. https://github.com/eosnetworkfoundation/evm-public-docs: A repository to hold technical documentation for an audience interested in following and participating in the operations of the EOS EVM project. The genesis JSON needed to stand up a EOS EVM Node that works with the EVM on the EOS blockchain can also be found in that repository.
+2. https://docs.eosnetwork.com/docs/latest/eos-evm/: Official documentation for the EOS EVM.
+
 ## Overview
 
 The EOS EVM Node consumes Antelope (EOS) blocks from a Leap node via state history (SHiP) endpoint and builds the virtual EVM blockchain in a deterministic way.
