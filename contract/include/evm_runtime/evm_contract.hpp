@@ -68,6 +68,8 @@ public:
     */
    [[eosio::action]] void freeze(bool value);
 
+   [[eosio::action]] void exec(const exec_input& input, const std::optional<exec_callback>& callback);
+
    [[eosio::action]] void pushtx(eosio::name miner, const bytes& rlptx);
 
    [[eosio::action]] void open(eosio::name owner);
