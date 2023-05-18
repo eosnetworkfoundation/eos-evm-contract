@@ -29,6 +29,11 @@ if (!process.env.EOS_SENDER) {
   process.exit();
 }
 
+if (!process.env.EOS_PERMISSION) {
+  console.log("Missing EOS_PERMISSION in .env file!");
+  process.exit();
+}
+
 if (!process.env.EOS_RPC) {
   console.log("Missing EOS_RPC in .env file!");
   process.exit();
@@ -48,6 +53,13 @@ if (!process.env.HOST || !isValidHostname(process.env.HOST)) {
 if (!process.env.PORT || !validateNum(process.env.PORT, 1, 65535)) {
   console.log("Missing or invalid PORT in .env file!");
   process.exit();
+}
+
+expire_sec = 300;
+if (!process.env.EXPIRE_SEC) {
+  console.log("Missing EXPIRE_SEC, default to " + expire_sec);
+} else {
+  expire_sec = +process.env.EXPIRE_SEC;
 }
 
 // Setting up EOS
@@ -79,9 +91,13 @@ function next_rpc_endpoint() {
 }
 
 // EOS Helpers
+var pushcount=0;
 async function push_tx(strRlptx) {
-  console.log('----rlptx-----');
+  id=pushcount;
+  pushcount = pushcount + 1;
+  console.log("----rlptx(" + id + ")-----");
   console.log(strRlptx);
+  t0 = Date.now();
   const result = await api.transact(
     {
       actions: [
@@ -90,7 +106,7 @@ async function push_tx(strRlptx) {
           name: "pushtx",
           authorization: [{
               actor      : process.env.EOS_SENDER,
-              permission : "active",
+              permission : process.env.EOS_PERMISSION,
             }
           ],
           data: {
@@ -102,10 +118,11 @@ async function push_tx(strRlptx) {
     },
     {
       blocksBehind: 3,
-      expireSeconds: 3000,
+      expireSeconds: +expire_sec,
     }
   );
-  console.log('----response----');
+  latency = Date.now() - t0;
+  console.log("----response(" + id + ", " + latency + "ms) ----");
   console.log(result);
   return result;
 }
@@ -120,7 +137,7 @@ async function eth_sendRawTransaction(params) {
 var lastGetTableCallTime = 0
 var gasPrice = "0x1";
 async function eth_gasPrice(params) {
-  if ( (new Date() - lastGetTableCallTime) >= 500 ) {
+  if ( (new Date() - lastGetTableCallTime) >= 1000 ) {
     try {
       const result = await rpc.get_table_rows({
         json: true,                // Get the response as json
@@ -131,7 +148,7 @@ async function eth_gasPrice(params) {
         reverse: false,            // Optional: Get reversed data
         show_payer: false          // Optional: Show ram payer
       });
-      console.log("result:", result);
+      console.log("result:", result.rows[0].gas_price);
       gasPrice = "0x" + parseInt(result.rows[0].gas_price).toString(16);
       lastGetTableCallTime = new Date();
     } catch(e) {
@@ -188,3 +205,4 @@ rpcServer.listen(+process.env.PORT, process.env.HOST).then(() => {
     "server is listening at " + process.env.HOST + ":" + process.env.PORT
   );
 });
+

@@ -27,9 +27,9 @@ from core_symbol import CORE_SYMBOL
 from antelope_name import convert_name_to_value
 
 ###############################################################
-# nodeos_trust_evm_server
+# nodeos_eos_evm_server
 #
-# Set up a TrustEVM env
+# Set up a EOS EVM env
 #
 # This test sets up 2 producing nodes and one "bridge" node using test_control_api_plugin.
 #   One producing node has 3 of the elected producers and the other has 1 of the elected producers.
@@ -39,13 +39,13 @@ from antelope_name import convert_name_to_value
 #   The bridge node has the test_control_api_plugin, which exposes a restful interface that the test script uses to kill
 #       the "bridge" node when /fork endpoint called.
 #
-# --trust-evm-contract-root should point to root of TrustEVM contract build dir
+# --eos-evm-contract-root should point to root of EOS EVM Contract build dir
 # --genesis-json file to save generated EVM genesis json
-# --read-endpoint trustnode-rpc endpoint (read endpoint)
+# --read-endpoint eos-evm-rpc endpoint (read endpoint)
 #
 # Example:
 #  cd ~/ext/leap/build
-#  ~/ext/TrustEVM/tests/leap/nodeos_trust_evm_server.py --trust-evm-contract-root ~/ext/TrustEVM/contract/build --leave-running
+#  ~/ext/eos-evm/tests/leap/nodeos_eos_evm_server.py --eos-evm-contract-root ~/ext/eos-evm/contract/build --leave-running
 #
 #  Launches wallet at port: 9899
 #    Example: bin/cleos --wallet-url http://127.0.0.1:9899 ...
@@ -63,9 +63,9 @@ Print=Utils.Print
 errorExit=Utils.errorExit
 
 appArgs=AppArgs()
-appArgs.add(flag="--trust-evm-contract-root", type=str, help="TrustEVM contract build dir", default=None)
-appArgs.add(flag="--genesis-json", type=str, help="File to save generated genesis json", default="trust-evm-genesis.json")
-appArgs.add(flag="--read-endpoint", type=str, help="EVM read enpoint (trustevm-rpc)", default="http://localhost:8881")
+appArgs.add(flag="--eos-evm-contract-root", type=str, help="EOS EVM Contract build dir", default=None)
+appArgs.add(flag="--genesis-json", type=str, help="File to save generated genesis json", default="eos-evm-genesis.json")
+appArgs.add(flag="--read-endpoint", type=str, help="EVM read endpoint (eos-evm-rpc)", default="http://localhost:8881")
 
 args=TestHelper.parse_args({"--keep-logs","--dump-error-details","-v","--leave-running","--clean-run" }, applicationSpecificArgs=appArgs)
 debug=args.v
@@ -73,11 +73,11 @@ killEosInstances= not args.leave_running
 dumpErrorDetails=args.dump_error_details
 keepLogs=args.keep_logs
 killAll=args.clean_run
-trustEvmContractRoot=args.trust_evm_contract_root
+eosEvmContractRoot=args.eos_evm_contract_root
 gensisJson=args.genesis_json
 readEndpoint=args.read_endpoint
 
-assert trustEvmContractRoot is not None, "--trust-evm-contract-root is required"
+assert eosEvmContractRoot is not None, "--eos-evm-contract-root is required"
 
 totalProducerNodes=2
 totalNonProducerNodes=1
@@ -199,7 +199,7 @@ try:
 
     # setup evm
 
-    contractDir=trustEvmContractRoot + "/evm_runtime"
+    contractDir=eosEvmContractRoot + "/evm_runtime"
     wasmFile="evm_runtime.wasm"
     abiFile="evm_runtime.abi"
     Utils.Print("Publish evm_runtime contract")
@@ -236,7 +236,7 @@ try:
             "trust": {}
         },
         "difficulty": "0x01",
-        "extraData": "TrustEVM",
+        "extraData": "EOSEVM",
         "gasLimit": "0x7ffffffffff",
         "mixHash": "0x"+block["id"],
         "nonce": f'{convert_name_to_value(evmAcc.name):#0x}',
@@ -356,8 +356,8 @@ try:
     Utils.Print("Generated EVM json genesis file in: %s" % gensisJson)
     Utils.Print("")
     Utils.Print("You can now run:")
-    Utils.Print("  trustevm-node --plugin=blockchain_plugin --ship-endpoint=127.0.0.1:8999 --genesis-json=%s --chain-data=/tmp --verbosity=4" % gensisJson)
-    Utils.Print("  trustevm-rpc --trust-evm-node=127.0.0.1:8080 --http-port=0.0.0.0:8881 --chaindata=/tmp --api-spec=eth,debug,net,trace")
+    Utils.Print("  eos-evm-node --plugin=blockchain_plugin --ship-endpoint=127.0.0.1:8999 --genesis-json=%s --chain-data=/tmp --verbosity=4" % gensisJson)
+    Utils.Print("  eos-evm-rpc --eos-evm-node=127.0.0.1:8080 --http-port=0.0.0.0:8881 --chaindata=/tmp --api-spec=eth,debug,net,trace")
     Utils.Print("")
     Utils.Print("Web3 endpoint:")
     Utils.Print("  http://localhost:5000")

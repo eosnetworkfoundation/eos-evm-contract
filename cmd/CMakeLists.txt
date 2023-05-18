@@ -84,13 +84,13 @@ add_library(rpc_plugin rpc_plugin.cpp)
 target_include_directories(rpc_plugin PUBLIC ${CMAKE_SOURCE_DIR})
 target_link_libraries(rpc_plugin PUBLIC ${SILKRPC_LIBRARIES} ${SILKRPC_DAEMON_LIBRARIES} sys_plugin appbase ${Boost_PROGRAM_OPTIONS_LIBRARY})
 
-add_executable(trustevm-node node.cpp)
-target_include_directories(trustevm-node PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR})
-target_link_libraries(trustevm-node PRIVATE engine_plugin shipreceiver_plugin sys_plugin blockchain_plugin rpc_plugin trustevm_node-buildinfo)
+add_executable(eos-evm-node node.cpp)
+target_include_directories(eos-evm-node PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR})
+target_link_libraries(eos-evm-node PRIVATE engine_plugin shipreceiver_plugin sys_plugin blockchain_plugin rpc_plugin eos_evm_node-buildinfo)
 
-add_executable(trustevm-rpc rpc.cpp)
-target_include_directories(trustevm-rpc PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR})
-target_link_libraries(trustevm-rpc PRIVATE rpc_plugin trustevm_node-buildinfo)
+add_executable(eos-evm-rpc rpc.cpp)
+target_include_directories(eos-evm-rpc PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR})
+target_link_libraries(eos-evm-rpc PRIVATE rpc_plugin eos_evm_node-buildinfo)
 
 # Unit tests
 enable_testing()
@@ -126,4 +126,4 @@ include_directories(
 )
 
 target_compile_definitions(consensus PRIVATE SILKWORM_CONSENSUS_TEST_DIR="${CMAKE_SOURCE_DIR}/silkworm/third_party/tests")
-target_link_libraries(consensus PRIVATE engine_plugin shipreceiver_plugin sys_plugin blockchain_plugin rpc_plugin trustevm_node-buildinfo evmc::loader CLI11::CLI11)
+target_link_libraries(consensus PRIVATE engine_plugin shipreceiver_plugin sys_plugin blockchain_plugin rpc_plugin eos_evm_node-buildinfo evmc::loader CLI11::CLI11)

@@ -22,12 +22,12 @@
 #include "rpc_plugin.hpp"
 #include "sys_plugin.hpp"
 
-#include <trustevm_node/buildinfo.h>
+#include <eos_evm_node/buildinfo.h>
 
 std::string get_version_from_build_info() {
-    const auto build_info{trustevm_node_get_buildinfo()};
+    const auto build_info{eos_evm_node_get_buildinfo()};
 
-    std::string application_version{"trustevm node version: "};
+    std::string application_version{"EOS EVM RPC version: "};
     application_version.append(build_info->project_version);
     return application_version;
 }
