@@ -102,9 +102,8 @@ BOOST_FIXTURE_TEST_CASE(basic_deposit_withdraw, native_token_evm_tester_EOS) try
 
 } FC_LOG_AND_RETHROW()
 
-BOOST_FIXTURE_TEST_CASE(weird_names, native_token_evm_tester_EOS) try {
-   //just try some weird account names as memos
-
+BOOST_FIXTURE_TEST_CASE(invalid_memos, native_token_evm_tester_EOS) try {
+   //try some weird account names as memos
    BOOST_REQUIRE_EXCEPTION(transfer_token("alice"_n, "evm"_n, make_asset(1'0000), "BANANA"),
                            eosio_assert_message_exception, eosio_assert_message_is("character is not in allowed character set for names"));
 
@@ -115,6 +114,25 @@ BOOST_FIXTURE_TEST_CASE(weird_names, native_token_evm_tester_EOS) try {
                            eosio_assert_message_exception, eosio_assert_message_is("character is not in allowed character set for names"));
 
    BOOST_REQUIRE_EXCEPTION(transfer_token("alice"_n, "evm"_n, make_asset(1'0000), ""),
+                           eosio_assert_message_exception, eosio_assert_message_is("memo must be either 0x EVM address or already opened account name to credit deposit to"));
+
+   //try some invalid addresses as memos
+   BOOST_REQUIRE_EXCEPTION(transfer_token("alice"_n, "evm"_n, make_asset(1'0000), "0x"),
+                           eosio_assert_message_exception, eosio_assert_message_is("character is not in allowed character set for names"));
+
+   BOOST_REQUIRE_EXCEPTION(transfer_token("alice"_n, "evm"_n, make_asset(1'0000), "0xf00"),
+                           eosio_assert_message_exception, eosio_assert_message_is("character is not in allowed character set for names"));
+
+   BOOST_REQUIRE_EXCEPTION(transfer_token("alice"_n, "evm"_n, make_asset(1'0000), "0xf00000000000"),
+                           eosio_assert_message_exception, eosio_assert_message_is("memo must be either 0x EVM address or already opened account name to credit deposit to"));
+
+   BOOST_REQUIRE_EXCEPTION(transfer_token("alice"_n, "evm"_n, make_asset(1'0000), "0x1234567890123456789012345678901234567890123456789012345678901234567890"),
+                           eosio_assert_message_exception, eosio_assert_message_is("memo must be either 0x EVM address or already opened account name to credit deposit to"));
+
+   BOOST_REQUIRE_EXCEPTION(transfer_token("alice"_n, "evm"_n, make_asset(1'0000), "0x5b38da6a701c568545dzfcb03fcb875f56beddc4"),
+                           eosio_assert_message_exception, eosio_assert_message_is("unable to parse destination address"));
+
+   BOOST_REQUIRE_EXCEPTION(transfer_token("alice"_n, "evm"_n, make_asset(1'0000), "xx5b38da6a701c568545dafcb03fcb875f56beddc4"),
                            eosio_assert_message_exception, eosio_assert_message_is("memo must be either 0x EVM address or already opened account name to credit deposit to"));
 
 } FC_LOG_AND_RETHROW()
