@@ -437,7 +437,7 @@ void evm_contract::handle_evm_transfer(eosio::asset quantity, const std::string&
 
 void evm_contract::transfer(eosio::name from, eosio::name to, eosio::asset quantity, std::string memo) {
     assert_unfrozen();
-    eosio::check(quantity.symbol == token_symbol, "received unexpected token");
+    eosio::check(get_code() == token_account && quantity.symbol == token_symbol, "received unexpected token");
 
     if(to != get_self() || from == get_self())
         return;

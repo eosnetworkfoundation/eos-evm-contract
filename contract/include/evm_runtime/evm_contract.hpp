@@ -74,7 +74,7 @@ public:
 
    [[eosio::action]] void close(eosio::name owner);
 
-   [[eosio::on_notify(TOKEN_ACCOUNT_NAME "::transfer")]] void
+   [[eosio::on_notify("*::transfer")]] void
    transfer(eosio::name from, eosio::name to, eosio::asset quantity, std::string memo);
 
    [[eosio::action]] void withdraw(eosio::name owner, eosio::asset quantity, const eosio::binary_extension<eosio::name> &to);

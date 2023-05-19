@@ -129,6 +129,55 @@ BOOST_FIXTURE_TEST_CASE(non_standard_native_symbol, native_token_evm_tester_SPOO
 
 } FC_LOG_AND_RETHROW()
 
+BOOST_FIXTURE_TEST_CASE(non_standard_native_symbol2, native_token_evm_tester_EOS) try {
+   //the symbol 4,EOS is fixed as the expected native symbol. try transfering in a different symbol from eosio.token
+
+   create_accounts({"usdt"_n});
+   set_code("usdt"_n, testing::contracts::eosio_token_wasm());
+   set_abi("usdt"_n, testing::contracts::eosio_token_abi().data());
+   produce_block();
+
+   symbol usdt_symbol = symbol::from_string("4,USDT");
+   push_action("usdt"_n,
+               "create"_n,
+               "usdt"_n,
+               mvo()("issuer", "usdt"_n)("maximum_supply", asset(10'000'000'000'0000, usdt_symbol)));
+   push_action("usdt"_n,
+               "issue"_n,
+               "usdt"_n,
+               mvo()("to", "usdt"_n)("quantity", asset(1'000'000'000'0000, usdt_symbol))("memo", ""));
+   produce_block();
+
+   BOOST_REQUIRE_EXCEPTION(push_action("usdt"_n,
+                           "transfer"_n,
+                           "usdt"_n,
+                           mvo()("from", "usdt")("to", evm_account_name)("quantity", asset(1'000'0000, usdt_symbol))("memo", "")),
+                           eosio_assert_message_exception, eosio_assert_message_is("received unexpected token"));
+
+   create_accounts({"fakeeos"_n});
+   set_code("fakeeos"_n, testing::contracts::eosio_token_wasm());
+   set_abi("fakeeos"_n, testing::contracts::eosio_token_abi().data());
+   produce_block();
+
+   symbol eos_symbol = symbol::from_string("4,EOS");
+   push_action("fakeeos"_n,
+               "create"_n,
+               "fakeeos"_n,
+               mvo()("issuer", "fakeeos"_n)("maximum_supply", asset(10'000'000'000'0000, eos_symbol)));
+   push_action("fakeeos"_n,
+               "issue"_n,
+               "fakeeos"_n,
+               mvo()("to", "fakeeos"_n)("quantity", asset(1'000'000'000'0000, eos_symbol))("memo", ""));
+   produce_block();
+
+   BOOST_REQUIRE_EXCEPTION(push_action("fakeeos"_n,
+                           "transfer"_n,
+                           "fakeeos"_n,
+                           mvo()("from", "fakeeos")("to", evm_account_name)("quantity", asset(1'000'0000, eos_symbol))("memo", "")),
+                           eosio_assert_message_exception, eosio_assert_message_is("received unexpected token"));
+
+} FC_LOG_AND_RETHROW()
+
 BOOST_FIXTURE_TEST_CASE(transfer_notifier_without_init, native_token_evm_tester_noinit) try {
    //make sure to not accept transfer notifications unless contract has been inited
 
