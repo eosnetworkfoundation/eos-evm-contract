@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <iostream>
 #include <string>
+#include <fstream>
 
 #include <boost/process/environment.hpp>
 #include <boost/filesystem.hpp>
