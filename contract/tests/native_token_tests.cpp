@@ -533,4 +533,252 @@ BOOST_FIXTURE_TEST_CASE(withdraw_to, native_token_evm_tester_EOS) try {
 }
 FC_LOG_AND_RETHROW()
 
+
+BOOST_FIXTURE_TEST_CASE(evm_eos_loopback, native_token_evm_tester_EOS) try {
+   //alice does an ingress bridge to her reserved address, which just circles it back around as an egress bridge to herself
+   {
+      const int64_t to_bridge = 10'0000;
+      const int64_t alice_native_before = native_balance("alice"_n);
+      transfer_token("alice"_n, "evm"_n, make_asset(to_bridge), silkworm::to_hex(make_reserved_address("alice"_n.to_uint64_t()), true));
+
+      BOOST_REQUIRE_EQUAL(alice_native_before, native_balance("alice"_n));
+   }
+
+   //try it again, but this time send it to another account
+   {
+      const int64_t to_bridge = 10'0000;
+      const int64_t alice_native_before = native_balance("alice"_n);
+      const int64_t bob_native_before = native_balance("bob"_n);
+      transfer_token("alice"_n, "evm"_n, make_asset(to_bridge), silkworm::to_hex(make_reserved_address("bob"_n.to_uint64_t()), true));
+
+      BOOST_REQUIRE_EQUAL(alice_native_before - native_balance("alice"_n), to_bridge);
+      BOOST_REQUIRE_EQUAL(native_balance("bob"_n) - bob_native_before, to_bridge);
+   }
+
+   //try the above again, this time with a bridge free
+   const int64_t bridge_fee = 1000;
+   setfeeparams(fee_parameters{.ingress_bridge_fee = make_asset(bridge_fee)});
+   produce_block();
+
+   //alice to her own reserved address again..
+   {
+      const int64_t to_bridge = 10'0000;
+      const int64_t alice_native_before = native_balance("alice"_n);
+      transfer_token("alice"_n, "evm"_n, make_asset(to_bridge), silkworm::to_hex(make_reserved_address("alice"_n.to_uint64_t()), true));
+
+      BOOST_REQUIRE_EQUAL(alice_native_before - native_balance("alice"_n), bridge_fee);
+   }
+
+   //alice to bob's reserved address again..
+   {
+      const int64_t to_bridge = 10'0000;
+      const int64_t alice_native_before = native_balance("alice"_n);
+      const int64_t bob_native_before = native_balance("bob"_n);
+      transfer_token("alice"_n, "evm"_n, make_asset(to_bridge), silkworm::to_hex(make_reserved_address("bob"_n.to_uint64_t()), true));
+
+      BOOST_REQUIRE_EQUAL(alice_native_before - native_balance("alice"_n), to_bridge);
+      BOOST_REQUIRE_EQUAL(native_balance("bob"_n) - bob_native_before, to_bridge - bridge_fee);
+   }
+} FC_LOG_AND_RETHROW()
+
+BOOST_FIXTURE_TEST_CASE(evm_eos_send_and_revert, native_token_evm_tester_EOS) try {
+   // RevertTest.sol
+   const std::string send_and_revert_bytecode =
+      "608060405234801561001057600080fd5b50610236806100206000396000f3fe6080604052600436106100295760003560e01c"
+      "806312c385411461002e578063648bf77414610043575b600080fd5b61004161003c366004610195565b610056565b005b6100"
+      "416100513660046101b7565b6100a4565b6040516000906001600160a01b038316903480156108fc029184818181858888f193"
+      "5050505090508061008b5761008b6101ea565b60405163cc57499d60e01b815260040160405180910390fd5b6040516312c385"
+      "4160e01b81526001600160a01b038316600482015230906312c38541906127109034906024016000604051808303818589803b"
+      "1580156100ea57600080fd5b5088f194505050505080156100fd575060015b610137573d80801561012b576040519150601f19"
+      "603f3d011682016040523d82523d6000602084013e610130565b606091505b505061013f565b61013f6101ea565b6040516001"
+      "600160a01b038216903480156108fc02916000818181858888f19350505050158015610174573d6000803e3d6000fd5b505050"
+      "565b80356001600160a01b038116811461019057600080fd5b919050565b6000602082840312156101a757600080fd5b6101b0"
+      "82610179565b9392505050565b600080604083850312156101ca57600080fd5b6101d383610179565b91506101e16020840161"
+      "0179565b90509250929050565b634e487b7160e01b600052600160045260246000fdfea264697066735822122068a077777f85"
+      "bfd56183f4a75a5d535181050f262de5766cc862098d59758f0a64736f6c63430008110033";
+
+   evm_eoa evm1, evm2;
+   transfer_token("alice"_n, "evm"_n, make_asset(50'0000), evm1.address_0x());
+   transfer_token("alice"_n, "evm"_n, make_asset(50'0000), evm2.address_0x());
+   BOOST_REQUIRE(!!evm_balance(evm2));
+   open("bob"_n);
+   open("carol"_n);
+
+   const evmc::address send_and_revert_addr = deploy_contract(evm1, evmc::from_hex(send_and_revert_bytecode).value());
+
+   //evm2 is going to send the send_and_revert_addr 1 EOS; initially the contract will send it to bob's reserved
+   // address, but that will be reverted, and then it will be sent to carol's reserved address.
+   const int64_t to_bridge = 1'0000;
+   const intx::uint256 evm2_before = *evm_balance(evm2);
+
+   silkworm::Transaction txn = generate_tx(send_and_revert_addr, 100_szabo * to_bridge, 100'000);
+   txn.data = evmc::from_hex("0x648bf774"                                                                 //recover(address,address)
+                             "000000000000000000000000bbbbbbbbbbbbbbbbbbbbbbbb3d0e000000000000"           //bob reserved
+                             "000000000000000000000000bbbbbbbbbbbbbbbbbbbbbbbb41af488000000000").value(); //carol reserved
+   evm2.sign(txn);
+   pushtx(txn);
+
+   BOOST_REQUIRE(vault_balance("bob"_n) == (balance_and_dust{make_asset(0), 0ULL}));
+   BOOST_REQUIRE(vault_balance("carol"_n) == (balance_and_dust{make_asset(to_bridge), 0}));
+   BOOST_REQUIRE(evm2_before - *evm_balance(evm2) == 100_szabo * to_bridge + 75215_u256 * get_config().gas_price);
+} FC_LOG_AND_RETHROW()
+
+BOOST_FIXTURE_TEST_CASE(evm_eos_fanout, native_token_evm_tester_EOS) try {
+   // Distributor.sol
+   const std::string fanout_bytecode =
+      "608060405234801561001057600080fd5b50610284806100206000396000f3fe60806040526004361061001e5760003560e01c"
+      "80632929abe614610023575b600080fd5b610036610031366004610154565b610038565b005b6000805b848110156100f45785"
+      "8582818110610056576100566101c0565b905060200201602081019061006b91906101d6565b6001600160a01b03166108fc85"
+      "8584818110610089576100896101c0565b905060200201359081150290604051600060405180830381858888f1935050505015"
+      "80156100bb573d6000803e3d6000fd5b508383828181106100ce576100ce6101c0565b90506020020135826100e0919061021c"
+      "565b9150806100ec81610235565b91505061003c565b5034811461010157600080fd5b5050505050565b60008083601f840112"
+      "61011a57600080fd5b50813567ffffffffffffffff81111561013257600080fd5b6020830191508360208260051b8501011115"
+      "61014d57600080fd5b9250929050565b6000806000806040858703121561016a57600080fd5b843567ffffffffffffffff8082"
+      "111561018257600080fd5b61018e88838901610108565b909650945060208701359150808211156101a757600080fd5b506101"
+      "b487828801610108565b95989497509550505050565b634e487b7160e01b600052603260045260246000fd5b60006020828403"
+      "12156101e857600080fd5b81356001600160a01b03811681146101ff57600080fd5b9392505050565b634e487b7160e01b6000"
+      "52601160045260246000fd5b8082018082111561022f5761022f610206565b92915050565b6000600182016102475761024761"
+      "0206565b506001019056fea26469706673582212209964e90f15129fadc3f3ade8e9fcd3b3d9c3f27617b3bcc28cf29cc5e3e5"
+      "b5dc64736f6c63430008110033";
+
+   evm_eoa evm1, evm2;
+   transfer_token("alice"_n, "evm"_n, make_asset(50'0000), evm1.address_0x());
+   transfer_token("alice"_n, "evm"_n, make_asset(10'0000), evm2.address_0x());
+   BOOST_REQUIRE(!!evm_balance(evm2));
+
+   const evmc::address fanout_addr = deploy_contract(evm1, evmc::from_hex(fanout_bytecode).value());
+
+   //evm2 is going to try to send 3EOS, 1 to reserved alice, 1 to reserved bob, and 1 to reserved carol
+   const int64_t to_bridge = 3'0000;
+   const int64_t alice_native_start = native_balance("alice"_n);
+   const int64_t bob_native_start = native_balance("bob"_n);
+   const int64_t carol_native_start = native_balance("carol"_n);
+
+   silkworm::Transaction txn = generate_tx(fanout_addr, 100_szabo * to_bridge, 300'000);
+
+   txn.data = evmc::from_hex("0x2929abe6"                                                                 //distribute(address[],uint256[])
+                             "0000000000000000000000000000000000000000000000000000000000000040"           //offset to 'to' list
+                             "00000000000000000000000000000000000000000000000000000000000000c0"           //offset to 'amt' list
+                             "0000000000000000000000000000000000000000000000000000000000000003"           //3 addresses
+                             "000000000000000000000000bbbbbbbbbbbbbbbbbbbbbbbb345c850000000000"           //alice reserved
+                             "000000000000000000000000bbbbbbbbbbbbbbbbbbbbbbbb3d0e000000000000"           //bob reserved
+                             "000000000000000000000000bbbbbbbbbbbbbbbbbbbbbbbb41af488000000000"           //carol reserved
+                             "0000000000000000000000000000000000000000000000000000000000000003"           //3 amounts
+                             "0000000000000000000000000000000000000000000000000de0b6b3a7640000"           //1EOS
+                             "0000000000000000000000000000000000000000000000000de0b6b3a7640000"           //1EOS
+                             "0000000000000000000000000000000000000000000000000de0b6b3a7640000").value(); //1EOS
+   evm2.sign(txn);
+
+   //0 of 3 are open
+   BOOST_REQUIRE_EXCEPTION(pushtx(txn),
+                           eosio_assert_message_exception, eosio_assert_message_is("only one non-open account for egress bridging allowed in single transaction"));
+
+   open("alice"_n);
+   //only 1 of the 3 are open
+   BOOST_REQUIRE_EXCEPTION(pushtx(txn),
+                           eosio_assert_message_exception, eosio_assert_message_is("only one non-open account for egress bridging allowed in single transaction"));
+
+   open("bob"_n);
+
+   //nothing should have been sent to alice's nor bob's open balance yet
+   BOOST_REQUIRE(vault_balance("alice"_n) == (balance_and_dust{make_asset(0), 0ULL}));
+   BOOST_REQUIRE(vault_balance("bob"_n)   == (balance_and_dust{make_asset(0), 0ULL}));
+   //nor should have any of their native balances changed
+   BOOST_REQUIRE(native_balance("alice"_n) == alice_native_start);
+   BOOST_REQUIRE(native_balance("bob"_n) == bob_native_start);
+   BOOST_REQUIRE(native_balance("carol"_n) == carol_native_start);
+
+   //2 of 3 open, this should go through
+   {
+      const intx::uint256 evm2_before = *evm_balance(evm2);
+      pushtx(txn);
+
+      BOOST_REQUIRE(vault_balance("alice"_n)  == (balance_and_dust{make_asset(1'0000), 0ULL}));
+      BOOST_REQUIRE(vault_balance("bob"_n)    == (balance_and_dust{make_asset(1'0000), 0ULL}));
+      BOOST_REQUIRE(native_balance("carol"_n) == carol_native_start + 1'0000);
+
+      BOOST_REQUIRE(evm2_before - *evm_balance(evm2) == 100_szabo * to_bridge + 122826_u256 * get_config().gas_price);
+   }
+
+   open("carol"_n);
+   evm2.sign(txn);
+
+   //all 3 open
+   {
+      const intx::uint256 evm2_before = *evm_balance(evm2);
+      pushtx(txn);
+
+      BOOST_REQUIRE(vault_balance("alice"_n)  == (balance_and_dust{make_asset(2'0000), 0ULL}));
+      BOOST_REQUIRE(vault_balance("bob"_n)    == (balance_and_dust{make_asset(2'0000), 0ULL}));
+      BOOST_REQUIRE(vault_balance("carol"_n)  == (balance_and_dust{make_asset(1'0000), 0ULL}));
+      BOOST_REQUIRE(native_balance("carol"_n) == carol_native_start + 1'0000);
+
+      BOOST_REQUIRE(evm2_before - *evm_balance(evm2) == 100_szabo * to_bridge + 122826_u256 * get_config().gas_price);
+   }
+} FC_LOG_AND_RETHROW()
+
+BOOST_FIXTURE_TEST_CASE(evm_eos_fanout_out_of_gas, native_token_evm_tester_EOS) try {
+   // Distributor.sol
+   const std::string fanout_bytecode =
+      "608060405234801561001057600080fd5b50610284806100206000396000f3fe60806040526004361061001e5760003560e01c"
+      "80632929abe614610023575b600080fd5b610036610031366004610154565b610038565b005b6000805b848110156100f45785"
+      "8582818110610056576100566101c0565b905060200201602081019061006b91906101d6565b6001600160a01b03166108fc85"
+      "8584818110610089576100896101c0565b905060200201359081150290604051600060405180830381858888f1935050505015"
+      "80156100bb573d6000803e3d6000fd5b508383828181106100ce576100ce6101c0565b90506020020135826100e0919061021c"
+      "565b9150806100ec81610235565b91505061003c565b5034811461010157600080fd5b5050505050565b60008083601f840112"
+      "61011a57600080fd5b50813567ffffffffffffffff81111561013257600080fd5b6020830191508360208260051b8501011115"
+      "61014d57600080fd5b9250929050565b6000806000806040858703121561016a57600080fd5b843567ffffffffffffffff8082"
+      "111561018257600080fd5b61018e88838901610108565b909650945060208701359150808211156101a757600080fd5b506101"
+      "b487828801610108565b95989497509550505050565b634e487b7160e01b600052603260045260246000fd5b60006020828403"
+      "12156101e857600080fd5b81356001600160a01b03811681146101ff57600080fd5b9392505050565b634e487b7160e01b6000"
+      "52601160045260246000fd5b8082018082111561022f5761022f610206565b92915050565b6000600182016102475761024761"
+      "0206565b506001019056fea26469706673582212209964e90f15129fadc3f3ade8e9fcd3b3d9c3f27617b3bcc28cf29cc5e3e5"
+      "b5dc64736f6c63430008110033";
+
+   evm_eoa evm1, evm2;
+   transfer_token("alice"_n, "evm"_n, make_asset(50'0000), evm1.address_0x());
+   transfer_token("alice"_n, "evm"_n, make_asset(10'0000), evm2.address_0x());
+   BOOST_REQUIRE(!!evm_balance(evm2));
+
+   const evmc::address fanout_addr = deploy_contract(evm1, evmc::from_hex(fanout_bytecode).value());
+
+   const int64_t to_bridge = 3'0000;
+   const int64_t carol_native_start = native_balance("carol"_n);
+
+   silkworm::Transaction txn = generate_tx(fanout_addr, 100_szabo * to_bridge, 100'000);
+
+   txn.data = evmc::from_hex("0x2929abe6"                                                                 //distribute(address[],uint256[])
+                             "0000000000000000000000000000000000000000000000000000000000000040"           //offset to 'to' list
+                             "00000000000000000000000000000000000000000000000000000000000000c0"           //offset to 'amt' list
+                             "0000000000000000000000000000000000000000000000000000000000000003"           //3 addresses
+                             "000000000000000000000000bbbbbbbbbbbbbbbbbbbbbbbb345c850000000000"           //alice reserved
+                             "000000000000000000000000bbbbbbbbbbbbbbbbbbbbbbbb3d0e000000000000"           //bob reserved
+                             "000000000000000000000000bbbbbbbbbbbbbbbbbbbbbbbb41af488000000000"           //carol reserved
+                             "0000000000000000000000000000000000000000000000000000000000000003"           //3 amounts
+                             "0000000000000000000000000000000000000000000000000de0b6b3a7640000"           //1EOS
+                             "0000000000000000000000000000000000000000000000000de0b6b3a7640000"           //1EOS
+                             "0000000000000000000000000000000000000000000000000de0b6b3a7640000").value(); //1EOS
+   evm2.sign(txn);
+
+   open("alice"_n);
+   open("bob"_n);
+
+   const intx::uint256 evm2_before = *evm_balance(evm2);
+   const int64_t evm_vault_before = vault_balance(evm_account_name).balance.get_amount();
+
+   pushtx(txn);
+
+   //transaction will have run out of gas. make sure no one received any tokens and evm2 was only deducted its max gas
+
+   BOOST_REQUIRE(vault_balance("alice"_n)  == (balance_and_dust{make_asset(0'0000), 0ULL}));
+   BOOST_REQUIRE(vault_balance("bob"_n)    == (balance_and_dust{make_asset(0'0000), 0ULL}));
+   BOOST_REQUIRE(native_balance("carol"_n) == carol_native_start + 0'0000);
+
+   BOOST_REQUIRE(evm2_before - *evm_balance(evm2) == 100000_u256 * get_config().gas_price);
+
+   //also check that the miner & contract were credited
+   BOOST_REQUIRE_EQUAL(vault_balance(evm_account_name).balance.get_amount() - evm_vault_before, get_config().gas_price / 1000000000);
+
+} FC_LOG_AND_RETHROW()
+
 BOOST_AUTO_TEST_SUITE_END()
