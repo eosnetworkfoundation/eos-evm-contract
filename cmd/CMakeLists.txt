@@ -64,7 +64,7 @@ add_custom_command(
     OUTPUT ${GIT_SILKWORM_REV_FILE}
     COMMAND ${CMAKE_COMMAND} -E echo "#pragma once" > ${GIT_SILKWORM_REV_FILE}
     COMMAND ${CMAKE_COMMAND} -E echo_append "const std::string git_silkworm_rev=\"" >> ${GIT_SILKWORM_REV_FILE}
-    COMMAND git rev-parse --short HEAD | tr -d '\\n' >> ${GIT_SILKWORM_REV_FILE}
+    COMMAND git describe --always --dirty | tr -d '\\n' >> ${GIT_SILKWORM_REV_FILE}
     COMMAND ${CMAKE_COMMAND} -E echo "\";" >> ${GIT_SILKWORM_REV_FILE}
     DEPENDS ${CMAKE_SOURCE_DIR}/silkworm
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/silkworm
