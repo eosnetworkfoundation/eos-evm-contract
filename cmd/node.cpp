@@ -7,6 +7,7 @@
 #include <appbase/application.hpp>
 
 #include <eos_evm_node/buildinfo.h>
+#include "git_silkworm_rev.hpp"
 #include <silkrpc/common/log.hpp>
 //#include <silkrpc/daemon.hpp>
 
@@ -19,9 +20,11 @@
 
 std::string get_version_from_build_info() {
     const auto build_info{eos_evm_node_get_buildinfo()};
-
     std::string application_version{"EOS EVM Node version: "};
     application_version.append(build_info->project_version);
+
+    auto silkworm_version = " (silkworm:"+git_silkworm_rev+")";
+    application_version.append(silkworm_version);
     return application_version;
 }
 

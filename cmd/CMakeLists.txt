@@ -56,6 +56,22 @@ if(SILKRPC_USE_MIMALLOC)
     list(APPEND SILKRPC_DAEMON_LIBRARIES mimalloc)
 endif()
 
+### Silkworm submodule version
+set(GIT_SILKWORM_REV_FILE "${CMAKE_BINARY_DIR}/git_silkworm_rev.hpp")
+
+# Create a custom command that generates the commit header, depending on the dummy file.
+add_custom_command(
+    OUTPUT ${GIT_SILKWORM_REV_FILE}
+    COMMAND ${CMAKE_COMMAND} -E echo "#pragma once" > ${GIT_SILKWORM_REV_FILE}
+    COMMAND ${CMAKE_COMMAND} -E echo_append "const std::string git_silkworm_rev=\"" >> ${GIT_SILKWORM_REV_FILE}
+    COMMAND git rev-parse --short HEAD | tr -d '\\n' >> ${GIT_SILKWORM_REV_FILE}
+    COMMAND ${CMAKE_COMMAND} -E echo "\";" >> ${GIT_SILKWORM_REV_FILE}
+    DEPENDS ${CMAKE_SOURCE_DIR}/silkworm
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/silkworm
+    COMMENT "Generating git_silkworm_rev.hpp"
+    VERBATIM
+)
+
 add_executable(silkrpcdaemon silkrpc_daemon.cpp)
 target_include_directories(silkrpcdaemon PUBLIC ${CMAKE_SOURCE_DIR})
 target_link_libraries(silkrpcdaemon PRIVATE ${SILKRPC_DAEMON_LIBRARIES} silkrpc-buildinfo)
@@ -84,11 +100,11 @@ add_library(rpc_plugin rpc_plugin.cpp)
 target_include_directories(rpc_plugin PUBLIC ${CMAKE_SOURCE_DIR})
 target_link_libraries(rpc_plugin PUBLIC ${SILKRPC_LIBRARIES} ${SILKRPC_DAEMON_LIBRARIES} sys_plugin appbase ${Boost_PROGRAM_OPTIONS_LIBRARY})
 
-add_executable(eos-evm-node node.cpp)
+add_executable(eos-evm-node node.cpp ${GIT_SILKWORM_REV_FILE})
 target_include_directories(eos-evm-node PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR})
 target_link_libraries(eos-evm-node PRIVATE engine_plugin shipreceiver_plugin sys_plugin blockchain_plugin rpc_plugin eos_evm_node-buildinfo)
 
-add_executable(eos-evm-rpc rpc.cpp)
+add_executable(eos-evm-rpc rpc.cpp ${GIT_SILKWORM_REV_FILE})
 target_include_directories(eos-evm-rpc PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR})
 target_link_libraries(eos-evm-rpc PRIVATE rpc_plugin eos_evm_node-buildinfo)
 
