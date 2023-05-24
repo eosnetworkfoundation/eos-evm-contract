@@ -1051,6 +1051,8 @@ boost::asio::awaitable<void> EthereumRpcApi::handle_eth_call(const nlohmann::jso
         EVMExecutor executor{*context_.io_context(), tx_database, *chain_config_ptr, workers_, block_number};
         const auto block_with_hash = co_await core::read_block_by_number(*block_cache_, tx_database, block_number);
         silkworm::Transaction txn{call.to_transaction()};
+        if(!txn.from.has_value()) txn.from = evmc::address{0};
+
         const auto execution_result = co_await executor.call(block_with_hash.block, txn);
 
         if (execution_result.pre_check_error) {
