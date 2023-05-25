@@ -142,21 +142,51 @@ void evm_contract::freeze(bool value) {
 void check_result( ValidationResult r, const Transaction& txn, const char* desc ) {
     if( r == ValidationResult::kOk )
         return;
-
-    if( r == ValidationResult::kMissingSender ) {
-        eosio::print("txn.from.has_value is empty\n");
-    } else if ( r == ValidationResult::kSenderNoEOA ) {
-        eosio::print("get_code_hash is empty\n");
-    } else if ( r == ValidationResult::kWrongNonce ) {
-        eosio::print("invalid nonce:", txn.nonce, "\n");
-    } else if ( r == ValidationResult::kInsufficientFunds ) {
-        eosio::print("get_balance of from insufficient\n");
-    } else if ( r == ValidationResult::kBlockGasLimitExceeded ) {
-        eosio::print("available_gas\n");
+    std::string err_msg = std::string(desc) + ": " + std::to_string(uint64_t(r));
+    
+    switch (r) {
+        case ValidationResult::kWrongChainId:
+            err_msg += " Wrong chain id";
+            break;
+        case ValidationResult::kUnsupportedTransactionType:
+            err_msg += " Unsupported Transaction Type";
+            break;
+        case ValidationResult::kMaxFeeLessThanBase:
+            err_msg += " Max Fee per Gas Less Than Block Base Fee";
+            break;
+        case ValidationResult::kMaxPriorityFeeGreaterThanMax:
+            err_msg += " Max Priority Fee per Gas Greater Than Max Fee per Gas";
+            break;
+        case ValidationResult::kInvalidSignature:
+            err_msg += " Invalid Signature";
+            break;
+        case ValidationResult::kIntrinsicGas:
+            err_msg += " Intrinsic Gas Too Low";
+            break;
+        case ValidationResult::kNonceTooHigh:
+            err_msg += " Nounce Too High";
+            break;
+        case ValidationResult::kMissingSender:
+            err_msg += " Missing Sender";
+            break;
+        case ValidationResult::kSenderNoEOA:
+            err_msg += " Sender is Not EOA";
+            break;
+        case ValidationResult::kWrongNonce:
+            err_msg += " Wrong Nonce";
+            break;
+        case ValidationResult::kInsufficientFunds:
+            err_msg += " Insufficient Funds";
+            break;
+        case ValidationResult::kBlockGasLimitExceeded:
+            err_msg += " Block Gas Limit Exceeded";
+            break;
+        default:
+            break;
     }
-
-    eosio::print( "ERR: ", uint64_t(r), "\n" );
-    eosio::check( false, std::string(desc)+ ": " + std::to_string(uint64_t(r)));
+    
+    eosio::print(err_msg.c_str());
+    eosio::check( false, std::move(err_msg));
 }
 
 Receipt evm_contract::execute_tx( eosio::name miner, Block& block, Transaction& tx, silkworm::ExecutionProcessor& ep ) {
