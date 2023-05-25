@@ -300,6 +300,8 @@ Receipt evm_contract::execute_tx( eosio::name miner, Block& block, Transaction& 
 
 void evm_contract::exec(const exec_input& input, const std::optional<exec_callback>& callback) {
 
+    assert_unfrozen();
+
     const auto& current_config = _config.get();
     std::optional<std::pair<const std::string, const ChainConfig*>> found_chain_config = lookup_known_chain(current_config.chainid);
     check( found_chain_config.has_value(), "failed to find expected chain config" );
