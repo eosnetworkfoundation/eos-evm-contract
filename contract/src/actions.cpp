@@ -149,37 +149,37 @@ void check_result( ValidationResult r, const Transaction& txn, const char* desc 
             err_msg += " Wrong chain id";
             break;
         case ValidationResult::kUnsupportedTransactionType:
-            err_msg += " Unsupported Transaction Type";
+            err_msg += " Unsupported transaction type";
             break;
         case ValidationResult::kMaxFeeLessThanBase:
-            err_msg += " Max Fee per Gas Less Than Block Base Fee";
+            err_msg += " Max fee per gas less than block base fee";
             break;
         case ValidationResult::kMaxPriorityFeeGreaterThanMax:
-            err_msg += " Max Priority Fee per Gas Greater Than Max Fee per Gas";
+            err_msg += " Max priority fee per gas greater than max fee per gas";
             break;
         case ValidationResult::kInvalidSignature:
-            err_msg += " Invalid Signature";
+            err_msg += " Invalid signature";
             break;
         case ValidationResult::kIntrinsicGas:
-            err_msg += " Intrinsic Gas Too Low";
+            err_msg += " Intrinsic gas too low";
             break;
         case ValidationResult::kNonceTooHigh:
-            err_msg += " Nounce Too High";
+            err_msg += " Nonce too high";
             break;
         case ValidationResult::kMissingSender:
-            err_msg += " Missing Sender";
+            err_msg += " Missing sender";
             break;
         case ValidationResult::kSenderNoEOA:
-            err_msg += " Sender is Not EOA";
+            err_msg += " Sender is not EOA";
             break;
         case ValidationResult::kWrongNonce:
-            err_msg += " Wrong Nonce";
+            err_msg += " Wrong nonce";
             break;
         case ValidationResult::kInsufficientFunds:
-            err_msg += " Insufficient Funds";
+            err_msg += " Insufficient funds";
             break;
         case ValidationResult::kBlockGasLimitExceeded:
-            err_msg += " Block Gas Limit Exceeded";
+            err_msg += " Block gas limit exceeded";
             break;
         default:
             break;
