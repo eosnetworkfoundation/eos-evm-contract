@@ -333,8 +333,7 @@ void evm_contract::exec(const exec_input& input, const std::optional<exec_callba
 
     if(callback.has_value()) {
         const auto& cb = callback.value();
-        action(permission_level{ get_self(), "active"_n },
-            cb.contract, cb.action, output
+        action(std::vector<permission_level>{}, cb.contract, cb.action, output
         ).send();
     } else {
         auto output_bin = eosio::pack(output);
