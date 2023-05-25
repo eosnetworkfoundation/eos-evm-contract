@@ -109,11 +109,6 @@ struct exec_output {
    std::optional<bytes> context;
 };
 
-struct exec_output_row {
-   uint64_t    id;
-   exec_output output;
-};
-
 } // namespace evm_test
 
 
@@ -127,7 +122,6 @@ FC_REFLECT(evm_test::fee_parameters, (gas_price)(miner_cut)(ingress_bridge_fee))
 FC_REFLECT(evm_test::exec_input, (context)(from)(to)(data)(value))
 FC_REFLECT(evm_test::exec_callback, (contract)(action))
 FC_REFLECT(evm_test::exec_output, (status)(data)(context))
-FC_REFLECT(evm_test::exec_output_row, (id)(output))
 
 namespace evm_test {
 class evm_eoa

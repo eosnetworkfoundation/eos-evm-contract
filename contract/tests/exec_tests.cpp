@@ -5,6 +5,12 @@ using intx::operator""_u256;
 
 using namespace evm_test;
 using eosio::testing::eosio_assert_message_is;
+struct exec_output_row {
+  uint64_t    id;
+  exec_output output;
+};
+FC_REFLECT(exec_output_row, (id)(output))
+
 struct exec_evm_tester : basic_evm_tester {
     exec_evm_tester() {
       create_accounts({"alice"_n});
