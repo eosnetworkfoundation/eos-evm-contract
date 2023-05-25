@@ -222,12 +222,6 @@ BOOST_FIXTURE_TEST_CASE(wrong_input_params, exec_evm_tester) try {
 
   exec_input input;
 
-  // No "data" specified
-  BOOST_REQUIRE_EXCEPTION(exec(input, {}),
-                          eosio_assert_message_exception, eosio_assert_message_is("invalid data"));
-  
-  input.data = bytes{0x00,0x01,0x02,0x03};
-
   // No "to" specified
   BOOST_REQUIRE_EXCEPTION(exec(input, {}),
                           eosio_assert_message_exception, eosio_assert_message_is("wrong length"));

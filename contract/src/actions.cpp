@@ -317,8 +317,6 @@ void evm_contract::exec(const exec_input& input, const std::optional<exec_callba
 
     EVM evm{block, ibstate, *found_chain_config.value().second};
 
-    eosio::check(input.data.size() >= 4, "invalid data");
-
     Transaction txn;
     txn.to    = to_address(input.to);
     txn.data  = Bytes{input.data.begin(), input.data.end()};
