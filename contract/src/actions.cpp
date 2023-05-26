@@ -25,6 +25,11 @@
 #define LOGTIME(MSG)
 #endif
 
+extern "C" {
+__attribute__((eosio_wasm_import))
+void set_action_return_value(void*, size_t);
+}
+
 namespace silkworm {
     // provide no-op bloom
     Bloom logs_bloom(const std::vector<Log>& logs) {
@@ -321,6 +326,49 @@ Receipt evm_contract::execute_tx( eosio::name miner, Block& block, Transaction& 
 
     LOGTIME("EVM EXECUTE");
     return receipt;
+}
+
+void evm_contract::exec(const exec_input& input, const std::optional<exec_callback>& callback) {
+
+    assert_unfrozen();
+
+    const auto& current_config = _config.get();
+    std::optional<std::pair<const std::string, const ChainConfig*>> found_chain_config = lookup_known_chain(current_config.chainid);
+    check( found_chain_config.has_value(), "failed to find expected chain config" );
+
+    evm_common::block_mapping bm(current_config.genesis_time.sec_since_epoch());
+
+    Block block;
+    evm_common::prepare_block_header(block.header, bm, get_self().value,
+        bm.timestamp_to_evm_block_num(eosio::current_time_point().time_since_epoch().count()));
+
+    evm_runtime::state state{get_self(), get_self(), true};
+    IntraBlockState ibstate{state};
+
+    EVM evm{block, ibstate, *found_chain_config.value().second};
+
+    Transaction txn;
+    txn.to    = to_address(input.to);
+    txn.data  = Bytes{input.data.begin(), input.data.end()};
+    txn.from  = input.from.has_value()  ? to_address(input.from.value()) : evmc::address{};
+    txn.value = input.value.has_value() ? to_uint256(input.value.value()) : 0;
+
+    const CallResult vm_res{evm.execute(txn, 0x7ffffffffff)};
+
+    exec_output output{
+        .status  = int32_t(vm_res.status),
+        .data    = bytes{vm_res.data.begin(), vm_res.data.end()},
+        .context = input.context
+    };
+
+    if(callback.has_value()) {
+        const auto& cb = callback.value();
+        action(std::vector<permission_level>{}, cb.contract, cb.action, output
+        ).send();
+    } else {
+        auto output_bin = eosio::pack(output);
+        set_action_return_value(output_bin.data(), output_bin.size());
+    }
 }
 
 void evm_contract::pushtx( eosio::name miner, const bytes& rlptx ) {
