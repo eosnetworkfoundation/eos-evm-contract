@@ -18,6 +18,9 @@ namespace evm_runtime {
    constexpr intx::uint256 minimum_natively_representable = intx::exp(10_u256, intx::uint256(evm_precision - token_symbol.precision()));
    static_assert(evm_precision - token_symbol.precision() <= 14, "dust math may overflow a uint64_t");
 
+   // TODO: is this the proper way to define a constant eth address
+   const std::string addr_of_bridged_erc20_minter = "0x0000000000000000000000000000000000000001";
+
    typedef intx::uint<256>         uint256;
    typedef intx::uint<512>         uint512;
    typedef std::vector<char>       bytes;

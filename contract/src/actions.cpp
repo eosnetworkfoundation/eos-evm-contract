@@ -305,8 +305,17 @@ Receipt evm_contract::execute_tx( eosio::name miner, Block& block, Transaction& 
                 const bool was_to = tx.to && *tx.to == address;
                 const Bytes exit_memo = {'E', 'V', 'M', ' ', 'e', 'x', 'i', 't'}; //yikes
 
-                token::transfer_bytes_memo_action transfer_act(token_account, {{get_self(), "active"_n}});
-                transfer_act.send(get_self(), egress_account, asset((uint64_t)(reserved_account.balance / minimum_natively_representable), token_symbol), was_to ? tx.data : exit_memo);
+                if (/* TODO: check if tx.from equals addr_of_bridged_erc20_minter */) {
+                    // TODO: Decode token acount, symbol, transferring amount & memo from tx.data 
+                    const eosio::name token_account_erc20(eosio::name("" /* token name */));
+                    const eosio::symbol token_symbol_erc20("" /* token symbol */, 4u);
+                    const Bytes memo = {'m', 'e', 'm', 'o'}; // memo
+                    token::transfer_bytes_memo_action transfer_act(token_account_erc20, {{get_self(), "active"_n}});
+                    transfer_act.send(get_self(), egress_account, asset(0 /* amount */, token_symbol_erc20), memo);
+                } else {
+                    token::transfer_bytes_memo_action transfer_act(token_account, {{get_self(), "active"_n}});
+                    transfer_act.send(get_self(), egress_account, asset((uint64_t)(reserved_account.balance / minimum_natively_representable), token_symbol), was_to ? tx.data : exit_memo);
+                }
 
                 non_open_account_sent = true;
             }
@@ -466,6 +475,8 @@ checksum256 evm_contract::get_code_hash(name account) const {
 }
 
 void evm_contract::handle_account_transfer(const eosio::asset& quantity, const std::string& memo) {
+    eosio::check(get_code() == token_account && quantity.symbol == token_symbol, "received unexpected token");
+
     eosio::name receiver(memo);
 
     balances balance_table(get_self(), get_self().value);
@@ -477,23 +488,39 @@ void evm_contract::handle_account_transfer(const eosio::asset& quantity, const s
 }
 
 void evm_contract::handle_evm_transfer(eosio::asset quantity, const std::string& memo) {
-    //move all incoming quantity in to the contract's balance. the evm bridge trx will "pull" from this balance
-    balances balance_table(get_self(), get_self().value);
-    balance_table.modify(balance_table.get(get_self().value), eosio::same_payer, [&](balance& b){
-        b.balance.balance += quantity;
-    });
+    eosio::check(get_code() == token_account && quantity.symbol == token_symbol, "received unexpected token");
 
-    const auto& current_config = _config.get();
+    intx::uint256 value{0};
+    std::optional<Bytes> to_address_bytes;
+    std::optional<Bytes> input_data;
+    if (!(get_code() == token_account && quantity.symbol == token_symbol)) {
+        //move all incoming quantity in to the contract's balance. the evm bridge trx will "pull" from this balance
+        balances balance_table(get_self(), get_self().value);
+        balance_table.modify(balance_table.get(get_self().value), eosio::same_payer, [&](balance& b){
+            b.balance.balance += quantity;
+        });
 
-    //subtract off the ingress bridge fee from the quantity that will be bridged
-    quantity -= current_config.ingress_bridge_fee;
-    eosio::check(quantity.amount > 0, "must bridge more than ingress bridge fee");
+        const auto& current_config = _config.get();
 
-    const std::optional<Bytes> address_bytes = from_hex(memo);
-    eosio::check(!!address_bytes, "unable to parse destination address");
+        //subtract off the ingress bridge fee from the quantity that will be bridged
+        quantity -= current_config.ingress_bridge_fee;
+        eosio::check(quantity.amount > 0, "must bridge more than ingress bridge fee");
 
-    intx::uint256 value((uint64_t)quantity.amount);
-    value *= minimum_natively_representable;
+        to_address_bytes = from_hex(memo);
+        eosio::check(!!to_address_bytes, "unable to parse destination address");
+
+        value = (uint64_t)quantity.amount;
+        value *= minimum_natively_representable;
+    } else {
+        // bridge non-eosio.tokn as ERC20
+        to_address_bytes = from_hex(addr_of_bridged_erc20_minter);
+
+        input_data = from_hex(memo);
+        eosio::check(!!input_data, "unable to parse destination address");
+        input_data->prepend("0x12345678"); // TODO: this should be method signature for mint(address,uint256)
+        input_data->append("0x0000000000000000000000000000000000000000"); // TODO: need to convert token account & token symbol to hex
+        input_data->append("0x0000000000000000000000000000000000000000"); // TODO: need to convert quantity.amount to hex
+    }
 
     const Transaction txn {
         .type = Transaction::Type::kLegacy,
@@ -501,8 +528,9 @@ void evm_contract::handle_evm_transfer(eosio::asset quantity, const std::string&
         .max_priority_fee_per_gas = current_config.gas_price,
         .max_fee_per_gas = current_config.gas_price,
         .gas_limit = 21000,
-        .to = to_evmc_address(*address_bytes),
+        .to = to_evmc_address(*to_address_bytes),
         .value = value,
+        .data = input_data,
         .r = 0u,  // r == 0 is pseudo signature that resolves to reserved address range
         .s = get_self().value
     };
@@ -515,7 +543,6 @@ void evm_contract::handle_evm_transfer(eosio::asset quantity, const std::string&
 
 void evm_contract::transfer(eosio::name from, eosio::name to, eosio::asset quantity, std::string memo) {
     assert_unfrozen();
-    eosio::check(get_code() == token_account && quantity.symbol == token_symbol, "received unexpected token");
 
     if(to != get_self() || from == get_self())
         return;
