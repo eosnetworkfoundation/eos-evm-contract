@@ -944,7 +944,17 @@ This determines the value of the "timestamp" field in EVM genesis.
 
 Set the "mixHash" field to be "0x + Antelope starting block id", e.g.  "0x000000026d392f1bfeddb000555bcb03ca6e31a54c0cf9edc23cede42bda17e6"
 
-Set the "nonce" field to be the hex encoding of the value of the Antelope name of the account on which the EVM contract is deployed. So if the `evmevmevmevm` account name is used, then set the nonce to "0x56e4adc95b92b720". If the `eosio.evm` account name is used, then set the nonce to "0x56e4adc95b92b720". This is re-purposed to be the block time (in mill-second) of the EVM chain.
+Set the "nonce" field to be the hex encoding of the value of the Antelope name of the account on which the EVM contract is deployed. So if the `evmevmevmevm` account name is used, then set the nonce to "0x56e4adc95b92b720". If the `eosio.evm` account name is used, then set the nonce to "0x5530ea015b900000".
+
+The function `convert_name_to_value` from https://github.com/eosnetworkfoundation/eos-evm/blob/main/tests/leap/antelope_name.py can be used to get the appropriate nonce value using Python:
+
+```shell
+>>> from antelope_name import convert_name_to_value
+>>> print(f'0x{convert_name_to_value("evmevmevmevm"):x}')
+0x56e4adc95b92b720
+>>> print(f'0x{convert_name_to_value("eosio.evm"):x}')
+0x5530ea015b900000
+```
 
 In the "alloc" part, setup the genesis EVM account balance (should be all zeros)
 
