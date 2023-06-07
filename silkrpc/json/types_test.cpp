@@ -148,7 +148,7 @@ TEST_CASE("serialize empty block header", "[silkrpc][to_json]") {
                     R"(000000000000000000000000000000000000000000000000000000000000000000000000)"
                     R"(000000000000000000000000000000000000000000000000000000000000000000000000)"
                     R"(00000000000000000000000000000000000000000000000000000000000000000000000000000000",
-        "difficulty":"0x",
+        "difficulty":"0x0",
         "nonce":"0x0000000000000000",
         "number":"0x0",
         "gasLimit":"0x0",
@@ -192,7 +192,7 @@ TEST_CASE("serialize block header", "[silkrpc][to_json]") {
                     R"(000000000000000000000000000000000000000000000000000000000000000000000000)"
                     R"(000000000000000000000000000000000000000000000000000000000000000000000000)"
                     R"(00000000000000000000000000000000000000000000000000000000000000000000000000000000",
-        "difficulty":"0x",
+        "difficulty":"0x0",
         "number":"0x5",
         "gasLimit":"0xf4240",
         "gasUsed":"0xf4240",
@@ -237,7 +237,7 @@ TEST_CASE("serialize block header with baseFeePerGas", "[silkrpc][to_json]") {
                     R"(000000000000000000000000000000000000000000000000000000000000000000000000)"
                     R"(000000000000000000000000000000000000000000000000000000000000000000000000)"
                     R"(00000000000000000000000000000000000000000000000000000000000000000000000000000000",
-        "difficulty":"0x",
+        "difficulty":"0x0",
         "number":"0x5",
         "gasLimit":"0xf4240",
         "gasUsed":"0xf4240",
@@ -329,7 +329,7 @@ TEST_CASE("serialize block with baseFeePerGas", "[silkrpc][to_json]") {
                     R"(000000000000000000000000000000000000000000000000000000000000000000000000)"
                     R"(000000000000000000000000000000000000000000000000000000000000000000000000)"
                     R"(00000000000000000000000000000000000000000000000000000000000000000000000000000000",
-        "difficulty":"0x",
+        "difficulty":"0x0",
         "number":"0x5",
         "hash": "0x0000000000000000000000000000000000000000000000000000000000000000",
         "gasLimit":"0xf4240",
@@ -340,7 +340,7 @@ TEST_CASE("serialize block with baseFeePerGas", "[silkrpc][to_json]") {
         "mixHash":"0x0000000000000000000000000000000000000000000000000000000000000001",
         "nonce":"0x00000000000000ff",
         "baseFeePerGas":"0x244428",
-        "totalDifficulty":"0x",
+        "totalDifficulty":"0x0",
         "transactions":[],
         "uncles":[]
     })"_json);
@@ -363,7 +363,7 @@ TEST_CASE("serialize empty block", "[silkrpc][to_json]") {
                     R"(000000000000000000000000000000000000000000000000000000000000000000000000)"
                     R"(000000000000000000000000000000000000000000000000000000000000000000000000)"
                     R"(00000000000000000000000000000000000000000000000000000000000000000000000000000000",
-        "difficulty":"0x",
+        "difficulty":"0x0",
         "nonce":"0x0000000000000000",
         "number":"0x0",
         "gasLimit":"0x0",
@@ -373,7 +373,7 @@ TEST_CASE("serialize empty block", "[silkrpc][to_json]") {
         "mixHash":"0x0000000000000000000000000000000000000000000000000000000000000000",
         "hash":"0x0000000000000000000000000000000000000000000000000000000000000000",
         "size":"0x1f5",
-        "totalDifficulty":"0x",
+        "totalDifficulty":"0x0",
         "transactions":[],
         "uncles":[]
     })"_json);
@@ -426,7 +426,7 @@ TEST_CASE("serialize EIP-2718 block", "[silkrpc][to_json]") {
         "size":"0x31c",
         "stateRoot":"0xef1552a40b7165c3cd773806b9e0c165b75356e0314bf0706f279c729f51e017",
         "timestamp":"0x5506eb07",
-        "totalDifficulty":"0x",
+        "totalDifficulty":"0x0",
         "transactions":[
             "0x77b19baa4de67e45a7b26e4a220bccdbb6731885aa9927064e239ca232023215",
             "0x554af720acf477830f996f1bc5d11e54c38aa40042aeac6f66cb66f9084a959d"
@@ -607,7 +607,7 @@ TEST_CASE("serialize block body with ommers", "[silkrpc][to_json]") {
 
     nlohmann::json rpc_block_json = rpc_block;
     CHECK(rpc_block_json == R"({
-        "difficulty":"0x",
+        "difficulty":"0x0",
         "extraData":"0x",
         "gasLimit":"0x0",
         "gasUsed":"0x0",
@@ -629,7 +629,7 @@ TEST_CASE("serialize block body with ommers", "[silkrpc][to_json]") {
         "size":"0x40c",
         "stateRoot":"0x0000000000000000000000000000000000000000000000000000000000000000",
         "timestamp":"0x0",
-        "totalDifficulty":"0x",
+        "totalDifficulty":"0x0",
         "transactions":[],
         "transactionsRoot":"0x0000000000000000000000000000000000000000000000000000000000000000",
         "uncles":["0x5cd50096dbb856a6d1befa6de8f9c20decb299f375154427d90761dc0b101109"]
