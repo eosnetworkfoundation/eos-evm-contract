@@ -53,7 +53,7 @@ jobs:
         with:
           owner: AntelopeIO
           repo: cdt
-          target: 'v3.1.0'
+          target: 'v4.0.0'
           prereleases: false
           file: 'cdt_.*amd64.deb'
           token: ${{ secrets.GITHUB_TOKEN }}
