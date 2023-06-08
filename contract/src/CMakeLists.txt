@@ -20,7 +20,7 @@ if (WITH_LOGTIME)
 endif()
 
 add_compile_definitions(ANTELOPE)
-add_compile_definitions(PROJECT_VERSION="0.3.0")
+add_compile_definitions(PROJECT_VERSION="0.5.0")
 
 # ethash
 list(APPEND SOURCES 
@@ -32,9 +32,6 @@ list(APPEND SOURCES
 # evmone
 list(APPEND SOURCES 
     ${CMAKE_CURRENT_SOURCE_DIR}/../../silkworm/third_party/evmone/lib/evmone/instructions_calls.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../silkworm/third_party/evmone/lib/evmone/advanced_analysis.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../silkworm/third_party/evmone/lib/evmone/advanced_instructions.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../silkworm/third_party/evmone/lib/evmone/advanced_execution.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../../silkworm/third_party/evmone/lib/evmone/vm.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../../silkworm/third_party/evmone/lib/evmone/eof.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../../silkworm/third_party/evmone/lib/evmone/baseline.cpp
@@ -87,5 +84,5 @@ target_compile_options(evm_runtime PUBLIC --no-missing-ricardian-clause)
 if (WITH_LARGE_STACK)
     target_link_options(evm_runtime PUBLIC --stack-size=50000000)
 else()
-    target_link_options(evm_runtime PUBLIC --stack-size=19984)
+    target_link_options(evm_runtime PUBLIC --stack-size=46080)
 endif()

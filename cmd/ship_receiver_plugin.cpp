@@ -259,6 +259,11 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
             sys::error("Unable to read canonical header");
             return;
          }
+         SILK_INFO << "get_head_canonical_header: "
+                     << "#" << head_header->number
+                     << ", hash:" << silkworm::to_hex(head_header->hash())
+                     << ", mixHash:" << silkworm::to_hex(head_header->mix_hash);
+
          auto start_from = utils::to_block_num(head_header->mix_hash.bytes) + 1;
          SILK_INFO << "Canonical header start from block: " << start_from;
 
@@ -310,7 +315,7 @@ void ship_receiver_plugin::set_program_options( appbase::options_description& cl
       ("ship-endpoint", boost::program_options::value<std::string>()->default_value("127.0.0.1:8999"),
         "SHiP host address")
       ("ship-core-account", boost::program_options::value<std::string>()->default_value("evmevmevmevm"),
-        "Account on the core blockchain that hosts the Trust EVM runtime")
+        "Account on the core blockchain that hosts the EOS EVM Contract")
       ("ship-start-from-block-id", boost::program_options::value<std::string>(),
         "Override Antelope block id to start syncing from"  )
       ("ship-start-from-block-timestamp", boost::program_options::value<int64_t>(),

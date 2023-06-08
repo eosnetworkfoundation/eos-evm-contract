@@ -14,7 +14,6 @@
 #include <fc/crypto/signature.hpp>
 #include <eosio/chain/exceptions.hpp>
 #include <eosio/chain/fixed_bytes.hpp>
-#include <Runtime/Runtime.h>
 
 #include "eosio.system_tester.hpp"
 

@@ -26,11 +26,12 @@ struct db_stats {
 struct state : State {
     name _self;
     name _ram_payer;
+    bool _read_only;
     mutable std::map<evmc::address, uint64_t> addr2id;
     mutable std::map<bytes32, bytes> addr2code;
     mutable db_stats stats;
 
-    explicit state(name self, name ram_payer) : _self(self), _ram_payer(ram_payer){}
+    explicit state(name self, name ram_payer, bool read_only=false) : _self(self), _ram_payer(ram_payer), _read_only{read_only}{}
 
     std::optional<Account> read_account(const evmc::address& address) const noexcept override;
 

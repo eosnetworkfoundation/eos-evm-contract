@@ -72,7 +72,7 @@ class engine_plugin_impl : std::enable_shared_from_this<engine_plugin_impl> {
          node_settings.network_id = node_settings.chain_config->chain_id;
 
          eth.reset(new silkworm::EthereumBackEnd(node_settings, &db_env));
-         eth->set_node_name("Trust Node");
+         eth->set_node_name("EOS EVM Node");
          SILK_INFO << "Created Ethereum Backend with network id <" << node_settings.network_id << ">, etherbase <" << node_settings.etherbase->bytes << ">";
 
          server.reset(new silkworm::rpc::BackEndKvServer(server_settings, *eth.get()));
@@ -93,6 +93,17 @@ class engine_plugin_impl : std::enable_shared_from_this<engine_plugin_impl> {
          silkworm::db::ROTxn txn(db_env);
          auto head_num = silkworm::db::stages::read_stage_progress(txn, silkworm::db::stages::kHeadersKey);
          return silkworm::db::read_canonical_header(txn, head_num);
+      }
+
+      std::optional<silkworm::Block> get_head_block() {
+         auto header = get_head_canonical_header();
+         if(!header) return {};
+
+         silkworm::db::ROTxn txn(db_env);
+         silkworm::Block block;
+         auto res = read_block_by_number(txn, header->number, false, block);
+         if(!res) return {};
+         return block;
       }
 
       std::optional<silkworm::BlockHeader> get_genesis_header() {
@@ -154,8 +165,13 @@ void engine_plugin::plugin_shutdown() {
 mdbx::env* engine_plugin::get_db() {
    return &my->db_env;
 }
+
 std::optional<silkworm::BlockHeader> engine_plugin::get_head_canonical_header() {
    return my->get_head_canonical_header();
+}
+
+std::optional<silkworm::Block> engine_plugin::get_head_block() {
+   return my->get_head_block();
 }
 
 std::optional<silkworm::BlockHeader> engine_plugin::get_genesis_header() {

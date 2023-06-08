@@ -41,6 +41,7 @@ bytes to_bytes(const evmc::address& addr) {
 
 evmc::address to_address(const bytes& addr) {
     evmc::address res;
+    eosio::check(addr.size() == 20, "wrong length");
     memcpy(res.bytes, addr.data(), 20);
     return res;
 }

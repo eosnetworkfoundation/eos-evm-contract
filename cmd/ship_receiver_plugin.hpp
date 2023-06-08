@@ -9,7 +9,6 @@
 
 #include "engine_plugin.hpp"
 #include "sys_plugin.hpp"
-#include "chain_state.hpp"
 #include "channels.hpp"
 
 class ship_receiver_plugin : public appbase::plugin<ship_receiver_plugin> {

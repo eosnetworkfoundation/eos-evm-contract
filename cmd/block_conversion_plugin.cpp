@@ -11,6 +11,25 @@
 #include <silkworm/common/endian.hpp>
 
 using sys = sys_plugin;
+
+silkworm::log::BufferBase& operator << ( silkworm::log::BufferBase& ss, const eosio::checksum256& id ) {
+   ss << silkworm::to_hex(id.extract_as_byte_array());
+   return ss;
+}
+
+silkworm::log::BufferBase& operator << ( silkworm::log::BufferBase& ss, const channels::native_block& block ) {
+   ss << "#" << block.block_num << " ("
+      << "id:" << block.id << ","
+      << "prev:" << block.prev
+      << ")";
+   return ss;
+}
+
+silkworm::log::BufferBase& operator << ( silkworm::log::BufferBase& ss, const silkworm::Block& block ) {
+   ss << "#" << block.header.number << ", txs:" << block.transactions.size() << ", hash:" << silkworm::to_hex(block.header.hash());
+   return ss;
+}
+
 class block_conversion_plugin_impl : std::enable_shared_from_this<block_conversion_plugin_impl> {
    public:
       block_conversion_plugin_impl()
@@ -27,23 +46,24 @@ class block_conversion_plugin_impl : std::enable_shared_from_this<block_conversi
       }
 
       void load_head() {
-         auto head_header = appbase::app().get_plugin<engine_plugin>().get_head_canonical_header();
-         if (!head_header) {
-            sys::error("Unable to read canonical header");
+         auto head_block = appbase::app().get_plugin<engine_plugin>().get_head_block();
+         if (!head_block) {
+            sys::error("Unable to read head block");
             return;
          }
-         evm_blocks.push_back(silkworm::Block{.header=*head_header});
+         SILK_INFO << "load_head: " << *head_block;
+         evm_blocks.push_back(*head_block);
 
          channels::native_block nb;
          std::optional<channels::native_block> start_from_block = appbase::app().get_plugin<ship_receiver_plugin>().get_start_from_block();
          if( start_from_block ) {
             nb = *start_from_block;
          } else {
-            nb.id = eosio::checksum256(head_header->mix_hash.bytes);
-            nb.block_num = utils::to_block_num(head_header->mix_hash.bytes);
-            nb.timestamp = head_header->timestamp*1e6;
+            nb.id = eosio::checksum256(head_block->header.mix_hash.bytes);
+            nb.block_num = utils::to_block_num(head_block->header.mix_hash.bytes);
+            nb.timestamp = head_block->header.timestamp*1e6;
          }
-         SILK_DEBUG << "Loaded native block: [" << head_header->number << "][" << nb.block_num << "],[" << nb.timestamp << "]";
+         SILK_INFO << "Loaded native block: [" << head_block->header.number << "][" << nb.block_num << "],[" << nb.timestamp << "]";
          native_blocks.push_back(nb);
 
          auto genesis_header = appbase::app().get_plugin<engine_plugin>().get_genesis_header();
@@ -89,7 +109,11 @@ class block_conversion_plugin_impl : std::enable_shared_from_this<block_conversi
          return txn_root;
       }
 
-      silkworm::Block new_block(uint64_t num, const evmc::bytes32& parent_hash) {
+      void log_internal_status(const std::string& label) {
+         SILK_INFO << "internal_status(" << label << "): nb:" << native_blocks.size() << ", evmb:" << evm_blocks.size();
+      }
+
+      silkworm::Block generate_new_evm_block(uint64_t num, const evmc::bytes32& parent_hash) {
          silkworm::Block new_block;
          evm_common::prepare_block_header(new_block.header, bm.value(), evm_contract_name, num);
          new_block.header.parent_hash       = parent_hash;
@@ -123,70 +147,125 @@ class block_conversion_plugin_impl : std::enable_shared_from_this<block_conversi
          }
       }
 
+      template <typename F>
+      void for_each_reverse_action(const channels::native_block& block, F&& f) {
+         for(auto trx=block.transactions.rbegin(); trx != block.transactions.rend(); ++trx) {
+            for(auto act=trx->actions.rbegin(); act != trx->actions.rend(); ++act) {
+               f(*act);
+            }
+         }
+      }
+
       inline void init() {
          SILK_DEBUG << "block_conversion_plugin_impl INIT";
          load_head();
          
          native_blocks_subscription = appbase::app().get_channel<channels::native_blocks>().subscribe(
-            [this](auto b) {
+            [this](auto new_block) {
                static size_t count = 0;
 
-               //SILK_INFO << "--Enter Block #" << b->block_num;
-
                // Keep the last block before genesis timestamp
-               if (b->timestamp <= bm.value().genesis_timestamp) {
-                  SILK_DEBUG << "Before genesis: " << bm->genesis_timestamp <<  " Block #" << b->block_num << " timestamp: " << b->timestamp;
+               if (new_block->timestamp <= bm.value().genesis_timestamp) {
+                  SILK_WARN << "Before genesis: " << bm->genesis_timestamp <<  " Block #" << new_block->block_num << " timestamp: " << new_block->timestamp;
                   native_blocks.clear();
-                  native_blocks.push_back(*b);
+                  native_blocks.push_back(*new_block);
                   return;
                }
 
-               // Add received native block to our local reversible chain.
-               // If the received native block can't be linked we remove the forked blocks until the fork point.
-               // Also we remove the forked block transactions from the corresponding evm block as they where previously included
-               // and update the upper bound block accordingly
-               while( !native_blocks.empty() && native_blocks.back().id != b->prev ) {
-                  //SILK_DEBUG << "Fork at Block #" << b->block_num;
-                  const auto& forked_block = native_blocks.back();
+               // Check if received native block can't be linked
+               if( !native_blocks.empty() && native_blocks.back().id != new_block->prev ) {
 
-                  while( timestamp_to_evm_block_num(forked_block.timestamp) < evm_blocks.back().header.number )
+                  SILK_WARN << "Can't link new block " << *new_block;
+
+                  // Find fork block
+                  auto fork_block = std::find_if(native_blocks.begin(), native_blocks.end(), [&new_block](const auto& nb){ return nb.id == new_block->prev; });
+                  if( fork_block == native_blocks.end() ) {
+                     SILK_CRIT << "Unable to find fork block " << new_block->prev;
+                     throw std::runtime_error("Unable to find fork block");
+                  }
+
+                  SILK_WARN << "Fork at Block " << *fork_block;
+
+                  // Remove EVM blocks after the fork
+                  while( !evm_blocks.empty() && timestamp_to_evm_block_num(fork_block->timestamp) < evm_blocks.back().header.number ) {
+                     SILK_WARN << "Removing forked EVM block " << evm_blocks.back();
                      evm_blocks.pop_back();
+                  }
 
-                  auto& last_evm_block = evm_blocks.back();
-                  for_each_action(forked_block, [&last_evm_block](const auto&){
-                     last_evm_block.transactions.pop_back();
-                  });
+                  // Remove forked native blocks up until the fork point
+                  while( !native_blocks.empty() && native_blocks.back().id != fork_block->id ) {
 
-                  native_blocks.pop_back();
-                  if( native_blocks.size() && timestamp_to_evm_block_num(native_blocks.back().timestamp) == last_evm_block.header.number )
-                     set_upper_bound(last_evm_block, native_blocks.back());
+                     // Check if the native block to be removed has transactions
+                     // and they belong to the EVM block of the fork point
+                     if( native_blocks.back().transactions.size() > 0 && timestamp_to_evm_block_num(native_blocks.back().timestamp) == timestamp_to_evm_block_num(fork_block->timestamp) ) {
+
+                        // Check that we can remove transactions contained in the forked native block
+                        if (evm_blocks.empty() || timestamp_to_evm_block_num(native_blocks.back().timestamp) != evm_blocks.back().header.number) {
+                           SILK_CRIT << "Unable to remove transactions"
+                                       << "(empty: " << evm_blocks.empty()
+                                       << ", evmblock(native):" << timestamp_to_evm_block_num(native_blocks.back().timestamp) <<")"
+                                       << ", evm number:" << evm_blocks.back().header.number <<")";
+                           throw std::runtime_error("Unable to remove transactions");
+                        }
+
+                        // Remove transactions in forked native block
+                        SILK_WARN << "Removing transactions in forked native block  " << native_blocks.back();
+                        for_each_reverse_action(native_blocks.back(), [this](const auto& act){
+                              auto dtx = deserialize_tx(act.data);
+                              auto txid_a = ethash::keccak256(dtx.rlpx.data(), dtx.rlpx.size());
+
+                              silkworm::Bytes transaction_rlp{};
+                              silkworm::rlp::encode(transaction_rlp, evm_blocks.back().transactions.back());
+                              auto txid_b = ethash::keccak256(transaction_rlp.data(), transaction_rlp.size());
+
+                              // Ensure that the transaction to be removed is the correct one
+                              if( std::memcmp(txid_a.bytes, txid_b.bytes, sizeof(txid_a.bytes)) != 0) {
+                                 SILK_CRIT << "Unable to remove transaction "
+                                             << ",txid_a:" << silkworm::to_hex(txid_a.bytes)
+                                             << ",txid_b:" << silkworm::to_hex(txid_b.bytes);
+                                 throw std::runtime_error("Unable to remove transaction");
+                              }
+
+                              SILK_WARN << "Removing trx: " << silkworm::to_hex(txid_a.bytes);
+                              evm_blocks.back().transactions.pop_back();
+                        });
+                     }
+
+                     // Remove forked native block
+                     SILK_WARN << "Removing forked native block " << native_blocks.back();
+                     native_blocks.pop_back();
+                  }
+
+                  // Ensure upper bound native block correspond to this EVM block
+                  if( evm_blocks.empty() || timestamp_to_evm_block_num(native_blocks.back().timestamp) != evm_blocks.back().header.number ) {
+                     SILK_CRIT << "Unable to set upper bound "
+                                 << "(empty: " << evm_blocks.empty()
+                                 << ", evmblock(native):" << timestamp_to_evm_block_num(native_blocks.back().timestamp) <<")"
+                                 << ", evm number:" << evm_blocks.back().header.number <<")";
+                     throw std::runtime_error("Unable to set upper bound");
+                  }
+
+                  // Reset upper bound
+                  SILK_WARN << "Reset upper bound for EVM Block " << evm_blocks.back() << " to: " << native_blocks.back();
+                  set_upper_bound(evm_blocks.back(), native_blocks.back());
                }
 
-               if( native_blocks.empty() || native_blocks.back().id != b->prev ) {
-                  SILK_CRIT << "Unbale to link block #" << b->block_num;
-                  throw std::runtime_error("Unbale to link block");
-               }
-               native_blocks.push_back(*b);
+               // Enqueue received block
+               native_blocks.push_back(*new_block);
 
-               // Process the last native block received.
-               // We extend the evm chain if necessary up until the block where the received block belongs
-               auto evm_num = timestamp_to_evm_block_num(b->timestamp);
-               //SILK_INFO << "Expecting evm number: " << evm_num;
+               // Extend the EVM chain if necessary up until the block where the received block belongs
+               auto evm_num = timestamp_to_evm_block_num(new_block->timestamp);
 
                while(evm_blocks.back().header.number < evm_num) {
                   auto& last_evm_block = evm_blocks.back();
-                  //if( last_evm_block.header.number != 0 ) {
-                     last_evm_block.header.transactions_root = compute_transaction_root(last_evm_block);
-                     if (!(last_evm_block.header.number % 1000))
-                        SILK_INFO << "Generating EVM #" << last_evm_block.header.number;
-                     evm_blocks_channel.publish(80, std::make_shared<silkworm::Block>(last_evm_block));
-                  //}
-                  evm_blocks.push_back(new_block(last_evm_block.header.number+1, last_evm_block.header.hash()));
+                  last_evm_block.header.transactions_root = compute_transaction_root(last_evm_block);
+                  evm_blocks_channel.publish(80, std::make_shared<silkworm::Block>(last_evm_block));
+                  evm_blocks.push_back(generate_new_evm_block(last_evm_block.header.number+1, last_evm_block.header.hash()));
                }
 
                // Add transactions to the evm block
                auto& curr = evm_blocks.back();
-               for_each_action(*b, [this, &curr](const auto& act){
+               for_each_action(*new_block, [this, &curr](const auto& act){
                      auto dtx = deserialize_tx(act.data);
                      silkworm::ByteView bv = {(const uint8_t*)dtx.rlpx.data(), dtx.rlpx.size()};
                      silkworm::Transaction evm_tx;
@@ -196,33 +275,26 @@ class block_conversion_plugin_impl : std::enable_shared_from_this<block_conversi
                      }
                      curr.transactions.emplace_back(std::move(evm_tx));
                });
-               //SILK_DEBUG << "Txs added to EVM #" << curr.header.number;
-               set_upper_bound(curr, *b);
+               set_upper_bound(curr, *new_block);
 
                // Calculate last irreversible EVM block
                std::optional<uint64_t> lib_timestamp;
-               if(b->lib < native_blocks.back().block_num) {
-                  auto it = std::find_if(native_blocks.begin(), native_blocks.end(), [&b](const auto& nb){ return nb.block_num == b->lib; });
-                  if(it != native_blocks.end()) {
-                     lib_timestamp = it->timestamp;
-                  }
-               } else {
-                   lib_timestamp = b->timestamp;
+               auto it = std::upper_bound(native_blocks.begin(), native_blocks.end(), new_block->lib, [](uint32_t lib, const auto& nb) { return lib < nb.block_num; });
+               if(it != native_blocks.begin()) {
+                  --it;
+                  lib_timestamp = it->timestamp;
                }
 
                if( lib_timestamp ) {
                   auto evm_lib = timestamp_to_evm_block_num(*lib_timestamp) - 1;
-                  //SILK_DEBUG << "EVM LIB: #" << evm_lib;
 
                   // Remove irreversible native blocks
                   while(timestamp_to_evm_block_num(native_blocks.front().timestamp) < evm_lib) {
-                     //SILK_DEBUG << "Remove IRR native: #" << native_blocks.front().block_num;
                      native_blocks.pop_front();
                   }
 
                   // Remove irreversible evm blocks
                   while(evm_blocks.front().header.number < evm_lib) {
-                     //SILK_DEBUG << "Remove IRR EVM: #" << evm_blocks.front().header.number;
                      evm_blocks.pop_front();
                   }
                }

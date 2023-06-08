@@ -1,5 +1,6 @@
 #include <eosio/eosio.hpp>
 #include <eosio/asset.hpp>
+#include <eosio/binary_extension.hpp>
 #include <eosio/singleton.hpp>
 
 #include <evm_runtime/types.hpp>
@@ -36,8 +37,8 @@ public:
    /**
     * @brief Initialize EVM contract
     *
-    * @param chainid Chain ID of the EVM. Choose 15555 for a production network.
-    *                For test networks, choose either 15556 for a public test network or 25555 for a local test
+    * @param chainid Chain ID of the EVM. Choose 17777 for a production network.
+    *                For test networks, choose either 15555 for a public test network or 25555 for a local test
     * network.
     * @param fee_params See documentation of fee_parameters struct.
     */
@@ -67,16 +68,18 @@ public:
     */
    [[eosio::action]] void freeze(bool value);
 
+   [[eosio::action]] void exec(const exec_input& input, const std::optional<exec_callback>& callback);
+
    [[eosio::action]] void pushtx(eosio::name miner, const bytes& rlptx);
 
    [[eosio::action]] void open(eosio::name owner);
 
    [[eosio::action]] void close(eosio::name owner);
 
-   [[eosio::on_notify(TOKEN_ACCOUNT_NAME "::transfer")]] void
+   [[eosio::on_notify("*::transfer")]] void
    transfer(eosio::name from, eosio::name to, eosio::asset quantity, std::string memo);
 
-   [[eosio::action]] void withdraw(eosio::name owner, eosio::asset quantity);
+   [[eosio::action]] void withdraw(eosio::name owner, eosio::asset quantity, const eosio::binary_extension<eosio::name> &to);
 
    /// @return true if all garbage has been collected
    [[eosio::action]] bool gc(uint32_t max);

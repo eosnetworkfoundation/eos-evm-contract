@@ -1,7 +1,7 @@
 const { Api, JsonRpc, RpcError } = require("eosjs");
 const { JsSignatureProvider } = require("eosjs/dist/eosjs-jssig"); // development only
-// const fetch = require("node-fetch"); // node only; not needed in browsers
-const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
+const fetch = require("node-fetch"); // node only; not needed in browsers
+//const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 const { TextEncoder, TextDecoder } = require("util"); // node only; native TextEncoder/Decoder
 
 const RpcServer = require("http-jsonrpc-server");
@@ -29,6 +29,11 @@ if (!process.env.EOS_SENDER) {
   process.exit();
 }
 
+if (!process.env.EOS_PERMISSION) {
+  console.log("Missing EOS_PERMISSION in .env file!");
+  process.exit();
+}
+
 if (!process.env.EOS_RPC) {
   console.log("Missing EOS_RPC in .env file!");
   process.exit();
@@ -50,22 +55,49 @@ if (!process.env.PORT || !validateNum(process.env.PORT, 1, 65535)) {
   process.exit();
 }
 
+expire_sec = 300;
+if (!process.env.EXPIRE_SEC) {
+  console.log("Missing EXPIRE_SEC, default to " + expire_sec);
+} else {
+  expire_sec = +process.env.EXPIRE_SEC;
+}
+
 // Setting up EOS
-const rpc = new JsonRpc(process.env.EOS_RPC, { fetch });
+rpc_list = process.env.EOS_RPC.split("|");
+console.log("number of RPC endpoints = " + rpc_list.length + ", using " + rpc_list[0]);
+rpc_index = 0;
+
+rpc = new JsonRpc(rpc_list[rpc_index], { fetch });
 const defaultPrivateKey = process.env.EOS_KEY;
 const signatureProvider = new JsSignatureProvider([defaultPrivateKey]);
 
-const api = new Api({
+api = new Api({
   rpc,
   signatureProvider,
   textDecoder: new TextDecoder(),
   textEncoder: new TextEncoder(),
 });
 
+function next_rpc_endpoint() {
+  rpc_index = (rpc_index + 1) % rpc_list.length;
+  console.log("changing RPC endpoint to " + rpc_list[rpc_index]);
+  rpc = new JsonRpc(rpc_list[rpc_index], { fetch });
+  api = new Api({
+    rpc,
+    signatureProvider,
+    textDecoder: new TextDecoder(),
+    textEncoder: new TextEncoder(),
+  });
+}
+
 // EOS Helpers
+var pushcount=0;
 async function push_tx(strRlptx) {
-  console.log('----rlptx-----');
+  id=pushcount;
+  pushcount = pushcount + 1;
+  console.log("----rlptx(" + id + ")-----");
   console.log(strRlptx);
+  t0 = Date.now();
   const result = await api.transact(
     {
       actions: [
@@ -74,7 +106,7 @@ async function push_tx(strRlptx) {
           name: "pushtx",
           authorization: [{
               actor      : process.env.EOS_SENDER,
-              permission : "active",
+              permission : process.env.EOS_PERMISSION,
             }
           ],
           data: {
@@ -86,10 +118,11 @@ async function push_tx(strRlptx) {
     },
     {
       blocksBehind: 3,
-      expireSeconds: 3000,
+      expireSeconds: +expire_sec,
     }
   );
-  console.log('----response----');
+  latency = Date.now() - t0;
+  console.log("----response(" + id + ", " + latency + "ms) ----");
   console.log(result);
   return result;
 }
@@ -104,7 +137,7 @@ async function eth_sendRawTransaction(params) {
 var lastGetTableCallTime = 0
 var gasPrice = "0x1";
 async function eth_gasPrice(params) {
-  if ( (new Date() - lastGetTableCallTime) >= 500 ) {
+  if ( (new Date() - lastGetTableCallTime) >= 1000 ) {
     try {
       const result = await rpc.get_table_rows({
         json: true,                // Get the response as json
@@ -115,11 +148,12 @@ async function eth_gasPrice(params) {
         reverse: false,            // Optional: Get reversed data
         show_payer: false          // Optional: Show ram payer
       });
-      console.log("result:", result);
+      console.log("result:", result.rows[0].gas_price);
       gasPrice = "0x" + parseInt(result.rows[0].gas_price).toString(16);
       lastGetTableCallTime = new Date();
     } catch(e) {
       console.log("Error getting gas price from nodeos: " + e);
+      next_rpc_endpoint();
     }
   }
   return gasPrice;
@@ -151,9 +185,24 @@ const rpcServer = new RpcServer({
 rpcServer.setMethod("eth_sendRawTransaction", eth_sendRawTransaction);
 rpcServer.setMethod("eth_gasPrice", eth_gasPrice);
 
+process.on('SIGTERM', function onSigterm () {
+  console.info('Got SIGTERM. Graceful shutdown start', new Date().toISOString())
+  shutdown();
+})
+
+function shutdown() {
+  rpcServer.close(function onServerClosed (err) {
+    if (err) {
+      console.error(err)
+    }
+    process.exit()
+  })
+}
+
 // Main loop
 rpcServer.listen(+process.env.PORT, process.env.HOST).then(() => {
   console.log(
     "server is listening at " + process.env.HOST + ":" + process.env.PORT
   );
 });
+

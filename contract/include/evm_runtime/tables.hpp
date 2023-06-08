@@ -87,7 +87,7 @@ struct [[eosio::table]] [[eosio::contract("evm_contract")]] gcstore {
 
 typedef multi_index< "gcstore"_n, gcstore> gc_store_table;
 
-struct balance_with_dust {
+struct [[eosio::table("inevm")]] [[eosio::contract("evm_contract")]] balance_with_dust {
     asset balance = asset(0, token_symbol);
     uint64_t dust = 0;
 

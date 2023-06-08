@@ -3,25 +3,24 @@
 Sample config for location:
 ```
 location / {
-  set $jsonrpc_write_calls 'eth_sendRawTransaction';
-  set $jsonrpc_blacklist 'eth_mining';
+  set $jsonrpc_write_calls 'eth_sendRawTransaction,eth_gasPrice';
+  set $jsonrpc_read_calls 'xxx,xxx';
+  set $jsonrpc_test_calls 'xxx';
   access_by_lua_file 'eth-jsonrpc-access.lua';
   proxy_pass http://$proxy;
 }
 ```
 
-**The access log and error log are directed to stdout and sterr by default.**
-
-To build
+To build (You can change the endpoints through build-arg):
 ```
-sudo docker build -t evm/tx_proxy .
+sudo docker build -t evm/tx_proxy --build-arg WRITE_ENDPOINT=host.docker.internal:18888 --build-arg READ_ENDPOINT=host.docker.internal:8881 --build-arg TEST_ENDPOINT=host.docker.internal:8882 .
 ```
 
-To run
+To run:
 ```
 mkdir -p logs
 
-sudo docker run -p 80:80 -v ${PWD}/nginx.conf:/usr/local/openresty/nginx/conf/nginx.conf evm/tx_proxy:latest > ./logs/access.log 2>./logs/error.log &
+sudo docker run --add-host=host.docker.internal:host-gateway -p 80:80 -v ${PWD}/logs:/var/log/nginx -d --restart=always --name=tx_proxy evm/tx_proxy
+
 ```
 
-Or use -d instead of the & approach. Make sure logs are handled properly in that case.
