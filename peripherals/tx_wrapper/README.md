@@ -13,13 +13,14 @@ Create a .env file:
 # one or more EOS_RPC endpoints, separated by '|'
 EOS_RPC="http://127.0.0.1:8888|http://192.168.1.1:8888"
 EOS_KEY="5KQwrPbwdL6PhXujxW37FSSQZ1JiwsST4cqQzDeyXtP79zkvFD3"
-
-# the listening IP & port of this service
-HOST="127.0.0.1"
-PORT="3335"
+HOST="0.0.0.0"
+PORT="18888"
+EOS_EVM_ACCOUNT="evmevmevmevm"
+EOS_SENDER="a123"
 EOS_PERMISSION="active"
 EXPIRE_SEC=60
 ```
+
 Then
 ```
 node index.js
