@@ -363,6 +363,11 @@ Set chain ID & native token configuration (in this example, gas price is 150 Gwe
 \"}}" -p evmevmevmevm
 ```
 
+Add eosio.code to active permission
+```
+./cleos set account permission evmevmevmevm active --add-code
+```
+
 after the init action we need a small amount of token (1 EOS) to be transferred into the contract account (with memo=contract account), for example:
 ```
 ./cleos transfer eosio evmevmevmevm "1.0000 EOS" "evmevmevmevm"
@@ -1018,7 +1023,7 @@ In the above command, eos-evm-rpc will listen on port 8881 for RPC requests.
 To verify the RPC response run below command:
 
 ```shell
-curl --location --request POST 'localhost:8881/' --header 'Content-Type: application/json' --data-raw '{"method":"eth_blockNumber","id":0}'
+curl --location --request POST 'localhost:8881/' --header 'Content-Type: application/json' --data-raw '{"method":"eth_blockNumber","id":0,"jsonrpc":"2.0"}'
 ```
 
 You'll recevie a response similar to the one below:
@@ -1032,7 +1037,7 @@ You'll recevie a response similar to the one below:
 Request:
 
 ```shell
-curl --location --request POST 'localhost:8881/' --header 'Content-Type: application/json' --data-raw '{"method":"eth_getBlockByNumber","params":["0x1",true],"id":0}'
+curl --location --request POST 'localhost:8881/' --header 'Content-Type: application/json' --data-raw '{"method":"eth_getBlockByNumber","params":["0x1",true],"id":0,"jsonrpc":"2.0"}'
 ```
 
 Response:
@@ -1046,7 +1051,7 @@ Response:
 Request:
 
 ```shell
-curl --location --request POST 'localhost:8881/' --header 'Content-Type: application/json' --data-raw '{"method":"eth_getBalance","params":["9edf022004846bc987799d552d1b8485b317b7ed","latest"],"id":0}'
+curl --location --request POST 'localhost:8881/' --header 'Content-Type: application/json' --data-raw '{"method":"eth_getBalance","params":["9edf022004846bc987799d552d1b8485b317b7ed","latest"],"id":0,"jsonrpc":"2.0"}'
 ```
 
 response:
@@ -1061,7 +1066,7 @@ Request:
 data - 0x2e64cec1 is the hash of a solidity function `retrieve() public view returns (uint256)`
 
 ```shell
-curl --location --request POST 'localhost:8881/' --header 'Content-Type: application/json' --data-raw '{"method":"eth_call","params":[{"from":" 2787b98fc4e731d0456b3941f0b3fe2e01439961","to":"3f4b0f92007341792aa61e065484e48e583ebeb9","data":"0x2e64cec1"},"latest"],"id":11}'
+curl --location --request POST 'localhost:8881/' --header 'Content-Type: application/json' --data-raw '{"method":"eth_call","params":[{"from":" 2787b98fc4e731d0456b3941f0b3fe2e01439961","to":"3f4b0f92007341792aa61e065484e48e583ebeb9","data":"0x2e64cec1"},"latest"],"id":11,"jsonrpc":"2.0"}'
 ```
 
 Response:
