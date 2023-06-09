@@ -348,17 +348,7 @@ module.exports = {
         count: 80,
         passphrase: "",
       },
-    },
-    ttrust2: {
-      url: "https://api-testnet2.trust.one",
-      accounts: {
-        mnemonic: "test test test test test test test test test test test junk",
-        path: "m/44'/60'/0'/0",
-        initialIndex: 0,
-        count: 80,
-        passphrase: "",
-      },
-    },
+    }
   },
   solidity: {
     compilers : [
