@@ -406,6 +406,7 @@ void evm_contract::pushtx( eosio::name miner, const bytes& rlptx ) {
 
     engine.finalize(ep.state(), ep.evm().block(), ep.evm().revision());
     ep.state().write_to_db(ep.evm().block().header.number);
+    LOGTIME("EVM END");
 }
 
 void evm_contract::open(eosio::name owner) {

@@ -1,6 +1,6 @@
 {
   "devDependencies": {
-    "@b10k.io/hardhat-uniswap-v2-deploy-plugin": "^1.0.4",
+    "@onmychain/hardhat-uniswap-v2-deploy-plugin": "^1.0.4",
     "@ethersproject/abi": "^5.4.7",
     "@ethersproject/providers": "^5.4.7",
     "@nomicfoundation/hardhat-chai-matchers": "^1.0.0",
