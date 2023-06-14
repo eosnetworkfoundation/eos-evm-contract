@@ -88,7 +88,7 @@ public:
     boost::asio::awaitable<intx::uint256> estimate_gas(const Call& call, uint64_t block_number);
 
 private:
-    boost::asio::awaitable<bool> try_execution(const silkworm::Transaction& transaction);
+    boost::asio::awaitable<std::tuple<bool, std::optional<ExecutionResult>>> try_execution(const silkworm::Transaction& transaction);
 
     const BlockHeaderProvider& block_header_provider_;
     const AccountReader& account_reader_;
