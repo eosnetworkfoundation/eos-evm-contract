@@ -234,6 +234,12 @@ boost::asio::awaitable<ExecutionResult> EVMExecutor<WorldState, VM>::call(
                 assert(txn.from.has_value());
                 state_.access_account(*txn.from);
 
+                if(silkworm::is_reserved_address(*txn.from)) {
+                    //must mirror contract's initial state of reserved address
+                    state_.set_balance(*txn.from, txn.value + intx::uint256(txn.gas_limit) * txn.max_fee_per_gas);
+                    state_.set_nonce(*txn.from, txn.nonce);
+                }
+                
                 const evmc_revision rev{evm.revision()};
                 const intx::uint256 base_fee_per_gas{evm.block().header.base_fee_per_gas.value_or(0)};
                 const intx::uint128 g0{silkworm::intrinsic_gas(txn, rev >= EVMC_HOMESTEAD, rev >= EVMC_ISTANBUL)};
