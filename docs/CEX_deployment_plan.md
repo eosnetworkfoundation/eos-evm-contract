@@ -38,7 +38,7 @@ git submodule update --init --recursive
 mkdir build; cd build;
 cmake .. && make -j8
 ```
-for more details please refer to https://github.com/eosnetworkfoundation/eos-evm/blob/main/docs/compilation_and_testing_guide.md
+for more details please refer to https://github.com/eosnetworkfoundation/eos-evm
 
 - Eos-evm-miner: please refer to https://github.com/eosnetworkfoundation/eos-evm-miner
 
