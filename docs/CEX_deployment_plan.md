@@ -210,6 +210,7 @@ curl --location --request POST '127.0.0.1:8881/' --header 'Content-Type: applica
 In order to monitoring fund withdrawal, exchanges need to consider:
 - 1. The ```EXPIRE_SEC``` value set in the eos-evm-miner. This value will control how long will the EOS trasaction expires in such a way that it will never be included in the blockchain after expiration.
   2. The irreversible EVM block number.
+
 For example, at 9:00:00AM UTC, the upstream signed the eth transaction with ETH compatible private key and then call eth_sendRawTransaction, and then the eos-evm-miner package the trasaction into EOS transaction and signed it with EOS private key. If ```EXPIRE_SEC``` set to 60, the EOS transaction will expire at 9:01:00AM. In this case we need to wait until the EVM irreversible block has reach 9:01:01AM (1 sec max difference between EOS blocks and EVM blocks), and then scan each EVM block between 9:00:00AM and 9:01:01AM to confirm whether it is included in the EVM blockchain.
 
 ## [Optional] For EVM-Node operators Only: Setting up the read-write proxy and explorer
