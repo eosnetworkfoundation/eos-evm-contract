@@ -178,7 +178,7 @@ curl http://127.0.0.1:18888 -X POST -H "Accept: application/json" -H "Content-Ty
 {"jsonrpc":"2.0","id":1,"result":"0x22ecb25c00"}
 ```
 
-## Calculate the irreversible block number from EOS (L1) chain to EOS-EVM (L2) Chain
+## [For centralized exchanges] Calculate the irreversible block number from EOS (L1) chain to EOS-EVM (L2) Chain
 For centralized exchange it is important to know up to which block number the chain is irrversible. This is the way for EOS-EVM:
 - ensure the leap node & eos-evm-node are fully sync-up.
 - do a get_info request to leap node.
@@ -201,6 +201,16 @@ to get the EVM irreversible blocktime in hex ```0x64950d2b```, in this case the 
 curl --location --request POST '127.0.0.1:8881/' --header 'Content-Type: application/json' --data-raw '{"method":"eth_getBlockByNumber","params":["6828746",false],"id":0}'
 {"id":0,"jsonrpc":"2.0","result":{"difficulty":"0x1","extraData":"0x","gasLimit":"0x7ffffffffff","gasUsed":"0x0","hash":"0x563fe6290cf38d55e4c4d2c86886032a1734ad1e467b7ce06ff52f12ee378b0d","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","miner":"0xbbbbbbbbbbbbbbbbbbbbbbbb5530ea015b900000","mixHash":"0x12df121840088703a9fe2f305eefe25dbe97bc57f7e127d922ffa8d005aceea6","nonce":"0x0000000000000000","number":"0x6832ca","parentHash":"0xafebdcf129bd506cee25892b2f20703e5ae98bd95557a04b91ac0f56a3433824","receiptsRoot":"0x0000000000000000000000000000000000000000000000000000000000000000","sha3Uncles":"0x0000000000000000000000000000000000000000000000000000000000000000","size":"0x202","stateRoot":"0x0000000000000000000000000000000000000000000000000000000000000000","timestamp":"0x64950d2b","totalDifficulty":"0x6832cb","transactions":[],"transactionsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","uncles":[]}}
 ```
+
+### Monitoring if funds deposit into exchanges:
+- For EOS tokens on EOS-EVM: Since this is the native token, similar to other ETH compatible networks, exchanges can use similar way to query EVM blocks (such as using eth_getBlockByNumber) up to the last irreversible EVM blocks as illustruted as above. Or query the account balance using eth_getBalance if needed.
+- For ERC20 tokens on EOS-EVM: Also similar to other ETH network. To get the balance, exchanges can execute the ETH view action to extract the balance, using eth_call
+ 
+### Monitoring if fund withdraw is successful or failed:
+In order to monitoring fund withdrawal, exchanges need to consider:
+- 1. The ```EXPIRE_SEC``` value set in the eos-evm-miner. This value will control how long will the EOS trasaction expires in such a way that it will never be included in the blockchain after expiration.
+  2. The irreversible EVM block number.
+For example, at 9:00:00AM UTC, the upstream signed the eth transaction with ETH compatible private key and then call eth_sendRawTransaction, and then the eos-evm-miner package the trasaction into EOS transaction and signed it with EOS private key. If ```EXPIRE_SEC``` set to 60, the EOS transaction will expire at 9:01:00AM. In this case we need to wait until the EVM irreversible block has reach 9:01:01AM (1 sec max difference between EOS blocks and EVM blocks), and then scan each EVM block between 9:00:00AM and 9:01:01AM to confirm whether it is included in the EVM blockchain.
 
 ## [Optional] For EVM-Node operators Only: Setting up the read-write proxy and explorer
 This is same as https://github.com/eosnetworkfoundation/eos-evm/blob/main/docs/local_testnet_deployment_plan.md
