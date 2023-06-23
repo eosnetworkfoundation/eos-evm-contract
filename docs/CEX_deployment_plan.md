@@ -1,4 +1,4 @@
-# Deploy and Support EOS EVM Network for Centralized Exchanges
+# Deploy and Support EOS EVM Network for Centralized Exchanges and EOS-EVM Node operators
 
 This document will describes the minimum requirements to deploy and support EOS EVM Network for Centralized Cryptocurrency Exchanges.
 
@@ -21,6 +21,9 @@ Periodic Backup service:
     | with state_history_plugin enabled        |        +----------------------------+
     +------------------------------------------+         
 ```
+Leap node stands for the EOS (Level 1) blockchain, and eos-evm-node stands for the EOS-EVM (Level 2) blockchain. eos-evm-rpc talk to eos-evm-node 
+ in the same VM and it is used for providing read-only ETH APIs (such as eth_getBlockByNumber, eth_call, eth_blockNumber, ... ) which is compatible with standard ETH API. For ETH write requests eth_sendRawTransaction, and eth_gasPrice, they will be served via eos-evm-miner instead of eos-evm-rpc.
+ 
 - VM1: this VM will run EOS leap node in head mode with state_history_plugin enable. A high end CPU with good single threaded performance is recommended. RAM: 64GB+, SSD 2TB+ (for storing block logs & state history from the EVM genesis time (2023-04-05T02:18:09 UTC) up to now)
 - VM2: this VM will run eos-evm-node, eos-evm-rpc & eos-evm-miner. Recommend to use 8 vCPU, 32GB+ RAM, and 1TB+ SSD
 - VM3: this VM will run leap (in irrversible mode), eos-evm-node & eos-evm-rpc and mainly for backup purpose. Recommend to use 8 vCPU, 64GB+ RAM, 3TB+ SSD (backup files can be large).
@@ -41,14 +44,6 @@ cmake .. && make -j8
 for more details please refer to https://github.com/eosnetworkfoundation/eos-evm
 
 - Eos-evm-miner: please refer to https://github.com/eosnetworkfoundation/eos-evm-miner
-
-## Preparing your EOS miner account
-- create your miner account (for example: a123) on EOS Network
-- open account balance on EVM side:
-  ```
-  ./cleos push action eosio.evm open '{"owner":"a123"}' -p a123
-  ```
-- powerup the miner account with enough CPU & NET resource (for example: 1min CPU. 10 MB net per day). You can use some existing auto powerup service such as https://eospowerup.io/auto or push the powerup transaction (eosio::powerup) via cleos.
 
 ## Running the EOS (leap) nodes with state_history_plugin (with trace-history=true)
 
@@ -108,4 +103,107 @@ Notes:
 
 
 ## Running the eos-evm-node & eos-evm-rpc
+
+- Copy the mainnet EOS-EVM genesis from https://github.com/eosnetworkfoundation/evm-public-docs/blob/main/mainnet-genesis.json
+- run the eos-evm-node
+```
+mkdir ./chain-data
+./eos-evm-node --ship-endpoint=<NODEOS_IP_ADDRESS>:8999 --ship-core-account eosio.evm --chain-data ./chain-data --chain-id=17777 --plugin block_conversion_plugin --plugin blockchain_plugin --nocolor 1  --verbosity=4 --genesis-json=./genesis.json
+```
+- run the eos-evm-rpc (must be in the same VM as eos-evm-node)
+```
+./eos-evm-rpc --api-spec=eth,debug,net,trace --chain-id=17777 --http-port=0.0.0.0:8881 --eos-evm-node=127.0.0.1:8080 --chaindata=./chain-data
+```
+- The EVM state, logs will be stored in ./chain-data directory
+
+The eos-evm-rpc will talk to eos-evm-node and provide the eth compatible RPC services, for example, you can check the current block number of eos-evm-node via:
+```
+curl --location --request POST '127.0.0.1:8881/' --header 'Content-Type: application/json' --data-raw '{"method":"eth_blockNumber","params":["0x1",false],"id":0}'
+```
+- if either leap or eos-evm-node can't start, follow the recovery process in the next session.
+
+## Backup & Recovery of leap & eos-evm-node
+- It is quite important for node operator to backup all the state periodically (for example, once per day).
+- backup must be done on the leap node running in irreversible mode. And because of such, all the blocks in eos-evm-node has been finialized and it will never has a fork.
+- create the nodeos (leap) snapshot:
+  ```
+  curl http://127.0.0.1:8888/v1/producer/create_snapshot
+  ```
+- gracefull kill all processes:
+```
+pkill eos-evm-node
+sleep 2.0
+pkill eos-evm-rpc
+sleep 2.0
+pkill nodeos
+```
+- backup leap's data-dir folder and eos-evm-node's chain-data
+- restart back nodeos, eos-evm-node & eos-evm-rpc
+- for leap recovery, please restore the data-dir folder of the last backup and use the leap's snapshot
+- for eos-evm-node recovery, please restore the chain-data folder of the last backup.
+
+## Running the eos-evm-miner service 
+The miner service will help to package the EVM transaction into EOS transaction and set to the EOS network. It will provide the following 2 eth API:
+- eth_gasPrice: retrieve the currect gas price from EOS Network
+- eth_sendRawTransaction: package the ETH transaction into EOS transaction and push into the EOS Network.
+clone the https://github.com/eosnetworkfoundation/eos-evm-miner repo
+
+### Preparing your EOS miner account
+- create your miner account (for example: a123) on EOS Network
+- open account balance on EVM side:
+  ```
+  ./cleos push action eosio.evm open '{"owner":"a123"}' -p a123
+  ```
+- powerup the miner account with enough CPU & NET resource (for example: 1min CPU. 10 MB net per day). You can use some existing auto powerup service such as https://eospowerup.io/auto or push the powerup transaction (eosio::powerup) via cleos.
+
+- prepare the .env file with the correct information
+```
+PRIVATE_KEY=5KQwrPbwdL6PhXujxW37FSSQZ1JiwsST4cqQzDeyXtP79zkvFD3
+MINER_ACCOUNT=a123
+RPC_ENDPOINTS=http://127.0.0.1:8888|http://192.168.1.1:8888
+PORT=18888
+LOCK_GAS_PRICE=true
+MINER_PERMISSION="active"
+EXPIRE_SEC=60
+```
+- build and start the miner
+```
+npm install
+yarn build
+yarn start
+```
+- test if the miner is working
+```
+curl http://127.0.0.1:18888 -X POST -H "Accept: application/json" -H "Content-Type: application/json" --data '{"method":"eth_gasPrice","params":[],"id":1,"jsonrpc":"2.0"}'
+{"jsonrpc":"2.0","id":1,"result":"0x22ecb25c00"}
+```
+
+## Calculate the irreversible block number from EOS (L1) chain to EOS-EVM (L2) Chain
+For centralized exchange it is important to know up to which block number the chain is irrversible. This is the way for EOS-EVM:
+- ensure the leap node & eos-evm-node are fully sync-up.
+- do a get_info request to leap node.
+```
+{
+  "server_version": "943d1134",
+  "chain_id": "aca376f206b8fc25a6ed44dbdc66547c36c6c33e3a119ffbeaef943642f0e906",
+  "head_block_num": 316609050,
+...
+  "earliest_available_block_num": 302853021,
+  "last_irreversible_block_time": "2023-06-23T03:10:35.500"
+}
+```
+- in the above example all EVM blocks before `"last_irreversible_block_time": "2023-06-23T03:10:35.500"` are irreversible. You can use the time conversion script:
+```
+python3 -c 'from datetime import datetime; print(hex(int((datetime.strptime("2023-06-23T03:10:35.500","%Y-%m-%dT%H:%M:%S.%f")-datetime(1970,1,1)).total_seconds())))'
+```
+to get the EVM irreversible blocktime in hex ```0x64950d2b```, in this case the EVM blocks up to ```6828746``` are irreversible.
+```
+curl --location --request POST '127.0.0.1:8881/' --header 'Content-Type: application/json' --data-raw '{"method":"eth_getBlockByNumber","params":["6828746",false],"id":0}'
+{"id":0,"jsonrpc":"2.0","result":{"difficulty":"0x1","extraData":"0x","gasLimit":"0x7ffffffffff","gasUsed":"0x0","hash":"0x563fe6290cf38d55e4c4d2c86886032a1734ad1e467b7ce06ff52f12ee378b0d","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","miner":"0xbbbbbbbbbbbbbbbbbbbbbbbb5530ea015b900000","mixHash":"0x12df121840088703a9fe2f305eefe25dbe97bc57f7e127d922ffa8d005aceea6","nonce":"0x0000000000000000","number":"0x6832ca","parentHash":"0xafebdcf129bd506cee25892b2f20703e5ae98bd95557a04b91ac0f56a3433824","receiptsRoot":"0x0000000000000000000000000000000000000000000000000000000000000000","sha3Uncles":"0x0000000000000000000000000000000000000000000000000000000000000000","size":"0x202","stateRoot":"0x0000000000000000000000000000000000000000000000000000000000000000","timestamp":"0x64950d2b","totalDifficulty":"0x6832cb","transactions":[],"transactionsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","uncles":[]}}
+```
+
+## [Optional] For EVM-Node operators Only: Setting up the read-write proxy and explorer
+This is same as https://github.com/eosnetworkfoundation/eos-evm/blob/main/docs/local_testnet_deployment_plan.md
+- Setup the read-write proxy to integrate the ETH read requests (eos-evm-rpc) & write requests (eos-evm-miner) together with a single listening endpoint.
+- Setup your own EOS-EVM Explorer
 
