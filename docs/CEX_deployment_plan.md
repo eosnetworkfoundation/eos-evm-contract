@@ -7,7 +7,7 @@ This is the minimum setup to run a EOS EVM service. It does not contain the high
 ```
 Real-time service:
     +--VM1------------------------------+       +--VM2-----------------------+
-    | leap node running in head mode    | <---- | eos-evm-node & eos-evm-rpc | <-- eth compatible read requests (e.g. eth_blockNumber, eth_getBlockByNumber ...)
+    | leap node running in head mode    | <---- | eos-evm-node & eos-evm-rpc | <-- eth compatible read requests (e.g. eth_getBlockByNumber, eth_call ...)
     | with state_history_plugin enabled |       +----------------------------+
     +-----------------------------------+              
                                        ^
@@ -48,4 +48,64 @@ for more details please refer to https://github.com/eosnetworkfoundation/eos-evm
   ```
   ./cleos push action eosio.evm open '{"owner":"a123"}' -p a123
   ```
-- powerup the miner account with enough CPU & NET resource (for example: 1min CPU. 10 MB net per day)
+- powerup the miner account with enough CPU & NET resource (for example: 1min CPU. 10 MB net per day). You can use some existing auto powerup service such as https://eospowerup.io/auto or push the powerup transaction (eosio::powerup) via cleos.
+
+## Running the EOS (leap) nodes with state_history_plugin (with trace-history=true)
+
+- For the first time: You need a snapshot file whose timestamps is before the EVM genesis timestamp 2023-04-05T02:18:09 UTC.
+- The block log and state history logs need to be replayed from the snapshot time and need to be saved together in the periodic backup.
+- The block logs, state-history logs can not be truncated in the future. This is because eos-evm-node may ask for old blocks for replaying the EVM chain. 
+- You can download the snapshot from any public EOS snapshot service providers (such as https://snapshots-main.eossweden.org/), or use your own snapshot.
+- Supported version: Leap 4.x (recommend), Leap 3.x
+  
+example data-dir/config.ini
+```
+# 48GB for VM with 64GB RAM, possible require bigger VM in the future
+chain-state-db-size-mb = 49152
+
+access-control-allow-credentials = false
+
+allowed-connection = any
+p2p-listen-endpoint = 0.0.0.0:9876
+p2p-max-nodes-per-host = 10
+http-server-address = 0.0.0.0:8888
+state-history-endpoint = 0.0.0.0:8999
+
+trace-history = true
+chain-state-history = false
+
+http-max-response-time-ms = 1000
+
+# add or remove peers if needed
+p2p-peer-address=eos.p2p.eosusa.io:9882
+p2p-peer-address=p2p.eos.cryptolions.io:9876
+p2p-peer-address=p2p.eossweden.se:9876
+p2p-peer-address=fullnode.eoslaomao.com:443
+p2p-peer-address=mainnet.eosamsterdam.net:9876
+
+# Plugin(s) to enable, may be specified multiple times
+plugin = eosio::producer_plugin
+plugin = eosio::chain_api_plugin
+plugin = eosio::http_plugin
+plugin = eosio::producer_api_plugin
+plugin = eosio::state_history_plugin
+plugin = eosio::net_plugin
+plugin = eosio::net_api_plugin
+plugin = eosio::db_size_api_plugin
+```
+example run command (VM1, head or speculative mode):
+```
+sudo ./nodeos --p2p-accept-transactions=0 --database-map-mode=locked --data-dir=./data-dir  --config-dir=./data-dir --http-max-response-time-ms=200 --disable-replay-opts --max-body-size=10000000
+```
+example run command (VM3, irreversible mode):
+```
+sudo ./nodeos --read-mode=irreversible --p2p-accept-transactions=0 --database-map-mode=locked --data-dir=./data-dir  --config-dir=./data-dir --http-max-response-time-ms=200 --disable-replay-opts --max-body-size=10000000
+```
+Notes:
+- To boost performance, it is important to set "--p2p-accept-transactions=0" to disallow executing transactions (which are not yet included in a blocks) received from other peers.
+- `--database-map-mode=locked` requires sudo access. it is recommended but not mandatory.
+- for the 1st time, run it also with `--snapshot=SNAPSHOT_FILE` to begin with the snapshot state.
+
+
+## Running the eos-evm-node & eos-evm-rpc
+
