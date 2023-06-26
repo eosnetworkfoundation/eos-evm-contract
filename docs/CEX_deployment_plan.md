@@ -10,6 +10,7 @@ This document will describes the minimum requirements to deploy and support EOS 
 6. [Running the eos-evm-miner service](#RMS)
 7. [[Exchanges Only]: Calculate the irreversible block number from EOS chain to EOS-EVM Chain](#CRB)
 8. [[EVM-Node operators Only]: Setting up the read-write proxy and explorer](#RWP)
+9. [Known Limitations](#KL)
 
 
 <a name="MA"></a>
@@ -195,7 +196,7 @@ curl http://127.0.0.1:18888 -X POST -H "Accept: application/json" -H "Content-Ty
 
 <a name="CRB"></a>
 ## [For centralized exchanges] Calculate the irreversible block number from EOS (L1) chain to EOS-EVM (L2) Chain
-For centralized exchange it is important to know up to which block number the chain is irrversible. This is the way for EOS-EVM:
+For centralized exchanges it is important to know up to which block number the chain is irreversible. This is the way to calculate the irreversible time of EOS-EVM:
 - ensure the leap node & eos-evm-node are fully sync-up.
 - do a get_info request to leap node.
 ```
@@ -208,11 +209,11 @@ For centralized exchange it is important to know up to which block number the ch
   "last_irreversible_block_time": "2023-06-23T03:10:35.500"
 }
 ```
-- in the above example all EVM blocks before `"last_irreversible_block_time": "2023-06-23T03:10:35.500"` are irreversible. You can use the time conversion script:
+- in the above example all EVM blocks before `"last_irreversible_block_time": "2023-06-23T03:10:35.500"` are irreversible. Use the time conversion script:
 `
 python3 -c 'from datetime import datetime; print(hex(int((datetime.strptime("2023-06-23T03:10:35.500","%Y-%m-%dT%H:%M:%S.%f")-datetime(1970,1,1)).total_seconds())))'
 `
-to get the EVM irreversible blocktime in hex ```0x64950d2b```, in this case the EVM blocks up to ```6828746``` are irreversible.
+to get the EVM irreversible blocktime in hex `0x64950d2b`. By scanning every EVM block, we found out that the EVM blocks up to ```6828746``` are irreversible, because its timestamp is `0x64950d2b`:
 
 `
 curl --location --request POST '127.0.0.1:8881/' --header 'Content-Type: application/json' --data-raw '{"method":"eth_getBlockByNumber","params":["6828746",false],"id":0}'
@@ -240,4 +241,12 @@ For example:
 This is same as https://github.com/eosnetworkfoundation/eos-evm/blob/main/docs/local_testnet_deployment_plan.md
 - Setup the read-write proxy to integrate the ETH read requests (eos-evm-rpc) & write requests (eos-evm-miner) together with a single listening endpoint.
 - Setup your own EOS-EVM Explorer
+
+<a name="KL"></a>
+## Known Limitations
+- Eos-evm-node will gracefully stop if the state-history-plugin connection in Leap node is dropped. Exchanges or node operators need to have auto-restart script to restart eos-evm-node (and choose the available leap end-point if high availability setup exist)
+
+- In some rare case, eos-evm-node can not handle forks happened in Native EOS (L1) chain. Exchanges or node operators may need to run the recovery process.
+
+- If eos-evm-node crashes, in some case it may not able to start due to database error. Exchanges or node operators may need to run the recovery process.
 
