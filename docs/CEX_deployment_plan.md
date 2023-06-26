@@ -164,7 +164,6 @@ The miner service will help to package the EVM transaction into EOS transaction 
 - eth_sendRawTransaction: package the ETH transaction into EOS transaction and push into the EOS Network.
 clone the https://github.com/eosnetworkfoundation/eos-evm-miner repo
 
-### Preparing your EOS miner account
 - create your miner account (for example: a123) on EOS Network
 - open account balance on EVM side:
   ```
@@ -210,25 +209,31 @@ For centralized exchange it is important to know up to which block number the ch
 }
 ```
 - in the above example all EVM blocks before `"last_irreversible_block_time": "2023-06-23T03:10:35.500"` are irreversible. You can use the time conversion script:
-```
+`
 python3 -c 'from datetime import datetime; print(hex(int((datetime.strptime("2023-06-23T03:10:35.500","%Y-%m-%dT%H:%M:%S.%f")-datetime(1970,1,1)).total_seconds())))'
-```
+`
 to get the EVM irreversible blocktime in hex ```0x64950d2b```, in this case the EVM blocks up to ```6828746``` are irreversible.
-```
+
+`
 curl --location --request POST '127.0.0.1:8881/' --header 'Content-Type: application/json' --data-raw '{"method":"eth_getBlockByNumber","params":["6828746",false],"id":0}'
 {"id":0,"jsonrpc":"2.0","result":{"difficulty":"0x1","extraData":"0x","gasLimit":"0x7ffffffffff","gasUsed":"0x0","hash":"0x563fe6290cf38d55e4c4d2c86886032a1734ad1e467b7ce06ff52f12ee378b0d","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","miner":"0xbbbbbbbbbbbbbbbbbbbbbbbb5530ea015b900000","mixHash":"0x12df121840088703a9fe2f305eefe25dbe97bc57f7e127d922ffa8d005aceea6","nonce":"0x0000000000000000","number":"0x6832ca","parentHash":"0xafebdcf129bd506cee25892b2f20703e5ae98bd95557a04b91ac0f56a3433824","receiptsRoot":"0x0000000000000000000000000000000000000000000000000000000000000000","sha3Uncles":"0x0000000000000000000000000000000000000000000000000000000000000000","size":"0x202","stateRoot":"0x0000000000000000000000000000000000000000000000000000000000000000","timestamp":"0x64950d2b","totalDifficulty":"0x6832cb","transactions":[],"transactionsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","uncles":[]}}
-```
+`
 
-### Monitoring if funds deposit into exchanges:
-- For EOS tokens on EOS-EVM: Since this is the native token, similar to other ETH compatible networks, exchanges can use similar way to query EVM blocks (such as using eth_getBlockByNumber) up to the last irreversible EVM blocks as illustruted as above. Or query the account balance using eth_getBalance if needed.
-- For ERC20 tokens on EOS-EVM: Also similar to other ETH network. To get the balance, exchanges can execute the ETH view action to extract the balance, using eth_call
+### Monitor funds deposits into exchanges:
+- For EOS tokens on EOS-EVM: Since this is the native token, similar to other ETH compatible networks, exchanges can use similar way to query EVM blocks (such as using eth_getBlockByNumber) up to the last irreversible EVM blocks as explained above. Or query the account balance using eth_getBalance if needed.
+- For ERC20 tokens on EOS-EVM: Also similar to other ETH networks, exchanges can execute the ETH view action (eth_call) to extract the balance of any EVM account, or monitor each EVM blocks.
  
-### Monitoring if fund withdraw is successful or failed:
+### Confirm if a fund withdrawal is successful or fail:
 In order to monitoring fund withdrawal, exchanges need to consider:
-- 1. The ```EXPIRE_SEC``` value set in the eos-evm-miner. This value will control how long will the EOS trasaction expires in such a way that it will never be included in the blockchain after expiration.
-  2. The irreversible EVM block number.
+- The ```EXPIRE_SEC``` value set in the eos-evm-miner. This value will control how long will the EOS trasaction expires in such a way that it will never be included in the blockchain after expiration.
+- The irreversible EVM block number.
 
-For example, at 9:00:00AM UTC, the upstream signed the eth transaction with ETH compatible private key and then call eth_sendRawTransaction, and then the eos-evm-miner package the trasaction into EOS transaction and signed it with EOS private key. If ```EXPIRE_SEC``` set to 60, the EOS transaction will expire at 9:01:00AM. In this case we need to wait until the EVM irreversible block has reach 9:01:01AM (1 sec max difference between EOS blocks and EVM blocks), and then scan each EVM block between 9:00:00AM and 9:01:01AM to confirm whether it is included in the EVM blockchain.
+For example:
+- 1. At 9:00:00AM UTC, the upstream signed the ETH transaction with ETH compatible private key and then call eth_sendRawTransaction
+- 2. The eos-evm-miner packages the EVM transaction into EOS transaction and signed it with EOS private key, and push to native EOS network.
+- 3. If `EXPIRE_SEC` is set to 60, the EOS transaction will expire at 9:01:00AM. So we need to wait until the result of `./cleos get info` shows that the last_irreversible_block_time >= 9:01:00AM. At most cases, the EOS Network will have around 3 minute finality time, so we probably need to wait until 9:04:00AM.
+- 4. Since all transactions up 9:01:00AM are irreversible, we scan each EVM block between 9:00:00AM and 9:01:01AM (1 sec max timestamp difference between EOS and EOS-EVM blocks) to confirm whether the transaction is included in the EVM blockchain (so as the native EOS blockchain). We can confirm the withdrawal is successfull if we find the transaction in this range. Otherwise, the transaction is already expired and can not be included in the blockchain.
+- 5. Alternative to 4, instead of scanning all blocks in the time range, we can get the nonce number of the EVM account to confirm if the withdrawal is successful. But this method only works if there is only one withdrawal pending under that EVM account.
 
 <a name="RWP"></a>
 ## [Optional] For EVM-Node operators Only: Setting up the read-write proxy and explorer
