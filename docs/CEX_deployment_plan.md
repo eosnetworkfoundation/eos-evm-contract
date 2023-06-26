@@ -2,10 +2,14 @@
 
 This document will describes the minimum requirements to deploy and support EOS EVM Network for Centralized Cryptocurrency Exchanges.
 
-1. [Minimum Architecture](#C1)
+1. [Minimum Architecture](#MA)
+2. [Building necessary components](#BNC)
+3. [Running the EOS (leap) nodes with state_history_plugin](#REN)
+4. [Running the eos-evm-node & eos-evm-rpc](#REE)
+5. [Backup & Recovery of leap & eos-evm-node](#BR)
 
 
-<a name="C1"></a>
+<a name="MA"></a>
 ## Minimum Architecture 
 This is the minimum setup to run a EOS EVM service. It does not contain the high availability setup. Exchanges can duplicate the real-time service part for high availability purpose if necessary. 
 ```
@@ -33,6 +37,7 @@ Leap node stands for the EOS (Level 1) blockchain, and eos-evm-node stands for t
 - VM3: this VM will run leap (in irrversible mode), eos-evm-node & eos-evm-rpc and mainly for backup purpose. Recommend to use 8 vCPU, 64GB+ RAM, 3TB+ SSD (backup files can be large).
 
 
+<a name="BNC"></a>
 ## Building necessary components:
 OS: Recommend to use ubuntu 22.04
 - EOS (leap) Node: please refer to https://github.com/AntelopeIO/leap
@@ -49,6 +54,7 @@ for more details please refer to https://github.com/eosnetworkfoundation/eos-evm
 
 - Eos-evm-miner: please refer to https://github.com/eosnetworkfoundation/eos-evm-miner
 
+<a name="REN"></a>
 ## Running the EOS (leap) nodes with state_history_plugin (with trace-history=true)
 
 - For the first time: You need a snapshot file whose timestamps is before the EVM genesis timestamp 2023-04-05T02:18:09 UTC.
@@ -106,6 +112,7 @@ Notes:
 - for the 1st time, run it also with `--snapshot=SNAPSHOT_FILE` to begin with the snapshot state.
 
 
+<a name="REE"></a>
 ## Running the eos-evm-node & eos-evm-rpc
 
 - Copy the mainnet EOS-EVM genesis from https://github.com/eosnetworkfoundation/evm-public-docs/blob/main/mainnet-genesis.json
@@ -126,6 +133,7 @@ curl --location --request POST '127.0.0.1:8881/' --header 'Content-Type: applica
 ```
 - if either leap or eos-evm-node can't start, follow the recovery process in the next session.
 
+<a name="BR"></a>
 ## Backup & Recovery of leap & eos-evm-node
 - It is quite important for node operator to backup all the state periodically (for example, once per day).
 - backup must be done on the leap node running in irreversible mode. And because of such, all the blocks in eos-evm-node has been finialized and it will never has a fork.
