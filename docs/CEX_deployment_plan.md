@@ -7,6 +7,9 @@ This document will describes the minimum requirements to deploy and support EOS 
 3. [Running the EOS (leap) nodes with state_history_plugin](#REN)
 4. [Running the eos-evm-node & eos-evm-rpc](#REE)
 5. [Backup & Recovery of leap & eos-evm-node](#BR)
+6. [Running the eos-evm-miner service](#RMS)
+7. [[Exchanges Only]: Calculate the irreversible block number from EOS chain to EOS-EVM Chain](#CRB)
+8. [[EVM-Node operators Only]: Setting up the read-write proxy and explorer](#RWP)
 
 
 <a name="MA"></a>
@@ -154,6 +157,7 @@ pkill nodeos
 - for leap recovery, please restore the data-dir folder of the last backup and use the leap's snapshot
 - for eos-evm-node recovery, please restore the chain-data folder of the last backup.
 
+<a name="RMS"></a>
 ## Running the eos-evm-miner service 
 The miner service will help to package the EVM transaction into EOS transaction and set to the EOS network. It will provide the following 2 eth API:
 - eth_gasPrice: retrieve the currect gas price from EOS Network
@@ -190,6 +194,7 @@ curl http://127.0.0.1:18888 -X POST -H "Accept: application/json" -H "Content-Ty
 {"jsonrpc":"2.0","id":1,"result":"0x22ecb25c00"}
 ```
 
+<a name="CRB"></a>
 ## [For centralized exchanges] Calculate the irreversible block number from EOS (L1) chain to EOS-EVM (L2) Chain
 For centralized exchange it is important to know up to which block number the chain is irrversible. This is the way for EOS-EVM:
 - ensure the leap node & eos-evm-node are fully sync-up.
@@ -225,6 +230,7 @@ In order to monitoring fund withdrawal, exchanges need to consider:
 
 For example, at 9:00:00AM UTC, the upstream signed the eth transaction with ETH compatible private key and then call eth_sendRawTransaction, and then the eos-evm-miner package the trasaction into EOS transaction and signed it with EOS private key. If ```EXPIRE_SEC``` set to 60, the EOS transaction will expire at 9:01:00AM. In this case we need to wait until the EVM irreversible block has reach 9:01:01AM (1 sec max difference between EOS blocks and EVM blocks), and then scan each EVM block between 9:00:00AM and 9:01:01AM to confirm whether it is included in the EVM blockchain.
 
+<a name="RWP"></a>
 ## [Optional] For EVM-Node operators Only: Setting up the read-write proxy and explorer
 This is same as https://github.com/eosnetworkfoundation/eos-evm/blob/main/docs/local_testnet_deployment_plan.md
 - Setup the read-write proxy to integrate the ETH read requests (eos-evm-rpc) & write requests (eos-evm-miner) together with a single listening endpoint.
