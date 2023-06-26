@@ -2,6 +2,10 @@
 
 This document will describes the minimum requirements to deploy and support EOS EVM Network for Centralized Cryptocurrency Exchanges.
 
+1. [Minimum Architecture](#C1)
+
+
+<a name="C1"></a>
 ## Minimum Architecture 
 This is the minimum setup to run a EOS EVM service. It does not contain the high availability setup. Exchanges can duplicate the real-time service part for high availability purpose if necessary. 
 ```
