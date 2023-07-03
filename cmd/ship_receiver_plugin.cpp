@@ -108,11 +108,9 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
          stream->async_read(*buff, appbase::app().get_priority_queue().wrap(80,
             [buff, func](const auto ec, auto) {
                if (ec) {
-                  SILK_CRIT << "SHiP read failed : " << ec.message();
-                  sys::error();
-               } else {
-                  func(buff);
-               }
+                  SILK_ERROR << "SHiP read failed : " << ec.message();
+               } 
+               func(ec, buff);
             })
          );
       }
@@ -232,7 +230,30 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
 
       void start_read() {
          static size_t num_messages = 0;
-         async_read([this](auto buff) {
+         async_read([this](const auto ec, auto buff) {
+            if (ec) {
+               // Failed in read, retry connecting!
+               // Note that we only try to reconnect when error happened during read. 
+               // Any other error will still result in exit.
+               SILK_INFO << "Trying to recover from SHiP read failure.";
+               // Wait for a while before doing anything in case we hit some network jam.
+               std::this_thread::sleep_for(std::chrono::seconds(3));
+
+               // Try close connection gracefully but ignore return value.
+               boost::system::error_code ec2;
+               stream->close(websocket::close_reason(websocket::close_code::normal),ec2);
+
+               // Reconnect and restart sync.
+               SILK_INFO << "Trying to reconnect.";
+               num_messages = 0;
+               stream = std::make_shared<websocket::stream<tcp::socket>>(appbase::app().get_io_service());
+               stream->binary(true);
+               stream->read_message_max(0x1ull << 36);
+               connect_stream();
+               SILK_INFO << "Trying to sync again."; 
+               sync(true);
+               return;
+            }
             auto block = to_native(std::get<eosio::ship_protocol::get_blocks_result_v0>(get_result(buff)));
             if(!block) {
                sys::error("Unable to generate native block");
@@ -250,7 +271,7 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
          });
       }
 
-      void sync() {
+      void sync(bool restart = false) {
          // get available blocks range we can grab
          auto res = get_status();
 
@@ -267,11 +288,23 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
          auto start_from = utils::to_block_num(head_header->mix_hash.bytes) + 1;
          SILK_INFO << "Canonical header start from block: " << start_from;
 
-         if( start_from_block_id ) {
-            uint32_t block_num = utils::to_block_num(*start_from_block_id);
-            SILK_INFO << "Using specified start block number:" << block_num;
-            start_from = block_num;
+         if (restart) {
+            // Always start from early blocks to handle potential forks.
+            // Clearly this approach will introduce overhaad, but since this piece of code 
+            // will only execute during recovery, it should be fine.
+            if (head_header->number > 250) {
+               start_from -= 500;
+            }
          }
+         else {
+            // Only take care of input option when it's initial sync.
+            if( start_from_block_id ) {
+               uint32_t block_num = utils::to_block_num(*start_from_block_id);
+               SILK_INFO << "Using specified start block number:" << block_num;
+               start_from = block_num;
+            }
+         }
+         
 
          if( res.trace_begin_block > start_from ) {
             SILK_ERROR << "Block #" << start_from << " not available in SHiP";
