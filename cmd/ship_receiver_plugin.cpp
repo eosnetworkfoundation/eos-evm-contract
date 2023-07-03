@@ -52,7 +52,10 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
             SILK_CRIT << "SHiP initial read failed : " << ec.message();
             sys::error();
          }
-         abi = load_abi(eosio::json_token_stream{(char*)buff.data().data()});
+         auto end = buff.prepare(1);
+         ((char *)end.data())[0] = '\0';
+         buff.commit(1);
+         abi = load_abi(eosio::json_token_stream{(char *)buff.data().data()});
       }
 
       void send_request(const eosio::ship_protocol::request& req) {
@@ -250,7 +253,8 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
                stream->binary(true);
                stream->read_message_max(0x1ull << 36);
                connect_stream();
-               SILK_INFO << "Trying to sync again."; 
+               initial_read();
+               SILK_INFO << "Trying to sync again.";
                sync(true);
                return;
             }
