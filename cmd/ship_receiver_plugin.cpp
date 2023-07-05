@@ -410,6 +410,10 @@ void ship_receiver_plugin::set_program_options( appbase::options_description& cl
         "Override Antelope block id to start syncing from"  )
       ("ship-start-from-block-timestamp", boost::program_options::value<int64_t>(),
         "Timestamp for the provided ship-start-from-block-id, required if block-id provided"  )
+      ("ship-max-retry", boost::program_options::value<uint32_t>(),
+        "Max retry times before give up when trying to reconnect to SHiP endpoints"  )
+      ("ship-delay-second", boost::program_options::value<uint32_t>(),
+        "Deply in seconds between each retry when trying to reconnect to SHiP endpoints"  )
    ;
 }
 
