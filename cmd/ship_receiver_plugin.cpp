@@ -39,6 +39,7 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
          start_from_block_id = start_block_id;
          start_from_block_timestamp = start_block_timestamp;
          last_lib = 0;
+         last_block_num = 0;
          delay_second = input_delay_second;
          max_retry = input_max_retry;
          retry_count = 0;
@@ -299,6 +300,7 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
             }
 
             last_lib = block->lib;
+            last_block_num = block->block_num;
             // reset retry_count upon successful read.
             retry_count = 0;
 
@@ -319,6 +321,7 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
       }
 
       void sync() {
+         SILK_INFO << "Start Syncing blocks.";
          // get available blocks range we can grab
          eosio::ship_protocol::get_status_result_v0 res = {};
          auto ec = get_status(res);
@@ -327,26 +330,34 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
             return;
          }
 
-         auto head_header = appbase::app().get_plugin<engine_plugin>().get_head_canonical_header();
-         if (!head_header) {
-            sys::error("Unable to read canonical header");
-            // No reset!
-            return;
+         uint32_t start_from = 0;
+
+         if (last_lib > 0) {
+            // None zero last_lib means we are in the process of reconnection.
+            // If last pushed block number is higher than LIB, we have the risk of fork and need to start from LIB.
+            // Otherwise it means we are catching up blocks and can safely continue from next block.
+            start_from = (last_lib > last_block_num ? last_block_num : last_lib) + 1;
+            SILK_INFO << "Recover from disconnection, " << "last LIB is: " << last_lib
+                     << ", last block num is: " << last_block_num
+                     << ", continue from: " << start_from;
          }
-         SILK_INFO << "get_head_canonical_header: "
+         else {
+            auto head_header = appbase::app().get_plugin<engine_plugin>().get_head_canonical_header();
+            if (!head_header) {
+               sys::error("Unable to read canonical header");
+               // No reset!
+               return;
+            }
+
+            // Only take care of canonical header and input options when it's initial sync.
+            SILK_INFO << "Get_head_canonical_header: "
                      << "#" << head_header->number
                      << ", hash:" << silkworm::to_hex(head_header->hash())
                      << ", mixHash:" << silkworm::to_hex(head_header->mix_hash);
 
-         auto start_from = utils::to_block_num(head_header->mix_hash.bytes) + 1;
-         SILK_INFO << "Canonical header start from block: " << start_from;
-
-         if (last_lib > 0 && last_lib < start_from) {
-            // None zeor last_lib means we are in the process of reconnection.
-            start_from = last_lib;
-         }
-         else {
-            // Only take care of input option when it's initial sync.
+            start_from = utils::to_block_num(head_header->mix_hash.bytes) + 1;
+            SILK_INFO << "Canonical header start from block: " << start_from;
+            
             if( start_from_block_id ) {
                uint32_t block_num = utils::to_block_num(*start_from_block_id);
                SILK_INFO << "Using specified start block number:" << block_num;
@@ -392,6 +403,7 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
       std::optional<eosio::checksum256>               start_from_block_id;
       int64_t                                         start_from_block_timestamp{};
       uint32_t                                        last_lib;
+      uint32_t                                        last_block_num;
       uint32_t                                        delay_second;
       uint32_t                                        max_retry;
       uint32_t                                        retry_count;
