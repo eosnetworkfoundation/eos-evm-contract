@@ -250,13 +250,14 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
             }
 
             // Delay in the case of reconnection.
-            std::this_thread::sleep_for(std::chrono::seconds(3));
+            std::this_thread::sleep_for(std::chrono::seconds(delay_second));
             SILK_INFO << "Trying to reconnect "<< retry_count << "/" << max_retry;
          }
          stream = std::make_shared<websocket::stream<tcp::socket>>(appbase::app().get_io_service());
          stream->binary(true);
          stream->read_message_max(0x1ull << 36);
 
+         // CAUTION: we have to use async call here to avoid recursive reset_connection() calls.
          resolver->async_resolve( tcp::v4(), host, port, [this](const auto ec, auto res) {
             if (ec) {
                SILK_ERROR << "Resolver failed : " << ec.message();
@@ -264,7 +265,8 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
                return;
             }
 
-            // It should be fine to call connection and initial read synchronously.
+            // It should be fine to call connection and initial read synchronously as though they are 
+            // blocking calls, it's only one thread and we have nothing more important to run anyway.
             auto ec2 = connect_stream(res);
             if (ec2) {
                reset_connection();
