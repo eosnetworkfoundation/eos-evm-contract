@@ -341,7 +341,7 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
          auto start_from = utils::to_block_num(head_header->mix_hash.bytes) + 1;
          SILK_INFO << "Canonical header start from block: " << start_from;
 
-         if (last_lib > 0) {
+         if (last_lib > 0 && last_lib < start_from) {
             // None zeor last_lib means we are in the process of reconnection.
             start_from = last_lib;
          }
