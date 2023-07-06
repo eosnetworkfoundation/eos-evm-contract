@@ -13,8 +13,7 @@ ee cdt-cc --version
 ee cmake --version
 
 # build
-ee mkdir -p contract/build
-ee pushd contract
+ee mkdir -p build
 ee pushd build
 ee "cmake -DCMAKE_BUILD_TYPE=$DCMAKE_BUILD_TYPE -DWITH_TEST_ACTIONS=$DWITH_TEST_ACTIONS -DWITH_LARGE_STACK=$DWITH_TEST_ACTIONS .."
 ee make -j "$(nproc)"

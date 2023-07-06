@@ -15,8 +15,8 @@ echo 'Leap version:'
 cat "$Deosio_DIR/EosioTester.cmake" | grep 'EOSIO_VERSION' | grep -oP "['\"].*['\"]" | tr -d "'\"" || :
 
 # build
-ee mkdir -p contract/tests/build
-ee pushd contract/tests
+ee mkdir -p tests/build
+ee pushd tests
 ee pushd build
 ee "cmake -DCMAKE_BUILD_TYPE=$DCMAKE_BUILD_TYPE .."
 ee make -j "$(nproc)" unit_test

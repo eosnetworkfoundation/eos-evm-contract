@@ -8,7 +8,7 @@ function ee()
     eval "$@"
 }
 
-ee pushd contract/tests/build
+ee pushd tests/build
 if [ "$DWITH_TEST_ACTIONS" = "on" ] || [ "$DWITH_TEST_ACTIONS" = "true" ]; then
 ee "ctest -R consensus_tests -j \"$(nproc)\" --output-on-failure -T Test"
 else
