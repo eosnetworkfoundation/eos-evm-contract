@@ -244,6 +244,10 @@ Receipt evm_contract::execute_tx( eosio::name miner, Block& block, Transaction& 
     else if(is_reserved_address(*tx.from))
         check(from_self, "bridge signature used outside of bridge transaction");
 
+    if(!from_self) {
+        check(tx.chain_id.has_value(), "tx without chain-id");
+    }
+
     ValidationResult r = consensus::pre_validate_transaction(tx, ep.evm().block().header.number, ep.evm().config(),
                                                              ep.evm().block().header.base_fee_per_gas);
     check_result( r, tx, "pre_validate_transaction error" );
