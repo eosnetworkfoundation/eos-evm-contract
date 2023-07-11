@@ -194,7 +194,7 @@ void check_result( ValidationResult r, const Transaction& txn, const char* desc 
     eosio::check( false, std::move(err_msg));
 }
 
-Receipt evm_contract::execute_tx( eosio::name miner, Block& block, Transaction& tx, silkworm::ExecutionProcessor& ep ) {
+Receipt evm_contract::execute_tx( eosio::name miner, Block& block, Transaction& tx, silkworm::ExecutionProcessor& ep, bool enforce_chain_id) {
     //when being called as an inline action, clutch in allowance for reserved addresses & signatures by setting from_self=true
     const bool from_self = get_sender() == get_self();
 
@@ -244,7 +244,7 @@ Receipt evm_contract::execute_tx( eosio::name miner, Block& block, Transaction& 
     else if(is_reserved_address(*tx.from))
         check(from_self, "bridge signature used outside of bridge transaction");
 
-    if(!from_self) {
+    if(enforce_chain_id && !from_self) {
         check(tx.chain_id.has_value(), "tx without chain-id");
     }
 
@@ -406,7 +406,7 @@ void evm_contract::pushtx( eosio::name miner, const bytes& rlptx ) {
     check(tx.max_priority_fee_per_gas == tx.max_fee_per_gas, "max_priority_fee_per_gas must be equal to max_fee_per_gas");
     check(tx.max_fee_per_gas >= current_config.gas_price, "gas price is too low");
 
-    auto receipt = execute_tx(miner, block, tx, ep);
+    auto receipt = execute_tx(miner, block, tx, ep, true);
 
     engine.finalize(ep.state(), ep.evm().block(), ep.evm().revision());
     ep.state().write_to_db(ep.evm().block().header.number);
@@ -573,7 +573,7 @@ bool evm_contract::gc(uint32_t max) {
         ByteView bv{(const uint8_t*)orlptx->data(), orlptx->size()};
         eosio::check(rlp::decode(bv,tx) == DecodingResult::kOk && bv.empty(), "unable to decode transaction");
 
-        execute_tx(eosio::name{}, block, tx, ep);
+        execute_tx(eosio::name{}, block, tx, ep, false);
     }
     engine.finalize(ep.state(), ep.evm().block(), ep.evm().revision());
     ep.state().write_to_db(ep.evm().block().header.number);

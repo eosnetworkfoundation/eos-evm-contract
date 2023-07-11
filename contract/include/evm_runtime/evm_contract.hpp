@@ -131,7 +131,7 @@ private:
       check((_config.get().status & static_cast<uint32_t>(status_flags::frozen)) == 0, "contract is frozen");
    }
 
-   silkworm::Receipt execute_tx(eosio::name miner, silkworm::Block& block, silkworm::Transaction& tx, silkworm::ExecutionProcessor& ep);
+   silkworm::Receipt execute_tx(eosio::name miner, silkworm::Block& block, silkworm::Transaction& tx, silkworm::ExecutionProcessor& ep, bool enforce_chain_id);
 
    uint64_t get_and_increment_nonce(const name owner);
 
