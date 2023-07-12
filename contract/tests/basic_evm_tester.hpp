@@ -134,6 +134,7 @@ public:
    key256_t address_key256() const;
 
    void sign(silkworm::Transaction& trx);
+   void sign(silkworm::Transaction& trx, std::optional<uint64_t> chain_id);
 
    ~evm_eoa();
 
