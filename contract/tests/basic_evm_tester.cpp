@@ -95,10 +95,15 @@ key256_t evm_eoa::address_key256() const
    return fixed_bytes<32>(buffer).get_array();
 }
 
-void evm_eoa::sign(silkworm::Transaction& trx)
+void evm_eoa::sign(silkworm::Transaction& trx) {
+   sign(trx, basic_evm_tester::evm_chain_id);
+}
+
+void evm_eoa::sign(silkworm::Transaction& trx, std::optional<uint64_t> evm_chain_id)
 {
    silkworm::Bytes rlp;
-   trx.chain_id = basic_evm_tester::evm_chain_id;
+   if(evm_chain_id.has_value())
+      trx.chain_id = evm_chain_id.value();
    trx.nonce = next_nonce++;
    silkworm::rlp::encode(rlp, trx, true, false);
    ethash::hash256 hash{silkworm::keccak256(rlp)};
