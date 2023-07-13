@@ -148,7 +148,10 @@ private:
 
 } // namespace evm_runtime
 
+#if __eosio_cdt_major__ <= 3
 namespace std {
+#endif
+
 template <typename DataStream>
 DataStream& operator<<(DataStream& ds, const std::basic_string<uint8_t>& bs)
 {
@@ -157,4 +160,9 @@ DataStream& operator<<(DataStream& ds, const std::basic_string<uint8_t>& bs)
       ds.write((const char*)bs.data(), bs.size());
    return ds;
 }
-} // namespace std
+
+#if __eosio_cdt_major__ <= 3
+}
+#endif
+
+
