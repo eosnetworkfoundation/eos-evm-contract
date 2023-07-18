@@ -15,5 +15,5 @@ else
 ee "ctest -E consensus_tests -j \"$(nproc)\" --output-on-failure -T Test"
 fi
 
-cp "$(find ./Testing -name 'Test.xml' | sort | tail -n '1')" "../../../${XUNIT_FILENAME:-test-results.xml}"
+cp "$(find ./Testing -name 'Test.xml' | sort | tail -n '1')" "../../${XUNIT_FILENAME:-test-results.xml}"
 echo "Done! - ${0##*/}"
