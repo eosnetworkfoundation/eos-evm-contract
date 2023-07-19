@@ -108,3 +108,7 @@ jobs:
           name: test-results.xml
           path: test-results.xml
           if-no-files-found: error
+
+      - name: Test Leap Integration
+        if: ${{ matrix.DWITH_TEST_ACTIONS == 'on' }}
+        run: ./tests/leap/nodeos_eos_evm_test.py --eos-evm-contract-root ./contract/build --eos-evm-build-root ./build --use-tx-wrapper ./peripherals/tx_wrapper
