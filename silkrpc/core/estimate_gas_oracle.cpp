@@ -80,11 +80,13 @@ boost::asio::awaitable<intx::uint256> EstimateGasOracle::estimate_gas(const Call
     SILKRPC_DEBUG << "hi: " << hi << ", lo: " << lo << ", cap: " << cap << "\n";
 
     silkworm::Transaction transaction{call.to_transaction()};
+    if(!transaction.from.has_value()) transaction.from = evmc::address{0};
+
     while (lo + 1 < hi) {
         auto mid = (hi + lo) / 2;
         transaction.gas_limit = mid;
 
-        auto failed = co_await try_execution(transaction);
+        auto [failed, _]= co_await try_execution(transaction);
 
         if (failed) {
             lo = mid;
@@ -95,10 +97,19 @@ boost::asio::awaitable<intx::uint256> EstimateGasOracle::estimate_gas(const Call
 
     if (hi == cap) {
         transaction.gas_limit = hi;
-        auto failed = co_await try_execution(transaction);
+        auto [failed, res] = co_await try_execution(transaction);
         SILKRPC_DEBUG << "HI == cap tested again with " << (failed ? "failure" : "succeed") << "\n";
 
         if (failed) {
+            if(res && res->error_code != evmc_status_code::EVMC_OUT_OF_GAS) {
+                const auto error_message = EVMExecutor<>::get_error_message(res->error_code, res->data);
+                SILKRPC_DEBUG << "result message " << error_message << ", code " << res->error_code << "\n";
+                if (res->data.empty()) {
+                    throw EstimateGasException{-32000, error_message};
+                } else {
+                    throw EstimateGasException{3, error_message, res->data};
+                }
+            }
             throw EstimateGasException{-1, "gas required exceeds allowance (" + std::to_string(cap) + ")"};
         }
     }
@@ -107,28 +118,19 @@ boost::asio::awaitable<intx::uint256> EstimateGasOracle::estimate_gas(const Call
     co_return hi;
 }
 
-boost::asio::awaitable<bool> EstimateGasOracle::try_execution(const silkworm::Transaction& transaction) {
+boost::asio::awaitable<std::tuple<bool, std::optional<ExecutionResult>>> EstimateGasOracle::try_execution(const silkworm::Transaction& transaction) {
     const auto result = co_await executor_(transaction);
 
-    bool failed = true;
     if (result.pre_check_error) {
         SILKRPC_DEBUG << "result error " << result.pre_check_error.value() << "\n";
-    } else if (result.error_code == evmc_status_code::EVMC_SUCCESS) {
-        SILKRPC_DEBUG << "result SUCCESS\n";
-        failed = false;
-    } else if (result.error_code == evmc_status_code::EVMC_INSUFFICIENT_BALANCE) {
-        SILKRPC_DEBUG << "result INSUFFICIENTE BALANCE\n";
-    } else {
-        const auto error_message = EVMExecutor<>::get_error_message(result.error_code, result.data);
-        SILKRPC_DEBUG << "result message " << error_message << ", code " << result.error_code << "\n";
-        // if (result.data.empty()) {
-        //     throw EstimateGasException{-32000, error_message};
-        // } else {
-        //     throw EstimateGasException{3, error_message, result.data};
-        // }
+        if(!result.pre_check_error.value().starts_with("intrinsic gas too low"))
+            throw EstimateGasException{-32000, result.pre_check_error.value()};
+
+        co_return std::make_tuple<bool, std::optional<ExecutionResult>>(true, {});
     }
 
-    co_return failed;
+    bool failed = result.error_code != evmc_status_code::EVMC_SUCCESS;
+    co_return std::make_tuple<bool, std::optional<ExecutionResult>>(std::move(failed), std::move(result));
 }
 
 } // namespace silkrpc::ego

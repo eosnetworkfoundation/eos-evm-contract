@@ -1,4 +1,5 @@
 #include "basic_evm_tester.hpp"
+#include <fc/io/raw.hpp>
 
 namespace fc {
 
@@ -94,10 +95,15 @@ key256_t evm_eoa::address_key256() const
    return fixed_bytes<32>(buffer).get_array();
 }
 
-void evm_eoa::sign(silkworm::Transaction& trx)
+void evm_eoa::sign(silkworm::Transaction& trx) {
+   sign(trx, basic_evm_tester::evm_chain_id);
+}
+
+void evm_eoa::sign(silkworm::Transaction& trx, std::optional<uint64_t> evm_chain_id)
 {
    silkworm::Bytes rlp;
-   trx.chain_id = basic_evm_tester::evm_chain_id;
+   if(evm_chain_id.has_value())
+      trx.chain_id = evm_chain_id.value();
    trx.nonce = next_nonce++;
    silkworm::rlp::encode(rlp, trx, true, false);
    ethash::hash256 hash{silkworm::keccak256(rlp)};
@@ -165,6 +171,44 @@ transaction_trace_ptr basic_evm_tester::transfer_token(name from, name to, asset
    return push_action(
       token_account_name, "transfer"_n, from, mvo()("from", from)("to", to)("quantity", quantity)("memo", memo));
 }
+
+action basic_evm_tester::get_action( account_name code, action_name acttype, vector<permission_level> auths,
+                                 const bytes& data )const { try {
+   const auto& acnt = control->get_account(code);
+   auto abi = acnt.get_abi();
+   chain::abi_serializer abis(abi, abi_serializer::create_yield_function( abi_serializer_max_time ));
+
+   string action_type_name = abis.get_action_type(acttype);
+   FC_ASSERT( action_type_name != string(), "unknown action type ${a}", ("a",acttype) );
+
+   action act;
+   act.account = code;
+   act.name = acttype;
+   act.authorization = auths;
+   act.data = data;
+   return act;
+} FC_CAPTURE_AND_RETHROW() }
+
+transaction_trace_ptr basic_evm_tester::push_action( const account_name& code,
+                                    const action_name& acttype,
+                                    const account_name& actor,
+                                    const bytes& data,
+                                    uint32_t expiration,
+                                    uint32_t delay_sec)
+{
+   vector<permission_level> auths;
+   auths.push_back( permission_level{actor, config::active_name} );
+   try {
+   signed_transaction trx;
+   trx.actions.emplace_back( get_action( code, acttype, auths, data ) );
+   set_transaction_headers( trx, expiration, delay_sec );
+   for (const auto& auth : auths) {
+      trx.sign( get_private_key( auth.actor, auth.permission.to_string() ), control->get_chain_id() );
+   }
+
+   return push_transaction( trx );
+} FC_CAPTURE_AND_RETHROW( (code)(acttype)(auths)(data)(expiration)(delay_sec) ) }
+
 
 void basic_evm_tester::init(const uint64_t chainid,
                             const uint64_t gas_price,
@@ -241,6 +285,10 @@ basic_evm_tester::generate_tx(const evmc::address& to, const intx::uint256& valu
       .to = to,
       .value = value,
    };
+}
+transaction_trace_ptr basic_evm_tester::exec(const exec_input& input, const std::optional<exec_callback>& callback) {
+   auto binary_data = fc::raw::pack<exec_input, std::optional<exec_callback>>(input, callback);
+   return basic_evm_tester::push_action(evm_account_name, "exec"_n, evm_account_name, bytes{binary_data.begin(), binary_data.end()});
 }
 
 void basic_evm_tester::pushtx(const silkworm::Transaction& trx, name miner)

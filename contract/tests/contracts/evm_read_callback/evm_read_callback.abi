@@ -1,0 +1,46 @@
+{
+    "____comment": "This file was generated with eosio-abigen. DO NOT EDIT ",
+    "version": "eosio::abi/1.2",
+    "types": [],
+    "structs": [
+        {
+            "name": "callback",
+            "base": "",
+            "fields": [
+                {
+                    "name": "output",
+                    "type": "exec_output"
+                }
+            ]
+        },
+        {
+            "name": "exec_output",
+            "base": "",
+            "fields": [
+                {
+                    "name": "status",
+                    "type": "int32"
+                },
+                {
+                    "name": "data",
+                    "type": "bytes"
+                },
+                {
+                    "name": "context",
+                    "type": "bytes?"
+                }
+            ]
+        }
+    ],
+    "actions": [
+        {
+            "name": "callback",
+            "type": "callback",
+            "ricardian_contract": ""
+        }
+    ],
+    "tables": [],
+    "ricardian_clauses": [],
+    "variants": [],
+    "action_results": []
+}

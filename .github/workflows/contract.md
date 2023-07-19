@@ -1,5 +1,5 @@
-# TrustEVM Contract CI
-This GitHub Actions workflow builds the TrustEVM contract and its associated tests.
+# EOS EVM Contract CI
+This GitHub Actions workflow builds the EOS EVM contract and its associated tests.
 
 ### Index
 1. [Triggers](#triggers)
@@ -30,17 +30,17 @@ This workflow performs the following steps:
 1. Attach Documentation
     1. Checkout the repo with no submodules.
     1. Attach an annotation to the GitHub Actions build summary page containing CI documentation.
-1. TrustEVM Contract Build
+1. EOS EVM Contract Build
     > This is a build matrix with and without tests enabled.
     1. Authenticate to the `trustevm-ci-submodule-checkout` GitHub app using the [AntelopeIO/github-app-token-action](https://github.com/AntelopeIO/github-app-token-action) action to obtain an ephemeral token.
     1. Checkout the repo and submodules using the ephemeral token.
     1. Download the CDT binary using the [AntelopeIO/asset-artifact-download-action](https://github.com/AntelopeIO/asset-artifact-download-action) action.
     1. Install the CDT binary.
-    1. Build the TrustEVM contract using `make` and `cmake`.
+    1. Build the EOS EVM contract using `make` and `cmake`.
     1. Upload the contract build folder to GitHub Actions.
     1. If tests are enabled, download the `leap-dev` binary using [AntelopeIO/asset-artifact-download-action](https://github.com/AntelopeIO/asset-artifact-download-action) action.
     1. If tests are enabled, install the `leap-dev` binary.
-    1. If tests are enabled, build the TrustEVM contract tests using `make` and `cmake`.
+    1. If tests are enabled, build the EOS EVM contract tests using `make` and `cmake`.
     1. If tests are enabled, upload the build folder for the contract test code to GitHub Actions.
     1. If tests are enabled, run them and ignore the outcome.
     1. If tests are enabled, attach xUnit-formatted test metrics as an artifact.
@@ -56,12 +56,12 @@ This workflow produces the following outputs:
 ## GitHub App Integration
 This workflow uses the [AntelopeIO/github-app-token-action](https://github.com/AntelopeIO/github-app-token-action) GitHub action to assume the role of a GitHub application installed to the AntelopeIO organization to clone the private submodules. It requests a token from the GitHub app, clones everything using this token under the identity of the app, then the token expires. This is advantageous over a persistent API key from a GitHub service account because this does not consume a paid user seat, the "account" associated with the app cannot be logged into in the GitHub web UI, the app is scoped to exactly the permissions it needs to perform the clones for this repo _and nothing more_, and the API key expires very quickly so a bad actor who exfiltrates this key from the CI system should find it is not useful.
 
-**The downside is that if TrustEVM adds additional private submodules, the GitHub app must be granted permissions to these new submodules.** The CI system will not work until this happens.
+**The downside is that if EOS EVM adds additional private submodules, the GitHub app must be granted permissions to these new submodules.** The CI system will not work until this happens.
 
 ## See Also
 - [asset-artifact-download-action](https://github.com/AntelopeIO/asset-artifact-download-action) GitHub Action
 - [github-app-token-action](https://github.com/AntelopeIO/github-app-token-action) GitHub action
-- [TrustEVM Documentation](../../README.md)
+- [EOS EVM Documentation](../../README.md)
 
 For assistance with the CI system, please open an issue in this repo or reach out in the `#help-automation` channel via IM.
 

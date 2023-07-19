@@ -37,6 +37,32 @@ namespace evm_runtime {
    evmc::address to_address(const bytes& addr);
    evmc::bytes32 to_bytes32(const bytes& data);
    uint256 to_uint256(const bytes& value);
+
+   struct exec_input {
+      std::optional<bytes> context;
+      std::optional<bytes> from;
+      bytes                to;
+      bytes                data;
+      std::optional<bytes> value;
+
+      EOSLIB_SERIALIZE(exec_input, (context)(from)(to)(data)(value));
+   };
+
+   struct exec_callback {
+      eosio::name contract;
+      eosio::name action;
+
+      EOSLIB_SERIALIZE(exec_callback, (contract)(action));
+   };
+
+   struct exec_output {
+      int32_t              status;
+      bytes                data;
+      std::optional<bytes> context;
+
+      EOSLIB_SERIALIZE(exec_output, (status)(data)(context));
+   };
+
 } //namespace evm_runtime
 
 namespace eosio {

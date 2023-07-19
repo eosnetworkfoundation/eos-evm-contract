@@ -25,6 +25,11 @@
 #define LOGTIME(MSG)
 #endif
 
+extern "C" {
+__attribute__((eosio_wasm_import))
+void set_action_return_value(void*, size_t);
+}
+
 namespace silkworm {
     // provide no-op bloom
     Bloom logs_bloom(const std::vector<Log>& logs) {
@@ -142,24 +147,54 @@ void evm_contract::freeze(bool value) {
 void check_result( ValidationResult r, const Transaction& txn, const char* desc ) {
     if( r == ValidationResult::kOk )
         return;
-
-    if( r == ValidationResult::kMissingSender ) {
-        eosio::print("txn.from.has_value is empty\n");
-    } else if ( r == ValidationResult::kSenderNoEOA ) {
-        eosio::print("get_code_hash is empty\n");
-    } else if ( r == ValidationResult::kWrongNonce ) {
-        eosio::print("invalid nonce:", txn.nonce, "\n");
-    } else if ( r == ValidationResult::kInsufficientFunds ) {
-        eosio::print("get_balance of from insufficient\n");
-    } else if ( r == ValidationResult::kBlockGasLimitExceeded ) {
-        eosio::print("available_gas\n");
+    std::string err_msg = std::string(desc) + ": " + std::to_string(uint64_t(r));
+    
+    switch (r) {
+        case ValidationResult::kWrongChainId:
+            err_msg += " Wrong chain id";
+            break;
+        case ValidationResult::kUnsupportedTransactionType:
+            err_msg += " Unsupported transaction type";
+            break;
+        case ValidationResult::kMaxFeeLessThanBase:
+            err_msg += " Max fee per gas less than block base fee";
+            break;
+        case ValidationResult::kMaxPriorityFeeGreaterThanMax:
+            err_msg += " Max priority fee per gas greater than max fee per gas";
+            break;
+        case ValidationResult::kInvalidSignature:
+            err_msg += " Invalid signature";
+            break;
+        case ValidationResult::kIntrinsicGas:
+            err_msg += " Intrinsic gas too low";
+            break;
+        case ValidationResult::kNonceTooHigh:
+            err_msg += " Nonce too high";
+            break;
+        case ValidationResult::kMissingSender:
+            err_msg += " Missing sender";
+            break;
+        case ValidationResult::kSenderNoEOA:
+            err_msg += " Sender is not EOA";
+            break;
+        case ValidationResult::kWrongNonce:
+            err_msg += " Wrong nonce";
+            break;
+        case ValidationResult::kInsufficientFunds:
+            err_msg += " Insufficient funds";
+            break;
+        case ValidationResult::kBlockGasLimitExceeded:
+            err_msg += " Block gas limit exceeded";
+            break;
+        default:
+            break;
     }
-
-    eosio::print( "ERR: ", uint64_t(r), "\n" );
-    eosio::check( false, desc );
+    
+    eosio::print(err_msg.c_str());
+    eosio::check( false, std::move(err_msg));
 }
 
-Receipt evm_contract::execute_tx( eosio::name miner, Block& block, Transaction& tx, silkworm::ExecutionProcessor& ep ) {
+Receipt evm_contract::execute_tx( eosio::name miner, Block& block, Transaction& tx, silkworm::ExecutionProcessor& ep, bool enforce_chain_id) {
     //when being called as an inline action, clutch in allowance for reserved addresses & signatures by setting from_self=true
     const bool from_self = get_sender() == get_self();
 
@@ -208,6 +243,10 @@ Receipt evm_contract::execute_tx( eosio::name miner, Block& block, Transaction& 
     }
     else if(is_reserved_address(*tx.from))
         check(from_self, "bridge signature used outside of bridge transaction");
+
+    if(enforce_chain_id && !from_self) {
+        check(tx.chain_id.has_value(), "tx without chain-id");
+    }
 
     ValidationResult r = consensus::pre_validate_transaction(tx, ep.evm().block().header.number, ep.evm().config(),
                                                              ep.evm().block().header.base_fee_per_gas);
@@ -293,6 +332,49 @@ Receipt evm_contract::execute_tx( eosio::name miner, Block& block, Transaction& 
     return receipt;
 }
 
+void evm_contract::exec(const exec_input& input, const std::optional<exec_callback>& callback) {
+
+    assert_unfrozen();
+
+    const auto& current_config = _config.get();
+    std::optional<std::pair<const std::string, const ChainConfig*>> found_chain_config = lookup_known_chain(current_config.chainid);
+    check( found_chain_config.has_value(), "failed to find expected chain config" );
+
+    evm_common::block_mapping bm(current_config.genesis_time.sec_since_epoch());
+
+    Block block;
+    evm_common::prepare_block_header(block.header, bm, get_self().value,
+        bm.timestamp_to_evm_block_num(eosio::current_time_point().time_since_epoch().count()));
+
+    evm_runtime::state state{get_self(), get_self(), true};
+    IntraBlockState ibstate{state};
+
+    EVM evm{block, ibstate, *found_chain_config.value().second};
+
+    Transaction txn;
+    txn.to    = to_address(input.to);
+    txn.data  = Bytes{input.data.begin(), input.data.end()};
+    txn.from  = input.from.has_value()  ? to_address(input.from.value()) : evmc::address{};
+    txn.value = input.value.has_value() ? to_uint256(input.value.value()) : 0;
+
+    const CallResult vm_res{evm.execute(txn, 0x7ffffffffff)};
+
+    exec_output output{
+        .status  = int32_t(vm_res.status),
+        .data    = bytes{vm_res.data.begin(), vm_res.data.end()},
+        .context = input.context
+    };
+
+    if(callback.has_value()) {
+        const auto& cb = callback.value();
+        action(std::vector<permission_level>{}, cb.contract, cb.action, output
+        ).send();
+    } else {
+        auto output_bin = eosio::pack(output);
+        set_action_return_value(output_bin.data(), output_bin.size());
+    }
+}
+
 void evm_contract::pushtx( eosio::name miner, const bytes& rlptx ) {
     LOGTIME("EVM START");
 
@@ -324,10 +406,11 @@ void evm_contract::pushtx( eosio::name miner, const bytes& rlptx ) {
     check(tx.max_priority_fee_per_gas == tx.max_fee_per_gas, "max_priority_fee_per_gas must be equal to max_fee_per_gas");
     check(tx.max_fee_per_gas >= current_config.gas_price, "gas price is too low");
 
-    auto receipt = execute_tx(miner, block, tx, ep);
+    auto receipt = execute_tx(miner, block, tx, ep, true);
 
     engine.finalize(ep.state(), ep.evm().block(), ep.evm().revision());
     ep.state().write_to_db(ep.evm().block().header.number);
+    LOGTIME("EVM END");
 }
 
 void evm_contract::open(eosio::name owner) {
@@ -437,7 +520,7 @@ void evm_contract::handle_evm_transfer(eosio::asset quantity, const std::string&
 
 void evm_contract::transfer(eosio::name from, eosio::name to, eosio::asset quantity, std::string memo) {
     assert_unfrozen();
-    eosio::check(quantity.symbol == token_symbol, "received unexpected token");
+    eosio::check(get_code() == token_account && quantity.symbol == token_symbol, "received unexpected token");
 
     if(to != get_self() || from == get_self())
         return;
@@ -450,7 +533,7 @@ void evm_contract::transfer(eosio::name from, eosio::name to, eosio::asset quant
         eosio::check(false, "memo must be either 0x EVM address or already opened account name to credit deposit to");
 }
 
-void evm_contract::withdraw(eosio::name owner, eosio::asset quantity) {
+void evm_contract::withdraw(eosio::name owner, eosio::asset quantity, const eosio::binary_extension<eosio::name> &to) {
     assert_unfrozen();
     require_auth(owner);
 
@@ -463,7 +546,7 @@ void evm_contract::withdraw(eosio::name owner, eosio::asset quantity) {
     });
 
     token::transfer_action transfer_act(token_account, {{get_self(), "active"_n}});
-    transfer_act.send(get_self(), owner, quantity, std::string("Withdraw from EVM balance"));
+    transfer_act.send(get_self(), to.has_value() ? *to : owner, quantity, std::string("Withdraw from EVM balance"));
 }
 
 bool evm_contract::gc(uint32_t max) {
@@ -491,7 +574,7 @@ bool evm_contract::gc(uint32_t max) {
         ByteView bv{(const uint8_t*)orlptx->data(), orlptx->size()};
         eosio::check(rlp::decode(bv,tx) == DecodingResult::kOk && bv.empty(), "unable to decode transaction");
 
-        execute_tx(eosio::name{}, block, tx, ep);
+        execute_tx(eosio::name{}, block, tx, ep, false);
     }
     engine.finalize(ep.state(), ep.evm().block(), ep.evm().revision());
     ep.state().write_to_db(ep.evm().block().header.number);

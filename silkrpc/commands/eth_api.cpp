@@ -972,7 +972,7 @@ boost::asio::awaitable<void> EthereumRpcApi::handle_eth_get_transaction_count(co
         if (account) {
             reply = make_json_content(request["id"], to_quantity(account->nonce));
         } else {
-            reply = make_json_content(request["id"], "0x");
+            reply = make_json_content(request["id"], "0x0");
         }
     } catch (const std::exception& e) {
         SILKRPC_ERROR << "exception: " << e.what() << " processing request: " << request.dump() << "\n";
@@ -1051,6 +1051,8 @@ boost::asio::awaitable<void> EthereumRpcApi::handle_eth_call(const nlohmann::jso
         EVMExecutor executor{*context_.io_context(), tx_database, *chain_config_ptr, workers_, block_number};
         const auto block_with_hash = co_await core::read_block_by_number(*block_cache_, tx_database, block_number);
         silkworm::Transaction txn{call.to_transaction()};
+        if(!txn.from.has_value()) txn.from = evmc::address{0};
+
         const auto execution_result = co_await executor.call(block_with_hash.block, txn);
 
         if (execution_result.pre_check_error) {
@@ -1411,7 +1413,7 @@ boost::asio::awaitable<void> EthereumRpcApi::handle_eth_get_logs(const nlohmann:
 
         SILKRPC_DEBUG << "block_numbers.cardinality(): " << block_numbers.cardinality() << "\n";
 
-        if (filter.topics.has_value()) {
+        if (filter.topics.has_value() && !filter.topics.value().empty()) {
             auto topics_bitmap = co_await get_topics_bitmap(tx_database, filter.topics.value(), start, end);
             SILKRPC_TRACE << "topics_bitmap: " << topics_bitmap.toString() << "\n";
             if (topics_bitmap.isEmpty()) {

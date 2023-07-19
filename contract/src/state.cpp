@@ -94,7 +94,7 @@ void state::begin_block(uint64_t block_number) {}
 
 void state::update_account(const evmc::address& address, std::optional<Account> initial,
                                    std::optional<Account> current) {
-
+    check(!_read_only, "ro state");
     const bool equal{current == initial};
     if(equal) return;
     
@@ -182,6 +182,7 @@ bool state::gc(uint32_t max) {
 }
 
 void state::update_account_code(const evmc::address& address, uint64_t, const evmc::bytes32& code_hash, ByteView code) {
+    check(!_read_only, "ro state");
     account_code_table codes(_self, _self.value);
     auto inxc = codes.get_index<"by.codehash"_n>();
     auto itrc = inxc.find(make_key(code_hash));
@@ -225,6 +226,7 @@ void state::update_account_code(const evmc::address& address, uint64_t, const ev
 void state::update_storage(const evmc::address& address, uint64_t incarnation, const evmc::bytes32& location,
                                    const evmc::bytes32& initial, const evmc::bytes32& current) {
     
+    check(!_read_only, "ro state");
     account_table accounts(_self, _self.value);
     auto inx = accounts.get_index<"by.address"_n>();
     auto itr = inx.find(make_key(address));

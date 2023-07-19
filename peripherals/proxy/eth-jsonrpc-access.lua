@@ -24,15 +24,21 @@ local function contains(arr, val)
 end
 
 -- parse conf
+local test_calls = nil
+if not empty(ngx.var.jsonrpc_test_calls) then
+  test_calls = split(ngx.var.jsonrpc_test_calls)
+end
+
+-- parse conf
 local write_calls = nil
 if not empty(ngx.var.jsonrpc_write_calls) then
   write_calls = split(ngx.var.jsonrpc_write_calls)
 end
 
 -- parse conf
-local blacklist = nil
-if not empty(ngx.var.jsonrpc_blacklist) then
-  blacklist = split(ngx.var.jsonrpc_blacklist)
+local read_calls = nil
+if not empty(ngx.var.jsonrpc_read_calls) then
+  read_calls = split(ngx.var.jsonrpc_read_calls)
 end
 
 -- get request content
@@ -75,16 +81,15 @@ if version ~= "2.0" then
   return
 end
 
--- if blacklist is configured, check that the method is not blacklisted
-if blacklist ~= nil then
-  if contains(blacklist, method) then
-    ngx.exit(ngx.HTTP_FORBIDDEN)
+-- Proxy calls to "read"
+if read_calls ~= nil then
+  if contains(read_calls, method) then
+    ngx.var.proxy = 'read'
     return
   end
 end
 
--- Proxy certain calls to "write" and rest to "read"
-ngx.var.proxy = 'read'
+-- Proxy calls to "write"
 if write_calls ~= nil then
   if contains(write_calls, method) then
     ngx.var.proxy = 'write'
@@ -92,4 +97,13 @@ if write_calls ~= nil then
   end
 end
 
+-- Proxy calls to "test"
+if test_calls ~= nil then
+  if contains(test_calls, method) then
+    ngx.var.proxy = 'test'
+    return
+  end
+end
+
+ngx.exit(ngx.HTTP_FORBIDDEN)
 return

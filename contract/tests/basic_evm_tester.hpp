@@ -90,6 +90,25 @@ struct fee_parameters
    std::optional<asset> ingress_bridge_fee;
 };
 
+struct exec_input {
+   std::optional<bytes> context;
+   std::optional<bytes> from;
+   bytes                to;
+   bytes                data;
+   std::optional<bytes> value;
+};
+
+struct exec_callback {
+   name contract;
+   name action;
+};
+
+struct exec_output {
+   int32_t              status;
+   bytes                data;
+   std::optional<bytes> context;
+};
+
 } // namespace evm_test
 
 
@@ -99,6 +118,10 @@ FC_REFLECT(evm_test::balance_and_dust, (balance)(dust));
 FC_REFLECT(evm_test::account_object, (id)(address)(nonce)(balance))
 FC_REFLECT(evm_test::storage_slot, (id)(key)(value))
 FC_REFLECT(evm_test::fee_parameters, (gas_price)(miner_cut)(ingress_bridge_fee))
+
+FC_REFLECT(evm_test::exec_input, (context)(from)(to)(data)(value))
+FC_REFLECT(evm_test::exec_callback, (contract)(action))
+FC_REFLECT(evm_test::exec_output, (status)(data)(context))
 
 namespace evm_test {
 class evm_eoa
@@ -111,6 +134,7 @@ public:
    key256_t address_key256() const;
 
    void sign(silkworm::Transaction& trx);
+   void sign(silkworm::Transaction& trx, std::optional<uint64_t> chain_id);
 
    ~evm_eoa();
 
@@ -126,6 +150,8 @@ private:
 class basic_evm_tester : public testing::validating_tester
 {
 public:
+   using testing::validating_tester::push_action;
+
    static constexpr name token_account_name = "eosio.token"_n;
    static constexpr name faucet_account_name = "faucet"_n;
    static constexpr name evm_account_name = "evm"_n;
@@ -147,6 +173,16 @@ public:
 
    transaction_trace_ptr transfer_token(name from, name to, asset quantity, std::string memo = "");
 
+   action get_action( account_name code, action_name acttype, vector<permission_level> auths,
+                                 const bytes& data )const;
+
+   transaction_trace_ptr push_action( const account_name& code,
+                                      const action_name& acttype,
+                                      const account_name& actor,
+                                      const bytes& data,
+                                      uint32_t expiration = DEFAULT_EXPIRATION_DELTA,
+                                      uint32_t delay_sec = 0 );
+
    void init(const uint64_t chainid = evm_chain_id,
              const uint64_t gas_price = suggested_gas_price,
              const uint32_t miner_cut = suggested_miner_cut,
@@ -162,6 +198,7 @@ public:
    silkworm::Transaction
    generate_tx(const evmc::address& to, const intx::uint256& value, uint64_t gas_limit = 21000) const;
 
+   transaction_trace_ptr exec(const exec_input& input, const std::optional<exec_callback>& callback);
    void pushtx(const silkworm::Transaction& trx, name miner = evm_account_name);
    evmc::address deploy_contract(evm_eoa& eoa, evmc::bytes bytecode);
 
