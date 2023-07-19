@@ -97,12 +97,6 @@ jobs:
           path: contract-test.tar.gz
           if-no-files-found: error
 
-      - name: Test Leap Integration
-        if: ${{ matrix.DWITH_TEST_ACTIONS == 'on' }}
-        run: |
-          pip install web3
-          ./tests/leap/nodeos_eos_evm_test.py --eos-evm-contract-root ./contract/build --eos-evm-build-root ./build --use-tx-wrapper ./peripherals/tx_wrapper
-
       - name: Test EOS EVM Contract
         run: .github/workflows/test-contract.sh
         env:
@@ -114,3 +108,63 @@ jobs:
           name: test-results.xml
           path: test-results.xml
           if-no-files-found: error
+
+  leap-integration:
+    runs-on: ubuntu-20.04
+    name: EOS EVM Leap Integration Tests
+    env:
+      CC: gcc-10
+      CXX: g++-10
+      DCMAKE_BUILD_TYPE: 'Release'
+
+    steps:
+      - name: Authenticate
+        id: auth
+        uses: AntelopeIO/github-app-token-action@v1
+        with:
+          app_id: ${{ secrets.TRUSTEVM_CI_APP_ID }}
+          private_key: ${{ secrets.TRUSTEVM_CI_APP_KEY }}
+
+      - name: Checkout Repo
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          submodules: 'recursive'
+          token: ${{ steps.auth.outputs.token }}
+
+      - name: Download CDT
+        uses: AntelopeIO/asset-artifact-download-action@v2
+        with:
+          owner: AntelopeIO
+          repo: cdt
+          target: 'v4'
+          prereleases: false
+          file: 'cdt_.*amd64.deb'
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install CDT
+        run: sudo apt-get install -y ./cdt*.deb
+
+      - name: Build EOS EVM Contract
+        run: .github/workflows/build-contract.sh
+        env:
+          DWITH_TEST_ACTIONS: ${{ matrix.DWITH_TEST_ACTIONS }}
+
+      - name: Download Leap - dev binary
+        uses: AntelopeIO/asset-artifact-download-action@v2
+        with:
+          owner: AntelopeIO
+          repo: leap
+          target: 'v4'
+          prereleases: false
+          file: 'leap-dev.*(x86_64|amd64).deb'
+          container-package: experimental-binaries
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install Leap
+        run: sudo apt-get install -y ./leap*.deb
+
+      - name: Test Leap Integration
+        run: |
+          pip install web3
+          ./tests/leap/nodeos_eos_evm_test.py --eos-evm-contract-root ./contract/build --eos-evm-build-root ./build --use-tx-wrapper ./peripherals/tx_wrapper
