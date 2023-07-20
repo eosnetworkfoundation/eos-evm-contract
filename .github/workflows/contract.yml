@@ -167,5 +167,5 @@ jobs:
       - name: Test Leap Integration
         run: |
           pip install web3
-          export PYTHONPATH=/usr/lib/python3/dist-packages
+          export PYTHONPATH=/usr/local/lib/python3/dist-packages
           ./tests/leap/nodeos_eos_evm_test.py --eos-evm-contract-root ./contract/build --eos-evm-build-root ./build --use-tx-wrapper ./peripherals/tx_wrapper
