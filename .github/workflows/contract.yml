@@ -164,10 +164,9 @@ jobs:
       - name: Install Leap
         run: |
           sudo apt-get install -y ./leap*.deb
-          dpkg -L leap-dev | grep TestHarness
 
       - name: Test Leap Integration
         run: |
           pip install web3
-          export PYTHONPATH=/usr/local/lib/python3/dist-packages
+          export PYTHONPATH=/usr/share/leap_testing/tests/TestHarness
           ./tests/leap/nodeos_eos_evm_test.py --eos-evm-contract-root ./contract/build --eos-evm-build-root ./build --use-tx-wrapper ./peripherals/tx_wrapper
