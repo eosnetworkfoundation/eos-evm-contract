@@ -170,6 +170,6 @@ jobs:
 
       - name: Test Leap Integration
         run: |
-          pip install --upgrade web3=6.5.0
+          pip install --upgrade web3==6.5.0
           export PYTHONPATH=/usr/share/leap_testing/tests/TestHarness
           ./tests/leap/nodeos_eos_evm_test.py --eos-evm-contract-root ./contract/build --eos-evm-build-root ./build --use-tx-wrapper ./peripherals/tx_wrapper
