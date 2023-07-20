@@ -219,30 +219,37 @@ Receipt evm_contract::execute_tx( eosio::name miner, Block& block, Transaction& 
         inevm.emplace(get_self(), get_self().value);
     };
 
+    bool is_special_signature = (tx.r == intx::uint256());
+
     tx.from.reset();
     tx.recover_sender();
     eosio::check(tx.from.has_value(), "unable to recover sender");
     LOGTIME("EVM RECOVER SENDER");
 
+    // type 1: normal signature (normal address recovered from normal signature), required !from_self 
+    // type 2: special signature (r == 0), reserved address (stored in s), required from_self + reduce special balance
+    // type 3: special signature (r == 0), normal address (stored in s), required from_self
     if(from_self) {
-        check(is_reserved_address(*tx.from), "actions from self without a reserved from address are unexpected");
-        const name ingress_account(*extract_reserved_address(*tx.from));
+        check(is_special_signature, "actions from self without a special signature are unexpected");
+        if (is_reserved_address(*tx.from)) {
+            const name ingress_account(*extract_reserved_address(*tx.from));
 
-        const intx::uint512 max_gas_cost = intx::uint256(tx.gas_limit) * tx.max_fee_per_gas;
-        check(max_gas_cost + tx.value < std::numeric_limits<intx::uint256>::max(), "too much gas");
-        const intx::uint256 value_with_max_gas = tx.value + (intx::uint256)max_gas_cost;
+            const intx::uint512 max_gas_cost = intx::uint256(tx.gas_limit) * tx.max_fee_per_gas;
+            check(max_gas_cost + tx.value < std::numeric_limits<intx::uint256>::max(), "too much gas");
+            const intx::uint256 value_with_max_gas = tx.value + (intx::uint256)max_gas_cost;
 
-        populate_bridge_accessors();
-        balance_table.modify(balance_table.get(ingress_account.value), eosio::same_payer, [&](balance& b){
-            b.balance -= value_with_max_gas;
-        });
-        inevm->set(inevm->get() += value_with_max_gas, eosio::same_payer);
+            populate_bridge_accessors();
+            balance_table.modify(balance_table.get(ingress_account.value), eosio::same_payer, [&](balance& b){
+                b.balance -= value_with_max_gas;
+            });
+            inevm->set(inevm->get() += value_with_max_gas, eosio::same_payer);
 
-        ep.state().set_balance(*tx.from, value_with_max_gas);
-        ep.state().set_nonce(*tx.from, tx.nonce);
+            ep.state().set_balance(*tx.from, value_with_max_gas);
+            ep.state().set_nonce(*tx.from, tx.nonce);
+        }
     }
-    else if(is_reserved_address(*tx.from))
-        check(from_self, "bridge signature used outside of bridge transaction");
+    else if(is_special_signature)
+        check(false, "bridge signature used outside of bridge transaction");
 
     if(enforce_chain_id && !from_self) {
         check(tx.chain_id.has_value(), "tx without chain-id");
@@ -553,6 +560,38 @@ bool evm_contract::gc(uint32_t max) {
 
     evm_runtime::state state{get_self(), eosio::same_payer};
     return state.gc(max);
+}
+
+void evm_contract::call_(intx::uint256 s, const bytes& to, uint128_t value, bytes& data, uint64_t gas_limit, uint64_t nonce) {
+
+    const auto& current_config = _config.get();
+
+    const Transaction txn {
+        .type = Transaction::Type::kLegacy,
+        .nonce = nonce,
+        .max_priority_fee_per_gas = current_config.gas_price,
+        .max_fee_per_gas = current_config.gas_price,
+        .gas_limit = gas_limit,
+        .to = to,
+        .value = intx::uint256(value),
+        .r = 0u,  // r == 0 is pseudo signature that resolves to reserved address range
+        .s = s
+    };
+
+    Bytes rlp;
+    rlp::encode(rlp, txn);
+    pushtx_action pushtx_act(get_self(), {{get_self(), "active"_n}});
+    pushtx_act.send(get_self(), rlp);
+}
+
+void evm_contract::call(eosio::name from, const bytes& to, uint128_t value, bytes& data, uint64_t gas_limit) {
+    require_auth(from);
+    call_(make_reserved_address(from.value), to, value, data, gas_limit, get_and_increment_nonce(from));
+}
+
+void evm_contract::call2(const bytes& from, const bytes& to, uint128_t value, bytes& data, uint64_t gas_limit) {
+    require_auth(get_self());
+    call_(intx::uint256(from), to, value, data, gas_limit);
 }
 
 #ifdef WITH_TEST_ACTIONS
