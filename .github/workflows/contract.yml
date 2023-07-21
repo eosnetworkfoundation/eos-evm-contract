@@ -150,7 +150,7 @@ jobs:
         env:
           DWITH_TEST_ACTIONS: ${{ matrix.DWITH_TEST_ACTIONS }}
 
-      - name: Download Leap - dev binary
+      - name: Download leap-dev binary
         uses: AntelopeIO/asset-artifact-download-action@v2
         with:
           owner: AntelopeIO
@@ -161,12 +161,24 @@ jobs:
           container-package: experimental-binaries
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Download leap binary
+        uses: AntelopeIO/asset-artifact-download-action@v2
+        with:
+          owner: AntelopeIO
+          repo: leap
+          target: 'v4'
+          file: 'leap.*(x86_64|amd64).deb'
+          token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Install Leap
         run: |
           apt-get update && apt-get upgrade -y
           sudo apt-get install -y ./leap*.deb
           dpkg -L leap-dev | grep TestHarness
-          python3 --version
+          dpkg -L leap | grep cleos
+
+      - name: Link Leap TestHarness Module (fix for v4 of leap)
+        run: ln -s /usr/share/leap_testing/tests/TestHarness /usr/lib/python3/dist-packages/TestHarness
 
       - name: Test Leap Integration
         run: |
