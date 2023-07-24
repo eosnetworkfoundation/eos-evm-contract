@@ -29,7 +29,7 @@ namespace evm_runtime {
    eosio::checksum256 make_key(bytes data);
    eosio::checksum256 make_key(const evmc::address& addr);
    eosio::checksum256 make_key(const evmc::bytes32& data);
-   
+
    bytes to_bytes(const uint256& val);
    bytes to_bytes(const evmc::bytes32& val);
    bytes to_bytes(const evmc::address& addr);
@@ -61,6 +61,16 @@ namespace evm_runtime {
       std::optional<bytes> context;
 
       EOSLIB_SERIALIZE(exec_output, (status)(data)(context));
+   };
+
+   struct bridge_emit_message {
+      eosio::name        receiver;
+      bytes              sender;
+      eosio::time_point  timestamp;
+      bytes              value;
+      bytes              data;
+
+      EOSLIB_SERIALIZE(bridge_emit_message, (receiver)(sender)(timestamp)(value)(data));
    };
 
 } //namespace evm_runtime
