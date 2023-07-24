@@ -5,7 +5,7 @@
 namespace evm_runtime { namespace bridge {
 
 struct emit {
-    static constexpr uint32_t id = 0x7e95a247; //sha3('emit_(string,bytes)')[:4]
+    static constexpr uint32_t id = 0x44282a35; //sha3('emit_(string,bytes)')[:4]
 
     string account;
     bytes  data;
