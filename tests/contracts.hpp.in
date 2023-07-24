@@ -40,6 +40,9 @@ struct contracts {
    static std::vector<uint8_t> evm_read_callback_wasm() { return read_wasm("${CMAKE_CURRENT_SOURCE_DIR}/contracts/evm_read_callback/evm_read_callback.wasm"); }
    static std::vector<char>    evm_read_callback_abi() { return read_abi("${CMAKE_CURRENT_SOURCE_DIR}/contracts/evm_read_callback/evm_read_callback.abi"); }
 
+   static std::vector<uint8_t> evm_bridge_receiver_wasm() { return read_wasm("${CMAKE_CURRENT_SOURCE_DIR}/contracts/evm_bridge_receiver/evm_bridge_receiver.wasm"); }
+   static std::vector<char>    evm_bridge_receiver_abi() { return read_abi("${CMAKE_CURRENT_SOURCE_DIR}/contracts/evm_bridge_receiver/evm_bridge_receiver.abi"); }
+
    static std::string eth_test_folder() {
       return "${CMAKE_CURRENT_SOURCE_DIR}/../silkworm/third_party/tests";
    }

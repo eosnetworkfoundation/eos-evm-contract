@@ -139,6 +139,10 @@ evmc::address basic_evm_tester::make_reserved_address(uint64_t account)
    // clang-format on
 }
 
+evmc::address basic_evm_tester::make_reserved_address(name account) {
+   return make_reserved_address(account.to_uint64_t());
+}
+
 basic_evm_tester::basic_evm_tester(std::string native_symbol_str) :
    native_symbol(symbol::from_string(native_symbol_str))
 {
@@ -329,7 +333,23 @@ void basic_evm_tester::admincall(const evmc::bytes& from, const evmc::bytes& to,
    push_action(evm_account_name, "admincall"_n, actor,  mvo()("from", from_bytes)("to", to_bytes)("value", value_bytes)("data", data_bytes)("gas_limit", gas_limit));
 }
 
-void basic_evm_tester::pushtx(const silkworm::Transaction& trx, name miner)
+transaction_trace_ptr basic_evm_tester::bridgereg(name receiver, asset min_fee, vector<account_name> extra_signers) {
+   extra_signers.push_back(receiver);
+   return basic_evm_tester::push_action(evm_account_name, "bridgereg"_n, extra_signers, 
+      mvo()("receiver", receiver)("min_fee", min_fee));
+}
+
+transaction_trace_ptr basic_evm_tester::bridgeunreg(name receiver) {
+   return basic_evm_tester::push_action(evm_account_name, "bridgeunreg"_n, receiver, 
+      mvo()("receiver", receiver));
+}
+
+transaction_trace_ptr basic_evm_tester::exec(const exec_input& input, const std::optional<exec_callback>& callback) {
+   auto binary_data = fc::raw::pack<exec_input, std::optional<exec_callback>>(input, callback);
+   return basic_evm_tester::push_action(evm_account_name, "exec"_n, evm_account_name, bytes{binary_data.begin(), binary_data.end()});
+}
+
+transaction_trace_ptr basic_evm_tester::pushtx(const silkworm::Transaction& trx, name miner)
 {
    silkworm::Bytes rlp;
    silkworm::rlp::encode(rlp, trx);
@@ -338,7 +358,7 @@ void basic_evm_tester::pushtx(const silkworm::Transaction& trx, name miner)
    rlp_bytes.resize(rlp.size());
    memcpy(rlp_bytes.data(), rlp.data(), rlp.size());
 
-   push_action(evm_account_name, "pushtx"_n, miner, mvo()("miner", miner)("rlptx", rlp_bytes));
+   return push_action(evm_account_name, "pushtx"_n, miner, mvo()("miner", miner)("rlptx", rlp_bytes));
 }
 
 evmc::address basic_evm_tester::deploy_contract(evm_eoa& eoa, evmc::bytes bytecode)
