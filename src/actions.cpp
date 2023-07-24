@@ -555,6 +555,42 @@ bool evm_contract::gc(uint32_t max) {
     return state.gc(max);
 }
 
+void evm_contract::bridgereg(eosio::name receiver, const eosio::asset& min_fee) {
+    assert_unfrozen();
+    require_auth(receiver);
+    require_auth(get_self());  // to temporarily prevent registration of unauthorized accounts
+
+    eosio::check(min_fee.symbol == token_symbol, "unexpected symbol");
+    eosio::check(min_fee.amount >= 0, "min_fee cannot be negative");
+
+    auto update_row = [&](auto& row) {
+        row.account = receiver;
+        row.min_fee = min_fee;
+    };
+
+    message_receiver_table message_receivers(get_self(), get_self().value);
+    auto it = message_receivers.find(receiver.value);
+
+    if(it == message_receivers.end()) {
+        message_receivers.emplace(receiver, update_row);
+    } else {
+        message_receivers.modify(*it, eosio::same_payer, update_row);
+    }
+
+    open(receiver);
+}
+
+void evm_contract::bridgeunreg(eosio::name receiver) {
+    assert_unfrozen();
+    require_auth(receiver);
+
+    message_receiver_table message_receivers(get_self(), get_self().value);
+    auto it = message_receivers.find(receiver.value);
+    eosio::check(it != message_receivers.end(), "receiver not found");
+    message_receivers.erase(*it);
+}
+
+
 #ifdef WITH_TEST_ACTIONS
 [[eosio::action]] void evm_contract::testtx( const std::optional<bytes>& orlptx, const evm_runtime::test::block_info& bi ) {
     assert_unfrozen();

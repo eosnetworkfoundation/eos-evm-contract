@@ -84,6 +84,9 @@ public:
    /// @return true if all garbage has been collected
    [[eosio::action]] bool gc(uint32_t max);
 
+   [[eosio::action]] void bridgereg(eosio::name receiver, const eosio::asset& min_fee);
+   [[eosio::action]] void bridgeunreg(eosio::name receiver);
+
 #ifdef WITH_TEST_ACTIONS
    [[eosio::action]] void testtx(const std::optional<bytes>& orlptx, const evm_runtime::test::block_info& bi);
    [[eosio::action]] void
