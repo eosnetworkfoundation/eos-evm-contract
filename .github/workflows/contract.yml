@@ -116,6 +116,12 @@ jobs:
       CC: gcc-10
       CXX: g++-10
       DCMAKE_BUILD_TYPE: 'Release'
+      EOS_RPC: "http://127.0.0.1:8888"
+      EOS_KEY: "5HrGbW2ofxkh6FJx6C69DdTUMgcW2kZWX6UWPuPBEAPUvbcioFT"
+      HOST: "127.0.0.1"
+      PORT: "18888"
+      EOS_EVM_ACCOUNT: "evmevmevmevm"
+      EOS_SENDER: "woixzhsdkaaa"
 
     steps:
       - name: Authenticate
