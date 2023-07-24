@@ -7,6 +7,7 @@
 #include <evm_runtime/state.hpp>
 #include <evm_runtime/intrinsics.hpp>
 #include <evm_runtime/eosio.token.hpp>
+#include <evm_runtime/bridge.hpp>
 
 #include <eosevm/block_mapping.hpp>
 
@@ -406,7 +407,60 @@ void evm_contract::pushtx( eosio::name miner, const bytes& rlptx ) {
     check(tx.max_priority_fee_per_gas == tx.max_fee_per_gas, "max_priority_fee_per_gas must be equal to max_fee_per_gas");
     check(tx.max_fee_per_gas >= current_config.gas_price, "gas price is too low");
 
+    // handler for all EVM call messages
+    std::vector<bridge::emit> emit_messages;
+    ep.set_evm_call_hook([&](const evmc_message& message, const evmc::Result& result){
+        static auto me = make_reserved_address(get_self().value);
+        if (message.recipient != me || message.input_size == 0) return;
+
+        eosio::check(result.status_code == EVMC_SUCCESS, "error calling reserved address");
+
+        auto call = bridge::decode_call_message(ByteView{message.input_data, message.input_size});
+        eosio::check(call.has_value(), "unable to decode call message");
+
+        auto& emit = std::get<bridge::emit>(call.value());
+        emit.message   = message;
+        emit.timestamp = eosio::current_time_point();
+
+        const auto& receiver = emit.get_account_as_name();
+        eosio::check(eosio::is_account(receiver), "receiver is not account");
+
+        message_receiver_table message_receivers(get_self(), get_self().value);
+        auto it = message_receivers.find(receiver.value);
+        eosio::check(it != message_receivers.end(), "receiver not registered");
+
+        intx::uint256 min_fee((uint64_t)it->min_fee.amount);
+        min_fee *= minimum_natively_representable;
+
+        auto value = intx::be::unsafe::load<uint256>(message.value.bytes);
+        eosio::check(value >= min_fee, "min_fee not covered");
+
+        emit_messages.push_back(emit);
+    });
+
     auto receipt = execute_tx(miner, block, tx, ep, true);
+
+    // Process emit messages
+    for(const auto& emit : emit_messages) {
+        balances balance_table(get_self(), get_self().value);
+        const balance& receiver_account = balance_table.get(emit.get_account_as_name().value, "receiver account is not open");
+
+        bridge_emit_message msg {
+            .receiver  = emit.get_account_as_name(),
+            .sender    = to_bytes(emit.message.sender),
+            .timestamp = emit.timestamp,
+            .value     = to_bytes(emit.message.value),
+            .data      = emit.data
+        };
+
+        action(std::vector<permission_level>{}, emit.get_account_as_name(), "onbridgemsg"_n, msg
+        ).send();
+
+        auto value = intx::be::unsafe::load<uint256>(emit.message.value.bytes);
+        balance_table.modify(receiver_account, eosio::same_payer, [&](balance& a) {
+            a.balance += value;
+        });
+    }
 
     engine.finalize(ep.state(), ep.evm().block());
     ep.state().write_to_db(ep.evm().block().header.number);
