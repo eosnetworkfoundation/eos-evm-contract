@@ -180,7 +180,18 @@ jobs:
       - name: Link Leap TestHarness Module (fix for v4 of leap)
         run: sudo ln -s /usr/share/leap_testing/tests/TestHarness /usr/lib/python3/dist-packages/TestHarness
 
-      - name: Test Leap Integration
+      - name: Install Test Depedencies
         run: |
           pip install --upgrade web3
+          sudo apt install nodejs
+          sudo apt install npm
+          npm install eosjs
+          npm install ethereumjs-util
+          npm install node-fetch
+          npm install http-jsonrpc-server
+          npm install dotenv
+          npm install is-valid-hostname
+
+      - name: Test Leap Integration
+        run: |
           ./tests/leap/nodeos_eos_evm_test.py --eos-evm-contract-root ./contract/build --eos-evm-build-root ./build --use-tx-wrapper ./peripherals/tx_wrapper

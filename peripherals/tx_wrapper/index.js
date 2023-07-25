@@ -1,7 +1,7 @@
 const { Api, JsonRpc, RpcError } = require("eosjs");
 const { JsSignatureProvider } = require("eosjs/dist/eosjs-jssig"); // development only
-const fetch = require("node-fetch"); // node only; not needed in browsers
-//const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
+// const fetch = require("node-fetch"); // node only; not needed in browsers
+const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 const { TextEncoder, TextDecoder } = require("util"); // node only; native TextEncoder/Decoder
 
 const RpcServer = require("http-jsonrpc-server");
