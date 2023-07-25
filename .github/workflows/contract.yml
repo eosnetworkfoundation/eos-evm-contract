@@ -184,6 +184,12 @@ jobs:
       - name: Link Leap TestHarness Module (fix for v4 of leap)
         run: sudo ln -s /usr/share/leap_testing/tests/TestHarness /usr/lib/python3/dist-packages/TestHarness
 
+      - name: Build EOS EVM Node
+        run: .github/workflows/build-node.sh
+        env:
+          CC: gcc-10
+          CXX: g++-10
+
       - name: Install Test Depedencies
         run: |
           pip install --upgrade web3
