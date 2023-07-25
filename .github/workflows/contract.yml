@@ -205,6 +205,6 @@ jobs:
         run: |
           ./tests/leap/nodeos_eos_evm_test.py --eos-evm-contract-root ./contract/build --eos-evm-build-root ./build --use-tx-wrapper ./peripherals/tx_wrapper
 
-      -name: Check Logs
+      - name: Check Logs
         run: |
           cat $(find . -name tx_wrapper.stderr)
