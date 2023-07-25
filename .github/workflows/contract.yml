@@ -118,6 +118,11 @@ jobs:
       DCMAKE_BUILD_TYPE: 'Release'
 
     steps:
+      - name: Update Package Index & Upgrade Packages
+        run: |
+          apt-get update
+          apt-get upgrade -y
+
       - name: Authenticate
         id: auth
         uses: AntelopeIO/github-app-token-action@v1
@@ -172,7 +177,6 @@ jobs:
 
       - name: Install Leap
         run: |
-          apt-get update && apt-get upgrade -y
           sudo apt-get install -y ./leap*.deb
           dpkg -L leap-dev | grep TestHarness
           dpkg -L leap | grep cleos
@@ -192,6 +196,15 @@ jobs:
           npm install dotenv
           npm install is-valid-hostname
 
+      - name: Check Depedency Versions
+        run: |
+          pip show web3
+          node --version
+
       - name: Test Leap Integration
         run: |
           ./tests/leap/nodeos_eos_evm_test.py --eos-evm-contract-root ./contract/build --eos-evm-build-root ./build --use-tx-wrapper ./peripherals/tx_wrapper
+
+      -name: Check Logs
+        run: |
+          cat $(find . -name tx_wrapper.stderr)
