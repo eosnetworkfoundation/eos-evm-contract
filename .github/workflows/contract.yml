@@ -220,3 +220,15 @@ jobs:
         if: always()
         run: |
           cat $(find . -name eos-evm-node.stderr)
+
+      - name: Prepare Logs
+        if: failure()
+        run: |
+          tar -czf leap-int-test-logs.tar.gz TestLogs/*
+
+      - name: Upload logs from failed tests
+        uses: actions/upload-artifact@v3
+        if: failure()
+        with:
+          name: leap-int-test-logs.tar.gz
+          path: leap-int-test-logs.tar.gz
