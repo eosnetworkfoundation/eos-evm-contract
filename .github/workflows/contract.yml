@@ -120,8 +120,8 @@ jobs:
     steps:
       - name: Update Package Index & Upgrade Packages
         run: |
-          apt-get update
-          apt-get upgrade -y
+          sudo apt-get update
+          sudo apt-get upgrade -y
 
       - name: Authenticate
         id: auth
