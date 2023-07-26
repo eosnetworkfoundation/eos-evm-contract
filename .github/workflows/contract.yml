@@ -231,7 +231,9 @@ jobs:
       - name: Prepare Logs
         if: failure()
         run: |
+          pwd
           cd ..
+          pwd
           tar -czf leap-int-test-logs.tar.gz test_run_root/*
 
       - name: Upload logs from failed tests
