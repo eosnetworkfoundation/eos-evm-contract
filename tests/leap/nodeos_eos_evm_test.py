@@ -665,7 +665,7 @@ try:
     Utils.Print("Launching: %s" % cmd)
     evmNodePOpen=Utils.delayedCheckOutput(cmd, stdout=outFile, stderr=errFile)
 
-    time.sleep(10) # allow time to sync trxs
+    time.sleep(30) # allow time to sync trxs
 
     # Validate all balances are the same on both sides
     rows=prodNode.getTable(evmAcc.name, evmAcc.name, "account")
