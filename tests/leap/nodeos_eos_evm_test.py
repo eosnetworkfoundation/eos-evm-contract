@@ -661,7 +661,7 @@ try:
     os.makedirs(dataDir)
     outFile = open(nodeStdOutDir, "w")
     errFile = open(nodeStdErrDir, "w")
-    cmd = "%s/cmd/eos-evm-node --plugin=blockchain_plugin --ship-endpoint=127.0.0.1:8999 --genesis-json=%s --chain-data=%s --verbosity=5 --nocolor=1 --plugin=rpc_plugin --eos-evm-node=127.0.0.1:8080 --http-port=0.0.0.0:8881 --api-spec=eth,debug,net,trace --chaindata=%s" % (eosEvmBuildRoot, gensisJson, dataDir, dataDir)
+    cmd = "%s/cmd/eos-evm-node --plugin=blockchain_plugin --ship-endpoint=127.0.0.1:8999 --genesis-json=%s --chain-data=%s --verbosity=9 --nocolor=1 --plugin=rpc_plugin --eos-evm-node=127.0.0.1:8080 --http-port=0.0.0.0:8881 --api-spec=eth,debug,net,trace --chaindata=%s" % (eosEvmBuildRoot, gensisJson, dataDir, dataDir)
     Utils.Print("Launching: %s" % cmd)
     evmNodePOpen=Utils.delayedCheckOutput(cmd, stdout=outFile, stderr=errFile)
 
