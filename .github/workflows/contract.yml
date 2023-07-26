@@ -216,6 +216,11 @@ jobs:
         run: |
           cat $(find . -name tx_wrapper.stderr)
 
+      - name: Check Genesis
+        if: always()
+        run: |
+          cat $(find . -name eos-evm-genesis.json)
+
       - name: Check eos-evm-node Logs
         if: always()
         run: |
