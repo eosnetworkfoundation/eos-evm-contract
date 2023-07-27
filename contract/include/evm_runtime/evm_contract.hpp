@@ -84,9 +84,9 @@ public:
    /// @return true if all garbage has been collected
    [[eosio::action]] bool gc(uint32_t max);
 
-   void call_(intx::uint256 from, const bytes& to, uint128_t value, bytes& data, uint64_t gas_limit);
+   
    [[eosio::action]] void call(eosio::name from, const bytes& to, uint128_t value, bytes& data, uint64_t gas_limit);
-   [[eosio::action]] void call2(const bytes& from, const bytes& to, uint128_t value, bytes& data, uint64_t gas_limit);
+   [[eosio::action]] void admincall(const bytes& from, const bytes& to, uint128_t value, bytes& data, uint64_t gas_limit);
 
 #ifdef WITH_TEST_ACTIONS
    [[eosio::action]] void testtx(const std::optional<bytes>& orlptx, const evm_runtime::test::block_info& bi);
@@ -143,6 +143,8 @@ private:
 
    void handle_account_transfer(const eosio::asset& quantity, const std::string& memo);
    void handle_evm_transfer(eosio::asset quantity, const std::string& memo);
+
+   void call_(intx::uint256 s, const evmc::address& to, intx::uint256 value, bytes& data, uint64_t gas_limit, uint64_t nonce);
 
    // to allow sending through a Bytes (basic_string<uint8_t>) w/o copying over to a std::vector<char>
    void pushtx_bytes(eosio::name miner, const std::basic_string<uint8_t>& rlptx);

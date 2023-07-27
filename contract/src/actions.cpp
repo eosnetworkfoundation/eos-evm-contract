@@ -40,6 +40,7 @@ namespace silkworm {
 namespace evm_runtime {
 
 static constexpr uint32_t hundred_percent = 100'000;
+static constexpr char err_msg_invalid_addr[] = "invalid address";
 
 using namespace silkworm;
 
@@ -458,7 +459,7 @@ void evm_contract::close(eosio::name owner) {
 uint64_t evm_contract::get_and_increment_nonce(const name owner) {
     nextnonces nextnonce_table(get_self(), get_self().value);
 
-    const nextnonce& nonce = nextnonce_table.get(owner.value);
+    const nextnonce& nonce = nextnonce_table.get(owner.value, "caller account has not been opened");
     uint64_t ret = nonce.next_nonce;
     nextnonce_table.modify(nonce, eosio::same_payer, [](nextnonce& n){
         ++n.next_nonce;
@@ -562,8 +563,7 @@ bool evm_contract::gc(uint32_t max) {
     return state.gc(max);
 }
 
-void evm_contract::call_(intx::uint256 s, const bytes& to, uint128_t value, bytes& data, uint64_t gas_limit, uint64_t nonce) {
-
+void evm_contract::call_(intx::uint256 s, const evmc::address& to, intx::uint256 value, bytes& data, uint64_t gas_limit, uint64_t nonce) {
     const auto& current_config = _config.get();
 
     const Transaction txn {
@@ -573,7 +573,8 @@ void evm_contract::call_(intx::uint256 s, const bytes& to, uint128_t value, byte
         .max_fee_per_gas = current_config.gas_price,
         .gas_limit = gas_limit,
         .to = to,
-        .value = intx::uint256(value),
+        .value = value,
+        .data = Bytes{(const uint8_t*)data.data(), data.size()},
         .r = 0u,  // r == 0 is pseudo signature that resolves to reserved address range
         .s = s
     };
@@ -585,13 +586,35 @@ void evm_contract::call_(intx::uint256 s, const bytes& to, uint128_t value, byte
 }
 
 void evm_contract::call(eosio::name from, const bytes& to, uint128_t value, bytes& data, uint64_t gas_limit) {
+    assert_unfrozen();
     require_auth(from);
-    call_(make_reserved_address(from.value), to, value, data, gas_limit, get_and_increment_nonce(from));
+
+    ByteView bv_to{(const uint8_t*)to.data(), to.size()};
+
+    call_(from.value, to_evmc_address(bv_to), intx::uint256(value), data, gas_limit, get_and_increment_nonce(from));
 }
 
-void evm_contract::call2(const bytes& from, const bytes& to, uint128_t value, bytes& data, uint64_t gas_limit) {
+void evm_contract::admincall(const bytes& from, const bytes& to, uint128_t value, bytes& data, uint64_t gas_limit) {
+    assert_unfrozen();
     require_auth(get_self());
-    call_(intx::uint256(from), to, value, data, gas_limit);
+    
+    // Prepare s
+    eosio::check(from.size() == kAddressLength, err_msg_invalid_addr);
+    intx::uint256 s = intx::be::unsafe::load<intx::uint256>((const uint8_t *)from.data());
+    // load will put the data in higher bytes, shift them donw.
+    s >>= 256 - kAddressLength * 8;
+    // pad with '1's
+    s |= ((~intx::uint256(0)) << (kAddressLength * 8));
+
+    // Prepare to
+    ByteView bv_to{(const uint8_t*)to.data(), to.size()};
+
+    // Prepare nonce
+    evm_runtime::state state{get_self(), get_self(), true};
+    auto account = state.read_account(to_address(from));
+    check(!!account, err_msg_invalid_addr);
+
+    call_(s, to_evmc_address(bv_to), intx::uint256(value), data, gas_limit, account->nonce);
 }
 
 #ifdef WITH_TEST_ACTIONS
