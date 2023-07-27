@@ -213,26 +213,9 @@ jobs:
           cd test_run_root
           ./../tests/leap/nodeos_eos_evm_test.py -v --eos-evm-contract-root ../contract/build --eos-evm-build-root ../build --use-tx-wrapper ../peripherals/tx_wrapper
 
-      - name: Check Tx_Wrapper Logs
-        if: always()
-        run: |
-          cat $(find . -name tx_wrapper.stderr)
-
-      - name: Check Genesis
-        if: always()
-        run: |
-          cat $(find . -name eos-evm-genesis.json)
-
-      - name: Check eos-evm-node Logs
-        if: always()
-        run: |
-          cat $(find . -name eos-evm-node.stderr)
-
       - name: Prepare Logs
         if: failure()
         run: |
-          pwd
-          ls
           tar -czf leap-int-test-logs.tar.gz test_run_root/*
 
       - name: Upload logs from failed tests
