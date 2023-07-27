@@ -98,7 +98,7 @@ try {
    BOOST_REQUIRE(produce_blocks_until_timestamp_satisfied(timestamp_at_second_boundary));
 
    init();
-   time_point_sec expected_genesis_time = control->pending_block_time(); // Rounds down to nearest second.
+   time_point_sec expected_genesis_time = time_point_sec(control->pending_block_time()); // Rounds down to nearest second.
 
    time_point_sec actual_genesis_time = get_genesis_time();
    ilog("Genesis time: ${time}", ("time", actual_genesis_time));
@@ -115,7 +115,7 @@ try {
    BOOST_REQUIRE(produce_blocks_until_timestamp_satisfied(timestamp_not_at_second_boundary));
 
    init();
-   time_point_sec expected_genesis_time = control->pending_block_time(); // Rounds down to nearest second.
+   time_point_sec expected_genesis_time = time_point_sec(control->pending_block_time()); // Rounds down to nearest second.
 
    time_point_sec actual_genesis_time = get_genesis_time();
    ilog("Genesis time: ${time}", ("time", actual_genesis_time));
