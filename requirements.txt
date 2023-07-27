@@ -1,4 +1,0 @@
-cpplint
-jsondiff
-web3
-pylint==2.11.*
