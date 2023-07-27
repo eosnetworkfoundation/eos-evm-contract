@@ -18,8 +18,6 @@ struct emit {
         return *account_;
     }
 
-    eosio::time_point   timestamp;
-    evmc_message        message;
     mutable std::optional<name> account_;
 };
 
