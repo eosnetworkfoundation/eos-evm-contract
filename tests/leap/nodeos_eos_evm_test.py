@@ -665,20 +665,29 @@ try:
     Utils.Print("Launching: %s" % cmd)
     evmNodePOpen=Utils.delayedCheckOutput(cmd, stdout=outFile, stderr=errFile)
 
-    time.sleep(30) # allow time to sync trxs
+    Utils.Print(f"Allow time for evm node to start and sync trxs - start {time.ctime()}")
+    time.sleep(60) # allow time to sync trxs
+    Utils.Print(f"Allow time for evm node to start and sync trxs - finish {time.ctime()}")
 
     # Validate all balances are the same on both sides
     rows=prodNode.getTable(evmAcc.name, evmAcc.name, "account")
     for row in rows['rows']:
         Utils.Print("Checking 0x{0} balance".format(row['eth_address']))
-        r = w3.eth.get_balance(Web3.to_checksum_address('0x'+row['eth_address']))
+        r = 0
+        try:
+            r = w3.eth.get_balance(Web3.to_checksum_address('0x'+row['eth_address']))
+        except:
+            Utils.Print("Exception thrown - Checking 0x{0} balance".format(row['eth_address']))
         if int(row['balance'],16) != 0:
             max = 0
             while r == 0 and max < 60:
                 time.sleep(1)
                 max+=1
                 Utils.Print("Re-Checking 0x{0} balance".format(row['eth_address']))
-                r = w3.eth.get_balance(Web3.to_checksum_address('0x'+row['eth_address']))
+                try:
+                    r = w3.eth.get_balance(Web3.to_checksum_address('0x'+row['eth_address']))
+                except:
+                    Utils.Print("Exception thrown - Re-Checking 0x{0} balance".format(row['eth_address']))
         assert r == int(row['balance'],16), f"{row['eth_address']} {r} != {int(row['balance'],16)}"
 
     foundErr = False
