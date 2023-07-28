@@ -563,21 +563,25 @@ bool evm_contract::gc(uint32_t max) {
     return state.gc(max);
 }
 
-void evm_contract::call_(intx::uint256 s, const evmc::address& to, intx::uint256 value, bytes& data, uint64_t gas_limit, uint64_t nonce) {
+void evm_contract::call_(intx::uint256 s, const bytes& to, intx::uint256 value, bytes& data, uint64_t gas_limit, uint64_t nonce) {
     const auto& current_config = _config.get();
 
     Transaction txn;
-
-    txn.type = TransactionType::kLegacy,
-    txn.nonce = nonce,
-    txn.max_priority_fee_per_gas = current_config.gas_price,
-    txn.max_fee_per_gas = current_config.gas_price,
-    txn.gas_limit = gas_limit,
-    txn.to = to,
-    txn.value = value,
-    txn.data = Bytes{(const uint8_t*)data.data(), data.size()},
-    txn.r = 0u,  // r == 0 is pseudo signature that resolves to reserved address range
+    txn.type = TransactionType::kLegacy;
+    txn.nonce = nonce;
+    txn.max_priority_fee_per_gas = current_config.gas_price;
+    txn.max_fee_per_gas = current_config.gas_price;
+    txn.gas_limit = gas_limit;
+    txn.value = value;
+    txn.data = Bytes{(const uint8_t*)data.data(), data.size()};
+    txn.r = 0u;  // r == 0 is pseudo signature that resolves to reserved address range
     txn.s = s;
+
+    // Allow empty to so that it can support contract creation calls.
+    if (!to.empty()) {
+        ByteView bv_to{(const uint8_t*)to.data(), to.size()};
+        txn.to = to_evmc_address(bv_to);
+    }
 
     Bytes rlp;
     rlp::encode(rlp, txn);
@@ -589,9 +593,7 @@ void evm_contract::call(eosio::name from, const bytes& to, uint128_t value, byte
     assert_unfrozen();
     require_auth(from);
 
-    ByteView bv_to{(const uint8_t*)to.data(), to.size()};
-
-    call_(from.value, to_evmc_address(bv_to), intx::uint256(value), data, gas_limit, get_and_increment_nonce(from));
+    call_(from.value, to, intx::uint256(value), data, gas_limit, get_and_increment_nonce(from));
 }
 
 void evm_contract::admincall(const bytes& from, const bytes& to, uint128_t value, bytes& data, uint64_t gas_limit) {
@@ -606,15 +608,21 @@ void evm_contract::admincall(const bytes& from, const bytes& to, uint128_t value
     // pad with '1's
     s |= ((~intx::uint256(0)) << (kAddressLength * 8));
 
-    // Prepare to
-    ByteView bv_to{(const uint8_t*)to.data(), to.size()};
-
     // Prepare nonce
-    evm_runtime::state state{get_self(), get_self(), true};
-    auto account = state.read_account(to_address(from));
-    check(!!account, err_msg_invalid_addr);
-
-    call_(s, to_evmc_address(bv_to), intx::uint256(value), data, gas_limit, account->nonce);
+    auto from_addr = to_address(from);
+    auto eos_acct = extract_reserved_address(from_addr);
+    uint64_t nonce = 0;
+    if (eos_acct) {
+        nonce = get_and_increment_nonce(eosio::name(*eos_acct));
+    }
+    else {
+        evm_runtime::state state{get_self(), get_self(), true};
+        auto account = state.read_account(from_addr);
+        check(!!account, err_msg_invalid_addr);
+        nonce = account->nonce;
+    }
+    
+    call_(s, to, intx::uint256(value), data, gas_limit, nonce);
 }
 
 #ifdef WITH_TEST_ACTIONS

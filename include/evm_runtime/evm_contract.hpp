@@ -144,7 +144,7 @@ private:
    void handle_account_transfer(const eosio::asset& quantity, const std::string& memo);
    void handle_evm_transfer(eosio::asset quantity, const std::string& memo);
 
-   void call_(intx::uint256 s, const evmc::address& to, intx::uint256 value, bytes& data, uint64_t gas_limit, uint64_t nonce);
+   void call_(intx::uint256 s, const bytes& to, intx::uint256 value, bytes& data, uint64_t gas_limit, uint64_t nonce);
 
    // to allow sending through a Bytes (basic_string<uint8_t>) w/o copying over to a std::vector<char>
    void pushtx_bytes(eosio::name miner, const std::basic_string<uint8_t>& rlptx);

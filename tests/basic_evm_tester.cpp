@@ -296,6 +296,7 @@ void basic_evm_tester::call(name from, const evmc::bytes& to, uint128_t value, e
    bytes to_bytes;
    to_bytes.resize(to.size());
    memcpy(to_bytes.data(), to.data(), to.size());
+   
    bytes data_bytes;
    data_bytes.resize(data.size());
    memcpy(data_bytes.data(), data.data(), data.size());
@@ -308,12 +309,13 @@ void basic_evm_tester::admincall(const evmc::bytes& from, const evmc::bytes& to,
    bytes to_bytes;
    to_bytes.resize(to.size());
    memcpy(to_bytes.data(), to.data(), to.size());
+
    bytes data_bytes;
    data_bytes.resize(data.size());
    memcpy(data_bytes.data(), data.data(), data.size());
 
    bytes from_bytes;
-   from_bytes.resize(to.size());
+   from_bytes.resize(from.size());
    memcpy(from_bytes.data(), from.data(), from.size());
 
    push_action(evm_account_name, "admincall"_n, actor,  mvo()("from", from_bytes)("to", to_bytes)("value", value)("data", data_bytes)("gas_limit", gas_limit));
