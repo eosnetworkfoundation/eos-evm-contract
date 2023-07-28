@@ -104,7 +104,7 @@ void state::update_account(const evmc::address& address, std::optional<Account> 
     ++stats.account.read;
 
     auto emplace = [&](auto& row) {
-        row.id = accounts.available_primary_key();
+        row.id = get_next_account_id();
         row.eth_address = to_bytes(address);
         row.nonce = current->nonce;
         row.balance = to_bytes(current->balance);
@@ -214,7 +214,7 @@ void state::update_account_code(const evmc::address& address, uint64_t, const ev
         ++stats.account.update;
     } else {
         accounts.emplace(_ram_payer, [&](auto& row){
-            row.id = accounts.available_primary_key();;
+            row.id = get_next_account_id();;
             row.eth_address = to_bytes(address);
             row.nonce = 0;
             row.code_id = code_id;
@@ -245,7 +245,7 @@ void state::update_storage(const evmc::address& address, uint64_t incarnation, c
         uint64_t table_id;
         if(itr == inx.end()){
             accounts.emplace(_ram_payer, [&](auto& row){
-                table_id = accounts.available_primary_key();
+                table_id = get_next_account_id();
                 row.id = table_id;
                 row.eth_address = to_bytes(address);
                 row.nonce = 0;
@@ -328,5 +328,32 @@ evmc::bytes32 state::state_root_hash() const {
     eosio::check(false, "state_root_hash not implemented");
     return {};
 }
+
+uint64_t state::get_next_account_id() {
+    if(!_config2) {
+        eosio::singleton<"config2"_n, config2> cfg2{_self, _self.value};
+        if(cfg2.exists()) {
+            _config2 = cfg2.get();
+        } else {
+            account_table accounts(_self, _self.value);
+            uint64_t next_account_id = accounts.available_primary_key();
+
+            gc_store_table gc(_self, _self.value);
+            if(gc.end() != gc.begin()) {
+                auto itr = --gc.end();
+                next_account_id = std::max(next_account_id, itr->storage_id+1);
+            }
+            _config2 = config2{next_account_id};
+        }
+    }
+    auto id = _config2->next_account_id;
+    _config2->next_account_id++;
+    return id;
+}
+state::~state() {
+    if(!_config2.has_value()) return;
+    eosio::singleton<"config2"_n, config2> cfg2{_self, _self.value};
+    cfg2.set(_config2.value(), _self);
+};
 
 }  // namespace evm_runtime
