@@ -336,24 +336,18 @@ uint64_t state::get_next_account_id() {
             _config2 = cfg2.get();
         } else {
             account_table accounts(_self, _self.value);
-            uint64_t next_account_id = accounts.available_primary_key();
-
-            gc_store_table gc(_self, _self.value);
-            if(gc.end() != gc.begin()) {
-                auto itr = --gc.end();
-                next_account_id = std::max(next_account_id, itr->storage_id+1);
-            }
-            _config2 = config2{next_account_id};
+            _config2 = config2{accounts.available_primary_key()};
         }
     }
     auto id = _config2->next_account_id;
     _config2->next_account_id++;
     return id;
 }
+
 state::~state() {
     if(!_config2.has_value()) return;
     eosio::singleton<"config2"_n, config2> cfg2{_self, _self.value};
     cfg2.set(_config2.value(), _self);
-};
+}
 
 }  // namespace evm_runtime
