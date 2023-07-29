@@ -12,17 +12,16 @@ struct account_id_tester : basic_evm_tester {
    std::optional<uint64_t> get_max_account_id() {
       const auto& db = control->db();
       const auto* t_id = db.find<chain::table_id_object, chain::by_code_scope_table>( boost::make_tuple( evm_account_name, evm_account_name, "account"_n ) );
-      if ( !t_id ) {
-         return {};
-      }
+      if ( !t_id ) return {};
 
       const auto& idx = db.get_index<chain::key_value_index, chain::by_scope_primary>();
       if( idx.begin() == idx.end() ) return {};
       
       decltype(t_id->id) next_tid(t_id->id._id + 1);
       auto itr = idx.lower_bound(boost::make_tuple(next_tid));
-      if(itr == idx.end()) return {};
-      if(itr->t_id._id > t_id->id._id) --itr;
+      if(itr == idx.end() || itr->t_id == next_tid) --itr;
+
+      if(itr->t_id._id != t_id->id._id) return {};
       return itr->primary_key;
    }
 
@@ -73,7 +72,7 @@ struct account_id_tester : basic_evm_tester {
 
 BOOST_AUTO_TEST_SUITE(account_id_tests)
 
-BOOST_FIXTURE_TEST_CASE(basic_test, account_id_tester) try {
+BOOST_FIXTURE_TEST_CASE(new_account_id_logic, account_id_tester) try {
    
    BOOST_CHECK(!get_max_account_id().has_value());
    BOOST_REQUIRE_EXCEPTION(get_config2(), fc::out_of_range_exception, [](const fc::out_of_range_exception& e) {return true;});
@@ -81,7 +80,7 @@ BOOST_FIXTURE_TEST_CASE(basic_test, account_id_tester) try {
    // Fund evm1 address with 100 EOS
    evm_eoa evm1;
    const int64_t to_bridge = 1000000;
-   transfer_token("alice"_n, "evm"_n, make_asset(to_bridge), evm1.address_0x());
+   transfer_token("alice"_n, evm_account_name, make_asset(to_bridge), evm1.address_0x());
    BOOST_CHECK(get_max_account_id().value() == 0);
    BOOST_CHECK(get_config2().next_account_id == 1);
 
@@ -162,6 +161,93 @@ BOOST_FIXTURE_TEST_CASE(basic_test, account_id_tester) try {
    gc(100);
    BOOST_CHECK(get_storage_slots_count(2) == 0);
 
+
+} FC_LOG_AND_RETHROW()
+
+BOOST_FIXTURE_TEST_CASE(transition_from_0_5_1, account_id_tester) try {
+
+   // Set old code
+   set_code(evm_account_name, testing::contracts::evm_runtime_wasm_0_5_1());
+   set_abi(evm_account_name, testing::contracts::evm_runtime_abi_0_5_1().data());
+
+   BOOST_CHECK(!get_max_account_id().has_value());
+
+   // Fund evm1 address with 100 EOS
+   evm_eoa evm1;
+   const int64_t to_bridge = 1000000;
+   transfer_token("alice"_n, evm_account_name, make_asset(to_bridge), evm1.address_0x());
+   BOOST_CHECK(get_max_account_id().value() == 0);
+
+   // Deploy Factory and Test contracts
+   auto contract_addr = deploy_contract(evm1, evmc::from_hex(factory_and_test_bytecode).value());
+   uint64_t contract_account_id = find_account_by_address(contract_addr).value().id;
+   BOOST_CHECK(get_max_account_id().value() == 1);
+
+   // Call 'Factory::deploy'
+   auto txn = generate_tx(contract_addr, 0, 1'000'000);
+
+   silkworm::Bytes data;
+   data += evmc::from_hex("2b85ba38").value();     //deploy
+   data += evmc::from_hex(int_str32(555)).value(); //salt=555
+   txn.data = data;
+   evm1.sign(txn);
+   pushtx(txn);
+
+   BOOST_CHECK(get_max_account_id().value() == 2);
+
+   // Recover TestContract address
+   auto test_contract_address = find_account_by_id(2).value().address;
+
+   // Call 'TestContract::set_foo(1234)'
+   txn = generate_tx(test_contract_address, 0, 1'000'000);
+   data.clear();
+   data += evmc::from_hex("e5d5dfbc").value(); //set_foo
+   data += evmc::from_hex(int_str32(1234)).value(); //val=1234
+   txn.data = data;
+   evm1.sign(txn);
+   pushtx(txn);
+
+   BOOST_CHECK(get_storage_slots_count(2) == 1);
+
+   // Call 'TestContract::killme'
+   txn = generate_tx(test_contract_address, 0, 1'000'000);
+   data.clear();
+   data += evmc::from_hex("24d97a4a").value(); //killme
+   txn.data = data;
+   evm1.sign(txn);
+   pushtx(txn);
+
+   BOOST_CHECK(get_storage_slots_count(2) == 1);
+   BOOST_CHECK(get_max_account_id().value() == 1);
+
+   // Make a transfer to a new address to create a new account
+   evm_eoa evm2;
+   transfer_token("alice"_n, evm_account_name, make_asset(to_bridge), evm2.address_0x());
+   BOOST_CHECK(get_max_account_id().value() == 2);
+
+   // Set new code
+   set_code(evm_account_name, testing::contracts::evm_runtime_wasm());
+   set_abi(evm_account_name, testing::contracts::evm_runtime_abi().data());
+
+   BOOST_REQUIRE_EXCEPTION(get_config2(), fc::out_of_range_exception, [](const fc::out_of_range_exception& e) {return true;});
+
+   // Call 'Factory::deploy' again
+   txn = generate_tx(contract_addr, 0, 1'000'000);
+   data.clear();
+   data += evmc::from_hex("2b85ba38").value();     //deploy
+   data += evmc::from_hex(int_str32(555)).value(); //salt=555
+   txn.data = data;
+   evm1.sign(txn);
+   pushtx(txn);
+
+   BOOST_CHECK(get_max_account_id().value() == 3);
+   BOOST_CHECK(get_config2().next_account_id == 4);
+
+   // Make a transfer to a new address to create a new account
+   evm_eoa evm3;
+   transfer_token("alice"_n, evm_account_name, make_asset(to_bridge), evm3.address_0x());
+   BOOST_CHECK(get_max_account_id().value() == 4);
+   BOOST_CHECK(get_config2().next_account_id == 5);
 
 } FC_LOG_AND_RETHROW()
 
