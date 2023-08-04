@@ -277,7 +277,7 @@ Receipt evm_contract::execute_tx( eosio::name miner, Block& block, Transaction& 
     }
 
     if(from_self)
-        eosio::check(receipt.success, "ingress bridge actions must succeed");
+        eosio::check(receipt.success, "inline actions must succeed");
 
     if(!ep.state().reserved_objects().empty()) {
         bool non_open_account_sent = false;
