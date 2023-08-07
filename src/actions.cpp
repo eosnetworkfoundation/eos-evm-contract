@@ -563,7 +563,7 @@ bool evm_contract::gc(uint32_t max) {
     return state.gc(max);
 }
 
-void evm_contract::call_(intx::uint256 s, const bytes& to, intx::uint256 value, bytes& data, uint64_t gas_limit, uint64_t nonce) {
+void evm_contract::call_(intx::uint256 s, const bytes& to, intx::uint256 value, const bytes& data, uint64_t gas_limit, uint64_t nonce) {
     const auto& current_config = _config.get();
 
     Transaction txn;
@@ -589,14 +589,14 @@ void evm_contract::call_(intx::uint256 s, const bytes& to, intx::uint256 value, 
     pushtx_act.send(get_self(), rlp);
 }
 
-void evm_contract::call(eosio::name from, const bytes& to, uint128_t value, bytes& data, uint64_t gas_limit) {
+void evm_contract::call(eosio::name from, const bytes& to, uint128_t value, const bytes& data, uint64_t gas_limit) {
     assert_unfrozen();
     require_auth(from);
 
     call_(from.value, to, intx::uint256(value), data, gas_limit, get_and_increment_nonce(from));
 }
 
-void evm_contract::admincall(const bytes& from, const bytes& to, uint128_t value, bytes& data, uint64_t gas_limit) {
+void evm_contract::admincall(const bytes& from, const bytes& to, uint128_t value, const bytes& data, uint64_t gas_limit) {
     assert_unfrozen();
     require_auth(get_self());
     
