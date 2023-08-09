@@ -155,7 +155,7 @@ BOOST_FIXTURE_TEST_CASE(call_test_function, call_evm_tester) try {
   auto total_fund2 = intx::uint256(vault_balance("alice"_n)) + intx::uint256(vault_balance("evm"_n));
 
   BOOST_REQUIRE_EXCEPTION(call_test(token_addr, 0, "alice"_n, "alice"_n),
-                          eosio_assert_message_exception, eosio_assert_message_is("inline actions must succeed"));
+                          eosio_assert_message_exception, eosio_assert_message_is("tx executed inline by contract must succeed"));
 
 
   // Call and check results 
@@ -230,7 +230,7 @@ BOOST_FIXTURE_TEST_CASE(admincall_test_function, call_evm_tester) try {
 
 
   BOOST_REQUIRE_EXCEPTION(admincall_test(token_addr, 0, evm2, "evm"_n),
-                          eosio_assert_message_exception, eosio_assert_message_is("inline actions must succeed"));
+                          eosio_assert_message_exception, eosio_assert_message_is("tx executed inline by contract must succeed"));
 
   // Call and check results  
   admincall_test(token_addr, 1234, evm2, "evm"_n);

@@ -220,39 +220,38 @@ Receipt evm_contract::execute_tx( eosio::name miner, Block& block, Transaction& 
         inevm.emplace(get_self(), get_self().value);
     };
 
-    bool is_special_signature = (tx.r == intx::uint256());
+    bool is_special_signature = silkworm::is_special_signature(tx.r, tx.s);
 
     tx.from.reset();
     tx.recover_sender();
     eosio::check(tx.from.has_value(), "unable to recover sender");
     LOGTIME("EVM RECOVER SENDER");
 
-    // type 1: normal signature (normal address recovered from normal signature), required !from_self 
-    // type 2: special signature (r == 0), reserved address (stored in s), required from_self + reduce special balance
-    // type 3: special signature (r == 0), normal address (stored in s), required from_self
-    if(from_self) {
-        check(is_special_signature, "actions from self without a special signature are unexpected");
-        if (is_reserved_address(*tx.from)) {
-            const name ingress_account(*extract_reserved_address(*tx.from));
+    // 1 Reject special signature NOT from self.
+    // 2 All other cases (normal signature or special signature from self) will be accepted.
+    // 3 If the from address is reserved address, the special balance needs some process.
+    check(from_self || !is_special_signature, "bridge signature used outside of bridge transaction");
+    
+    if (is_reserved_address(*tx.from)) {
+        const name ingress_account(*extract_reserved_address(*tx.from));
 
-            const intx::uint512 max_gas_cost = intx::uint256(tx.gas_limit) * tx.max_fee_per_gas;
-            check(max_gas_cost + tx.value < std::numeric_limits<intx::uint256>::max(), "too much gas");
-            const intx::uint256 value_with_max_gas = tx.value + (intx::uint256)max_gas_cost;
+        const intx::uint512 max_gas_cost = intx::uint256(tx.gas_limit) * tx.max_fee_per_gas;
+        check(max_gas_cost + tx.value < std::numeric_limits<intx::uint256>::max(), "too much gas");
+        const intx::uint256 value_with_max_gas = tx.value + (intx::uint256)max_gas_cost;
 
-            populate_bridge_accessors();
-            balance_table.modify(balance_table.get(ingress_account.value), eosio::same_payer, [&](balance& b){
-                b.balance -= value_with_max_gas;
-            });
-            inevm->set(inevm->get() += value_with_max_gas, eosio::same_payer);
+        populate_bridge_accessors();
+        balance_table.modify(balance_table.get(ingress_account.value), eosio::same_payer, [&](balance& b){
+            b.balance -= value_with_max_gas;
+        });
+        inevm->set(inevm->get() += value_with_max_gas, eosio::same_payer);
 
-            ep.state().set_balance(*tx.from, value_with_max_gas);
-            ep.state().set_nonce(*tx.from, tx.nonce);
-        }
+        ep.state().set_balance(*tx.from, value_with_max_gas);
+        ep.state().set_nonce(*tx.from, tx.nonce);
     }
-    else if(is_special_signature)
-        check(false, "bridge signature used outside of bridge transaction");
 
-    if(enforce_chain_id && !from_self) {
+    // A tx from self with regular signature can potentially from external source. 
+    // Therefore, only tx with special signature can waive the chain_id check.
+    if(enforce_chain_id && !is_special_signature) {
         check(tx.chain_id.has_value(), "tx without chain-id");
     }
 
@@ -277,7 +276,7 @@ Receipt evm_contract::execute_tx( eosio::name miner, Block& block, Transaction& 
     }
 
     if(from_self)
-        eosio::check(receipt.success, "inline actions must succeed");
+        eosio::check(receipt.success, "tx executed inline by contract must succeed");
 
     if(!ep.state().reserved_objects().empty()) {
         bool non_open_account_sent = false;
