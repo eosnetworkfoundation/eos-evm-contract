@@ -119,19 +119,19 @@ struct call_evm_tester : basic_evm_tester {
 BOOST_AUTO_TEST_SUITE(call_evm_tests)
 BOOST_FIXTURE_TEST_CASE(call_test_function, call_evm_tester) try {
   evm_eoa evm1;
-  auto total_fund = intx::uint256(vault_balance("evm"_n));
+  auto total_fund = intx::uint256(vault_balance(evm_account_name));
   // Fund evm1 address with 100 EOS
-  transfer_token("alice"_n, "evm"_n, make_asset(1000000), evm1.address_0x());
+  transfer_token("alice"_n, evm_account_name, make_asset(1000000), evm1.address_0x());
   auto evm1_balance = evm_balance(evm1);
   BOOST_REQUIRE(!!evm1_balance);
-  BOOST_REQUIRE(*evm1_balance == intx::exp<256>(10, 18) * 100);
+  BOOST_REQUIRE(*evm1_balance == 100_ether);
   total_fund += *evm1_balance;
 
   // Deploy contract
   auto token_addr = deploy_test_contract(evm1);
 
   // Deployment gas fee go to evm vault
-  BOOST_REQUIRE(*evm_balance(evm1) + intx::uint256(vault_balance("evm"_n)) == total_fund);
+  BOOST_REQUIRE(*evm_balance(evm1) + intx::uint256(vault_balance(evm_account_name)) == total_fund);
 
   // Missing authority
   BOOST_REQUIRE_EXCEPTION(call_test(token_addr, 1234, "alice"_n, "bob"_n),
@@ -149,10 +149,10 @@ BOOST_FIXTURE_TEST_CASE(call_test_function, call_evm_tester) try {
                           eosio_assert_message_exception, eosio_assert_message_is("decrementing more than available"));
 
   // Transfer enough funds
-  transfer_token("alice"_n, "evm"_n, make_asset(1000000), "alice");
+  transfer_token("alice"_n, evm_account_name, make_asset(1000000), "alice");
 
-  BOOST_REQUIRE(intx::uint256(vault_balance("alice"_n)) == intx::exp<256>(10, 18) * 100);
-  auto total_fund2 = intx::uint256(vault_balance("alice"_n)) + intx::uint256(vault_balance("evm"_n));
+  BOOST_REQUIRE(intx::uint256(vault_balance("alice"_n)) == 100_ether);
+  auto total_fund2 = intx::uint256(vault_balance("alice"_n)) + intx::uint256(vault_balance(evm_account_name));
 
   BOOST_REQUIRE_EXCEPTION(call_test(token_addr, 0, "alice"_n, "alice"_n),
                           eosio_assert_message_exception, eosio_assert_message_is("tx executed inline by contract must succeed"));
@@ -164,7 +164,7 @@ BOOST_FIXTURE_TEST_CASE(call_test_function, call_evm_tester) try {
   BOOST_REQUIRE(count == 1234);
 
   // Gas go from alice's vault to evm's vault
-  BOOST_REQUIRE(total_fund2 == intx::uint256(vault_balance("alice"_n)) + intx::uint256(vault_balance("evm"_n)));
+  BOOST_REQUIRE(total_fund2 == intx::uint256(vault_balance("alice"_n)) + intx::uint256(vault_balance(evm_account_name)));
 
 
   // Advance block so we do not generate same transaction.
@@ -175,7 +175,7 @@ BOOST_FIXTURE_TEST_CASE(call_test_function, call_evm_tester) try {
   BOOST_REQUIRE(count == 5555);
 
   // Gas go from alice's vault to evm's vault
-  BOOST_REQUIRE(total_fund2 == intx::uint256(vault_balance("alice"_n)) + intx::uint256(vault_balance("evm"_n)));
+  BOOST_REQUIRE(total_fund2 == intx::uint256(vault_balance("alice"_n)) + intx::uint256(vault_balance(evm_account_name)));
 
   // Function being called on behalf of reserved address of eos account "alice"
   auto caller = get_lastcaller(token_addr);
@@ -187,69 +187,69 @@ BOOST_FIXTURE_TEST_CASE(admincall_test_function, call_evm_tester) try {
   evm_eoa evm1;
   evm_eoa evm2;
 
-  auto total_fund = intx::uint256(vault_balance("evm"_n));
+  auto total_fund = intx::uint256(vault_balance(evm_account_name));
 
   // Fund evm1 address with 100 EOS
-  transfer_token("alice"_n, "evm"_n, make_asset(1000000), evm1.address_0x());
+  transfer_token("alice"_n, evm_account_name, make_asset(1000000), evm1.address_0x());
 
   auto evm1_balance = evm_balance(evm1);
   BOOST_REQUIRE(!!evm1_balance);
-  BOOST_REQUIRE(*evm1_balance == intx::exp<256>(10, 18) * 100);
+  BOOST_REQUIRE(*evm1_balance == 100_ether);
   total_fund += *evm1_balance;
 
   // Deploy contract
   auto token_addr = deploy_test_contract(evm1);
 
   // Deployment gas fee go to evm vault
-  BOOST_REQUIRE(*evm_balance(evm1) + intx::uint256(vault_balance("evm"_n)) == total_fund);
+  BOOST_REQUIRE(*evm_balance(evm1) + intx::uint256(vault_balance(evm_account_name)) == total_fund);
 
   // Missing authority
   BOOST_REQUIRE_EXCEPTION(admincall_test(token_addr, 1234, evm2, "alice"_n),
                           missing_auth_exception, eosio::testing::fc_exception_message_starts_with("missing authority"));
 
   // Account not created
-  BOOST_REQUIRE_EXCEPTION( admincall_test(token_addr, 1234, evm2, "evm"_n),
+  BOOST_REQUIRE_EXCEPTION( admincall_test(token_addr, 1234, evm2, evm_account_name),
                           eosio_assert_message_exception, eosio_assert_message_is("invalid address"));
 
   // Transfer small amount to create account
-  transfer_token("alice"_n, "evm"_n, make_asset(100), evm2.address_0x());
+  transfer_token("alice"_n, evm_account_name, make_asset(100), evm2.address_0x());
 
   auto evm2_balance = evm_balance(evm2);
   BOOST_REQUIRE(!!evm2_balance);
-  BOOST_REQUIRE(*evm2_balance == intx::exp<256>(10, 18 - 4) * 100);
+  BOOST_REQUIRE(*evm2_balance == 10_finney);
 
   // Insufficient funds
-  BOOST_REQUIRE_EXCEPTION( admincall_test(token_addr, 1234, evm2, "evm"_n),
+  BOOST_REQUIRE_EXCEPTION( admincall_test(token_addr, 1234, evm2, evm_account_name),
                           eosio_assert_message_exception, eosio_assert_message_is("validate_transaction error: 23 Insufficient funds"));
 
   // Transfer enough funds
-  transfer_token("alice"_n, "evm"_n, make_asset(10000), evm2.address_0x());
+  transfer_token("alice"_n, evm_account_name, make_asset(10000), evm2.address_0x());
 
-  BOOST_REQUIRE(evm_balance(evm2) == intx::exp<256>(10, 18 - 4) * 10100);
-  auto total_fund2 = intx::uint256(vault_balance("evm"_n)) + *evm_balance(evm2);
+  BOOST_REQUIRE(evm_balance(evm2) == 1010_finney);
+  auto total_fund2 = intx::uint256(vault_balance(evm_account_name)) + *evm_balance(evm2);
 
 
-  BOOST_REQUIRE_EXCEPTION(admincall_test(token_addr, 0, evm2, "evm"_n),
+  BOOST_REQUIRE_EXCEPTION(admincall_test(token_addr, 0, evm2, evm_account_name),
                           eosio_assert_message_exception, eosio_assert_message_is("tx executed inline by contract must succeed"));
 
   // Call and check results  
-  admincall_test(token_addr, 1234, evm2, "evm"_n);
+  admincall_test(token_addr, 1234, evm2, evm_account_name);
 
   auto count = get_count(token_addr);
   BOOST_REQUIRE(count == 1234);
 
   // Gas go from evm2 to evm vault
-  BOOST_REQUIRE(total_fund2 == *evm_balance(evm2) + intx::uint256(vault_balance("evm"_n)));
+  BOOST_REQUIRE(total_fund2 == *evm_balance(evm2) + intx::uint256(vault_balance(evm_account_name)));
 
   // Advance block so we do not generate same transaction.
   produce_block();
 
-  admincall_test(token_addr, 4321, evm2, "evm"_n);
+  admincall_test(token_addr, 4321, evm2, evm_account_name);
   count = get_count(token_addr);
   BOOST_REQUIRE(count == 5555);
 
   // Gas go from evm2 to evm vault
-  BOOST_REQUIRE(total_fund2 == *evm_balance(evm2) + intx::uint256(vault_balance("evm"_n)));
+  BOOST_REQUIRE(total_fund2 == *evm_balance(evm2) + intx::uint256(vault_balance(evm_account_name)));
 
   // Function being called on behalf of evm address "evm2"
   auto caller = get_lastcaller(token_addr);
@@ -262,7 +262,7 @@ BOOST_FIXTURE_TEST_CASE(admincall_test_function, call_evm_tester) try {
 BOOST_FIXTURE_TEST_CASE(deploy_contract_function, call_evm_tester) try {
   auto alice_addr = make_reserved_address("alice"_n.to_uint64_t());
   open("alice"_n);
-  transfer_token("alice"_n, "evm"_n, make_asset(1000000), "alice");
+  transfer_token("alice"_n, evm_account_name, make_asset(1000000), "alice");
 
 
   auto to = evmc::bytes();
@@ -282,7 +282,7 @@ BOOST_FIXTURE_TEST_CASE(deploy_contract_function, call_evm_tester) try {
 
   auto from = evmc::bytes{std::begin(alice_addr.bytes), std::end(alice_addr.bytes)};
 
-  admincall(from, to, 0, *data, 1000000, "evm"_n); // nonce 2->3
+  admincall(from, to, 0, *data, 1000000, evm_account_name); // nonce 2->3
   
   addr = silkworm::create_address(alice_addr, 2); 
   call_test(addr, 2222, "alice"_n, "alice"_n); // nonce 3->4
