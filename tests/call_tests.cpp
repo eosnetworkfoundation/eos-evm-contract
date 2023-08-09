@@ -28,6 +28,10 @@ struct call_evm_tester : basic_evm_tester {
           }
       }
       */
+    // Cost for first time call to test(), extra cost is needed for the lastcaller storage.
+    const intx::uint256 gas_fee = suggested_gas_price * 63526;
+    // Cost for other calls to test()
+    const intx::uint256 gas_fee2 = suggested_gas_price * 29326;
     const std::string contract_bytecode = 
           "608060405234801561001057600080fd5b506102ba806100206000396000f3fe608060405234801561001057600080fd5b50600436106100415760003560e01c806306661abd1461004657806329e99f0714610064578063d097e7a614610080575b600080fd5b61004e61009e565b60405161005b919061014c565b60405180910390f35b61007e60048036038101906100799190610198565b6100a4565b005b61008861010d565b6040516100959190610206565b60405180910390f35b60005481565b600081036100b157600080fd5b806000808282546100c29190610250565b9250508190555033600160006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff16021790555050565b600160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1681565b6000819050919050565b61014681610133565b82525050565b6000602082019050610161600083018461013d565b92915050565b600080fd5b61017581610133565b811461018057600080fd5b50565b6000813590506101928161016c565b92915050565b6000602082840312156101ae576101ad610167565b5b60006101bc84828501610183565b91505092915050565b600073ffffffffffffffffffffffffffffffffffffffff82169050919050565b60006101f0826101c5565b9050919050565b610200816101e5565b82525050565b600060208201905061021b60008301846101f7565b92915050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052601160045260246000fd5b600061025b82610133565b915061026683610133565b925082820190508082111561027e5761027d610221565b5b9291505056fea2646970667358221220edc009a00fe897643f99e8327c7fb355c96d7b91fb8a7da507513c6b2341acc564736f6c63430008120033";
 
@@ -162,7 +166,7 @@ BOOST_FIXTURE_TEST_CASE(call_test_function, call_evm_tester) try {
   call_test(token_addr, 1234, "alice"_n, "alice"_n);
   auto count = get_count(token_addr);
   BOOST_REQUIRE(count == 1234);
-
+  BOOST_REQUIRE(intx::uint256(vault_balance("alice"_n))  == 100_ether - gas_fee);
   // Gas go from alice's vault to evm's vault
   BOOST_REQUIRE(total_fund2 == intx::uint256(vault_balance("alice"_n)) + intx::uint256(vault_balance(evm_account_name)));
 
@@ -173,7 +177,7 @@ BOOST_FIXTURE_TEST_CASE(call_test_function, call_evm_tester) try {
   call_test(token_addr, 4321, "alice"_n, "alice"_n);
   count = get_count(token_addr);
   BOOST_REQUIRE(count == 5555);
-
+  BOOST_REQUIRE(intx::uint256(vault_balance("alice"_n)) == 100_ether - gas_fee - gas_fee2);
   // Gas go from alice's vault to evm's vault
   BOOST_REQUIRE(total_fund2 == intx::uint256(vault_balance("alice"_n)) + intx::uint256(vault_balance(evm_account_name)));
 
@@ -232,12 +236,13 @@ BOOST_FIXTURE_TEST_CASE(admincall_test_function, call_evm_tester) try {
   BOOST_REQUIRE_EXCEPTION(admincall_test(token_addr, 0, evm2, evm_account_name),
                           eosio_assert_message_exception, eosio_assert_message_is("tx executed inline by contract must succeed"));
 
+
   // Call and check results  
   admincall_test(token_addr, 1234, evm2, evm_account_name);
 
   auto count = get_count(token_addr);
   BOOST_REQUIRE(count == 1234);
-
+  BOOST_REQUIRE(evm_balance(evm2) == 1010_finney - gas_fee);
   // Gas go from evm2 to evm vault
   BOOST_REQUIRE(total_fund2 == *evm_balance(evm2) + intx::uint256(vault_balance(evm_account_name)));
 
@@ -247,7 +252,7 @@ BOOST_FIXTURE_TEST_CASE(admincall_test_function, call_evm_tester) try {
   admincall_test(token_addr, 4321, evm2, evm_account_name);
   count = get_count(token_addr);
   BOOST_REQUIRE(count == 5555);
-
+  BOOST_REQUIRE(evm_balance(evm2) == 1010_finney - gas_fee - gas_fee2);
   // Gas go from evm2 to evm vault
   BOOST_REQUIRE(total_fund2 == *evm_balance(evm2) + intx::uint256(vault_balance(evm_account_name)));
 
