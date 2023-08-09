@@ -20,6 +20,6 @@ ee make -j "$(nproc)"
 
 # pack
 ee popd
-ee 'tar -czf contract.tar.gz build/*'
+ee 'tar -czf contract.tar.gz --exclude="*.obj" build/*'
 
 echo "Done! - ${0##*/}"
