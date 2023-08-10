@@ -227,26 +227,28 @@ Receipt evm_contract::execute_tx( eosio::name miner, Block& block, Transaction& 
     eosio::check(tx.from.has_value(), "unable to recover sender");
     LOGTIME("EVM RECOVER SENDER");
 
-    // 1 Reject special signature NOT from self.
-    // 2 All other cases (normal signature or special signature from self) will be accepted.
-    // 3 If the from address is reserved address, the special balance needs some process.
-    check(from_self || !is_special_signature, "bridge signature used outside of bridge transaction");
-    
-    if (is_reserved_address(*tx.from)) {
-        const name ingress_account(*extract_reserved_address(*tx.from));
+    // 1 For regular signature, it's impossible to from reserved address, 
+    // and now we accpet them regardless from self or not, so no special treatment.
+    // 2 For special signature, we will reject calls not from self 
+    // and process the special balance if the tx is from reserved address.
+    if (is_special_signature) {
+        check(from_self, "bridge signature used outside of bridge transaction");
+        if (is_reserved_address(*tx.from)) {
+            const name ingress_account(*extract_reserved_address(*tx.from));
 
-        const intx::uint512 max_gas_cost = intx::uint256(tx.gas_limit) * tx.max_fee_per_gas;
-        check(max_gas_cost + tx.value < std::numeric_limits<intx::uint256>::max(), "too much gas");
-        const intx::uint256 value_with_max_gas = tx.value + (intx::uint256)max_gas_cost;
+            const intx::uint512 max_gas_cost = intx::uint256(tx.gas_limit) * tx.max_fee_per_gas;
+            check(max_gas_cost + tx.value < std::numeric_limits<intx::uint256>::max(), "too much gas");
+            const intx::uint256 value_with_max_gas = tx.value + (intx::uint256)max_gas_cost;
 
-        populate_bridge_accessors();
-        balance_table.modify(balance_table.get(ingress_account.value), eosio::same_payer, [&](balance& b){
-            b.balance -= value_with_max_gas;
-        });
-        inevm->set(inevm->get() += value_with_max_gas, eosio::same_payer);
+            populate_bridge_accessors();
+            balance_table.modify(balance_table.get(ingress_account.value), eosio::same_payer, [&](balance& b){
+                b.balance -= value_with_max_gas;
+            });
+            inevm->set(inevm->get() += value_with_max_gas, eosio::same_payer);
 
-        ep.state().set_balance(*tx.from, value_with_max_gas);
-        ep.state().set_nonce(*tx.from, tx.nonce);
+            ep.state().set_balance(*tx.from, value_with_max_gas);
+            ep.state().set_nonce(*tx.from, tx.nonce);
+        }
     }
 
     // A tx from self with regular signature can potentially from external source. 
