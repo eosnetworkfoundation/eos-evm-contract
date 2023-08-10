@@ -17,23 +17,37 @@ struct call_evm_tester : basic_evm_tester {
       pragma solidity ^0.8.0;
 
       contract Test {
-          uint256 public count;
-          address public lastcaller;
+        uint256 public count;
+        address public lastcaller;
 
-          function test(uint256 input) public {
-              require(input != 0);
+        function test(uint256 input) public {
+            require(input != 0);
+            
+            count += input;
+            lastcaller = msg.sender;
+        }
 
-              count += input;
-              lastcaller = msg.sender;
-          }
+        function testpay() payable public {
+            
+        }
+
+        function notpayable() public {
+            
+        }
+
       }
       */
     // Cost for first time call to test(), extra cost is needed for the lastcaller storage.
     const intx::uint256 gas_fee = suggested_gas_price * 63526;
     // Cost for other calls to test()
     const intx::uint256 gas_fee2 = suggested_gas_price * 29326;
+    // Cost for calls to testpay()
+    const intx::uint256 gas_fee_testpay = suggested_gas_price * 21206;
+    // Cost for calls to notpayable with 0 value
+    const intx::uint256 gas_fee_notpayable = suggested_gas_price * 21274;
+    
     const std::string contract_bytecode = 
-          "608060405234801561001057600080fd5b506102ba806100206000396000f3fe608060405234801561001057600080fd5b50600436106100415760003560e01c806306661abd1461004657806329e99f0714610064578063d097e7a614610080575b600080fd5b61004e61009e565b60405161005b919061014c565b60405180910390f35b61007e60048036038101906100799190610198565b6100a4565b005b61008861010d565b6040516100959190610206565b60405180910390f35b60005481565b600081036100b157600080fd5b806000808282546100c29190610250565b9250508190555033600160006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff16021790555050565b600160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1681565b6000819050919050565b61014681610133565b82525050565b6000602082019050610161600083018461013d565b92915050565b600080fd5b61017581610133565b811461018057600080fd5b50565b6000813590506101928161016c565b92915050565b6000602082840312156101ae576101ad610167565b5b60006101bc84828501610183565b91505092915050565b600073ffffffffffffffffffffffffffffffffffffffff82169050919050565b60006101f0826101c5565b9050919050565b610200816101e5565b82525050565b600060208201905061021b60008301846101f7565b92915050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052601160045260246000fd5b600061025b82610133565b915061026683610133565b925082820190508082111561027e5761027d610221565b5b9291505056fea2646970667358221220edc009a00fe897643f99e8327c7fb355c96d7b91fb8a7da507513c6b2341acc564736f6c63430008120033";
+          "608060405234801561001057600080fd5b5061030f806100206000396000f3fe60806040526004361061004a5760003560e01c806306661abd1461004f57806329e99f071461007a578063a1a7d817146100a3578063d097e7a6146100ad578063d79e1b6a146100d8575b600080fd5b34801561005b57600080fd5b506100646100ef565b60405161007191906101a1565b60405180910390f35b34801561008657600080fd5b506100a1600480360381019061009c91906101ed565b6100f5565b005b6100ab61015e565b005b3480156100b957600080fd5b506100c2610160565b6040516100cf919061025b565b60405180910390f35b3480156100e457600080fd5b506100ed610186565b005b60005481565b6000810361010257600080fd5b8060008082825461011391906102a5565b9250508190555033600160006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff16021790555050565b565b600160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1681565b565b6000819050919050565b61019b81610188565b82525050565b60006020820190506101b66000830184610192565b92915050565b600080fd5b6101ca81610188565b81146101d557600080fd5b50565b6000813590506101e7816101c1565b92915050565b600060208284031215610203576102026101bc565b5b6000610211848285016101d8565b91505092915050565b600073ffffffffffffffffffffffffffffffffffffffff82169050919050565b60006102458261021a565b9050919050565b6102558161023a565b82525050565b6000602082019050610270600083018461024c565b92915050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052601160045260246000fd5b60006102b082610188565b91506102bb83610188565b92508282019050808211156102d3576102d2610276565b5b9291505056fea2646970667358221220ed95d8f74110a8eb6307b7ae52b8623fd3e959169b208830a960c99a9ba1dbf564736f6c63430008120033";
 
     call_evm_tester() {
       create_accounts({"alice"_n});
@@ -57,6 +71,48 @@ struct call_evm_tester : basic_evm_tester {
       data += evmc::bytes32{amount};                // value
 
       call(eos, to, 0, data, 500000, actor);
+    }
+
+    void call_testpay(const evmc::address& contract_addr, uint128_t amount, name eos, name actor) {
+
+      auto to = evmc::bytes{std::begin(contract_addr.bytes), std::end(contract_addr.bytes)};
+
+      silkworm::Bytes data;
+      data += evmc::from_hex("a1a7d817").value();   // sha3(testpay())[:4]
+
+      call(eos, to, amount, data, 500000, actor);
+    }
+
+    void call_notpayable(const evmc::address& contract_addr, uint128_t amount, name eos, name actor) {
+
+      auto to = evmc::bytes{std::begin(contract_addr.bytes), std::end(contract_addr.bytes)};
+
+      silkworm::Bytes data;
+      data += evmc::from_hex("d79e1b6a").value();   // sha3(notpayable())[:4]
+
+      call(eos, to, amount, data, 500000, actor);
+    }
+
+  void admincall_testpay(const evmc::address& contract_addr, uint128_t amount, evm_eoa& eoa, name actor) {
+
+      auto to = evmc::bytes{std::begin(contract_addr.bytes), std::end(contract_addr.bytes)};
+      auto from = evmc::bytes{std::begin(eoa.address.bytes), std::end(eoa.address.bytes)};
+
+      silkworm::Bytes data;
+      data += evmc::from_hex("a1a7d817").value();   // sha3(testpay())[:4]
+
+      admincall(from, to, amount, data, 500000, actor);
+    }
+
+    void admincall_notpayable(const evmc::address& contract_addr, uint128_t amount, evm_eoa& eoa, name actor) {
+
+      auto to = evmc::bytes{std::begin(contract_addr.bytes), std::end(contract_addr.bytes)};
+      auto from = evmc::bytes{std::begin(eoa.address.bytes), std::end(eoa.address.bytes)};
+
+      silkworm::Bytes data;
+      data += evmc::from_hex("d79e1b6a").value();   // sha3(notpayable())[:4]
+
+      admincall(from, to, amount, data, 500000, actor);
     }
 
     void admincall_test(const evmc::address& contract_addr, uint64_t amount, evm_eoa& eoa, name actor) {
@@ -152,24 +208,28 @@ BOOST_FIXTURE_TEST_CASE(call_test_function, call_evm_tester) try {
   BOOST_REQUIRE_EXCEPTION(call_test(token_addr, 1234, "alice"_n, "alice"_n),
                           eosio_assert_message_exception, eosio_assert_message_is("decrementing more than available"));
 
-  // Transfer enough funds
+  // Transfer enough funds, save initial balance value.
   transfer_token("alice"_n, evm_account_name, make_asset(1000000), "alice");
-
-  BOOST_REQUIRE(intx::uint256(vault_balance("alice"_n)) == 100_ether);
-  auto total_fund2 = intx::uint256(vault_balance("alice"_n)) + intx::uint256(vault_balance(evm_account_name));
+  auto alice_balance = 100_ether;
+  BOOST_REQUIRE(intx::uint256(vault_balance("alice"_n)) == alice_balance);
+  auto evm_account_balance = intx::uint256(vault_balance(evm_account_name));
 
   BOOST_REQUIRE_EXCEPTION(call_test(token_addr, 0, "alice"_n, "alice"_n),
                           eosio_assert_message_exception, eosio_assert_message_is("tx executed inline by contract must succeed"));
 
+  BOOST_REQUIRE(intx::uint256(vault_balance("alice"_n)) == alice_balance);
+  BOOST_REQUIRE(intx::uint256(vault_balance(evm_account_name)) == evm_account_balance);
 
   // Call and check results 
   call_test(token_addr, 1234, "alice"_n, "alice"_n);
   auto count = get_count(token_addr);
   BOOST_REQUIRE(count == 1234);
-  BOOST_REQUIRE(intx::uint256(vault_balance("alice"_n))  == 100_ether - gas_fee);
-  // Gas go from alice's vault to evm's vault
-  BOOST_REQUIRE(total_fund2 == intx::uint256(vault_balance("alice"_n)) + intx::uint256(vault_balance(evm_account_name)));
 
+  alice_balance -= gas_fee;
+  evm_account_balance += gas_fee;
+
+  BOOST_REQUIRE(intx::uint256(vault_balance("alice"_n)) == alice_balance);
+  BOOST_REQUIRE(intx::uint256(vault_balance(evm_account_name)) == evm_account_balance);
 
   // Advance block so we do not generate same transaction.
   produce_block();
@@ -177,14 +237,73 @@ BOOST_FIXTURE_TEST_CASE(call_test_function, call_evm_tester) try {
   call_test(token_addr, 4321, "alice"_n, "alice"_n);
   count = get_count(token_addr);
   BOOST_REQUIRE(count == 5555);
-  BOOST_REQUIRE(intx::uint256(vault_balance("alice"_n)) == 100_ether - gas_fee - gas_fee2);
-  // Gas go from alice's vault to evm's vault
-  BOOST_REQUIRE(total_fund2 == intx::uint256(vault_balance("alice"_n)) + intx::uint256(vault_balance(evm_account_name)));
+
+  alice_balance -= gas_fee2;
+  evm_account_balance += gas_fee2;
+
+  BOOST_REQUIRE(intx::uint256(vault_balance("alice"_n)) == alice_balance);
+  BOOST_REQUIRE(intx::uint256(vault_balance(evm_account_name)) == evm_account_balance);
+  BOOST_REQUIRE(*evm_balance(token_addr) == 0);
 
   // Function being called on behalf of reserved address of eos account "alice"
   auto caller = get_lastcaller(token_addr);
   BOOST_REQUIRE(caller == make_reserved_address("alice"_n.to_uint64_t()));
 
+
+  BOOST_REQUIRE_EXCEPTION(call_notpayable(token_addr, 100, "alice"_n, "alice"_n),
+                          eosio_assert_message_exception, eosio_assert_message_is("tx executed inline by contract must succeed"));
+
+  BOOST_REQUIRE(intx::uint256(vault_balance("alice"_n)) == alice_balance);
+  BOOST_REQUIRE(intx::uint256(vault_balance(evm_account_name)) == evm_account_balance);
+  BOOST_REQUIRE(*evm_balance(token_addr) == 0);
+
+  call_notpayable(token_addr, 0, "alice"_n, "alice"_n);
+
+  alice_balance -= gas_fee_notpayable;
+  evm_account_balance += gas_fee_notpayable;
+
+  BOOST_REQUIRE(intx::uint256(vault_balance("alice"_n)) == alice_balance);
+  BOOST_REQUIRE(intx::uint256(vault_balance(evm_account_name)) == evm_account_balance);
+  BOOST_REQUIRE(*evm_balance(token_addr) == 0);
+
+  call_testpay(token_addr, 0, "alice"_n, "alice"_n);
+
+  alice_balance -= gas_fee_testpay;
+  evm_account_balance += gas_fee_testpay;
+
+  BOOST_REQUIRE(intx::uint256(vault_balance("alice"_n)) == alice_balance);
+  BOOST_REQUIRE(intx::uint256(vault_balance(evm_account_name)) == evm_account_balance);
+  BOOST_REQUIRE(*evm_balance(token_addr) == 0);
+
+  call_testpay(token_addr, *((uint128_t*)intx::as_words(50_ether)), "alice"_n, "alice"_n);
+
+  alice_balance -= gas_fee_testpay;
+  alice_balance -= 50_ether;
+  evm_account_balance += gas_fee_testpay;
+
+  BOOST_REQUIRE(intx::uint256(vault_balance("alice"_n)) == alice_balance);
+  BOOST_REQUIRE(intx::uint256(vault_balance(evm_account_name)) == evm_account_balance);
+  BOOST_REQUIRE(*evm_balance(token_addr) == 50_ether);
+
+  // Advance block so we do not generate same transaction.
+  produce_block();
+
+  // No enough gas
+  BOOST_REQUIRE_EXCEPTION(call_testpay(token_addr, *((uint128_t*)intx::as_words(50_ether)), "alice"_n, "alice"_n),
+                          eosio_assert_message_exception, eosio_assert_message_is("decrementing more than available"));
+  BOOST_REQUIRE(intx::uint256(vault_balance("alice"_n)) == alice_balance);
+  BOOST_REQUIRE(intx::uint256(vault_balance(evm_account_name)) == evm_account_balance);
+  BOOST_REQUIRE(*evm_balance(token_addr) == 50_ether);
+
+   call_testpay(token_addr, *((uint128_t*)intx::as_words(10_ether)), "alice"_n, "alice"_n);   
+
+  alice_balance -= gas_fee_testpay;
+  alice_balance -= 10_ether;
+  evm_account_balance += gas_fee_testpay;
+
+  BOOST_REQUIRE(intx::uint256(vault_balance("alice"_n)) == alice_balance);
+  BOOST_REQUIRE(intx::uint256(vault_balance(evm_account_name)) == evm_account_balance);                
+  BOOST_REQUIRE(*evm_balance(token_addr) == 60_ether);
 } FC_LOG_AND_RETHROW()
 
 BOOST_FIXTURE_TEST_CASE(admincall_test_function, call_evm_tester) try {
@@ -218,20 +337,19 @@ BOOST_FIXTURE_TEST_CASE(admincall_test_function, call_evm_tester) try {
   // Transfer small amount to create account
   transfer_token("alice"_n, evm_account_name, make_asset(100), evm2.address_0x());
 
-  auto evm2_balance = evm_balance(evm2);
-  BOOST_REQUIRE(!!evm2_balance);
-  BOOST_REQUIRE(*evm2_balance == 10_finney);
+  auto tb = evm_balance(evm2);
+  BOOST_REQUIRE(!!tb);
+  BOOST_REQUIRE(*tb == 10_finney);
 
   // Insufficient funds
   BOOST_REQUIRE_EXCEPTION( admincall_test(token_addr, 1234, evm2, evm_account_name),
                           eosio_assert_message_exception, eosio_assert_message_is("validate_transaction error: 23 Insufficient funds"));
 
-  // Transfer enough funds
-  transfer_token("alice"_n, evm_account_name, make_asset(10000), evm2.address_0x());
-
-  BOOST_REQUIRE(evm_balance(evm2) == 1010_finney);
-  auto total_fund2 = intx::uint256(vault_balance(evm_account_name)) + *evm_balance(evm2);
-
+  // Transfer enough funds, save initial balance
+  transfer_token("alice"_n, evm_account_name, make_asset(999900), evm2.address_0x());
+  auto evm2_balance = 100_ether;
+  BOOST_REQUIRE(evm_balance(evm2) == evm2_balance);
+  auto evm_account_balance = intx::uint256(vault_balance(evm_account_name));
 
   BOOST_REQUIRE_EXCEPTION(admincall_test(token_addr, 0, evm2, evm_account_name),
                           eosio_assert_message_exception, eosio_assert_message_is("tx executed inline by contract must succeed"));
@@ -242,9 +360,12 @@ BOOST_FIXTURE_TEST_CASE(admincall_test_function, call_evm_tester) try {
 
   auto count = get_count(token_addr);
   BOOST_REQUIRE(count == 1234);
-  BOOST_REQUIRE(evm_balance(evm2) == 1010_finney - gas_fee);
-  // Gas go from evm2 to evm vault
-  BOOST_REQUIRE(total_fund2 == *evm_balance(evm2) + intx::uint256(vault_balance(evm_account_name)));
+
+  evm2_balance -= gas_fee;
+  evm_account_balance += gas_fee;
+
+  BOOST_REQUIRE(evm_balance(evm2) == evm2_balance);
+  BOOST_REQUIRE(intx::uint256(vault_balance(evm_account_name)) == evm_account_balance);
 
   // Advance block so we do not generate same transaction.
   produce_block();
@@ -252,14 +373,71 @@ BOOST_FIXTURE_TEST_CASE(admincall_test_function, call_evm_tester) try {
   admincall_test(token_addr, 4321, evm2, evm_account_name);
   count = get_count(token_addr);
   BOOST_REQUIRE(count == 5555);
-  BOOST_REQUIRE(evm_balance(evm2) == 1010_finney - gas_fee - gas_fee2);
-  // Gas go from evm2 to evm vault
-  BOOST_REQUIRE(total_fund2 == *evm_balance(evm2) + intx::uint256(vault_balance(evm_account_name)));
+
+  evm2_balance -= gas_fee2;
+  evm_account_balance += gas_fee2;
+
+  BOOST_REQUIRE(evm_balance(evm2) == evm2_balance);
+  BOOST_REQUIRE(intx::uint256(vault_balance(evm_account_name)) == evm_account_balance);
 
   // Function being called on behalf of evm address "evm2"
   auto caller = get_lastcaller(token_addr);
   BOOST_REQUIRE(caller== evm2.address);
+  
+  BOOST_REQUIRE_EXCEPTION(admincall_notpayable(token_addr, 100, evm2, evm_account_name),
+                          eosio_assert_message_exception, eosio_assert_message_is("tx executed inline by contract must succeed"));
 
+  BOOST_REQUIRE(evm_balance(evm2)== evm2_balance);
+  BOOST_REQUIRE(intx::uint256(vault_balance(evm_account_name)) == evm_account_balance);
+  BOOST_REQUIRE(*evm_balance(token_addr) == 0);
+
+  admincall_notpayable(token_addr, 0, evm2, evm_account_name);
+
+  evm2_balance -= gas_fee_notpayable;
+  evm_account_balance += gas_fee_notpayable;
+
+  BOOST_REQUIRE(evm_balance(evm2) == evm2_balance);
+  BOOST_REQUIRE(intx::uint256(vault_balance(evm_account_name)) == evm_account_balance);
+  BOOST_REQUIRE(*evm_balance(token_addr) == 0);
+
+  admincall_testpay(token_addr, 0, evm2, evm_account_name);
+
+  evm2_balance -= gas_fee_testpay;
+  evm_account_balance += gas_fee_testpay;
+
+  BOOST_REQUIRE(evm_balance(evm2) == evm2_balance);
+  BOOST_REQUIRE(intx::uint256(vault_balance(evm_account_name)) == evm_account_balance);
+  BOOST_REQUIRE(*evm_balance(token_addr) == 0);
+
+  admincall_testpay(token_addr, *((uint128_t*)intx::as_words(50_ether)), evm2, evm_account_name);
+
+  evm2_balance -= gas_fee_testpay;
+  evm2_balance -= 50_ether;
+  evm_account_balance += gas_fee_testpay;
+
+  BOOST_REQUIRE(evm_balance(evm2)== evm2_balance);
+  BOOST_REQUIRE(intx::uint256(vault_balance(evm_account_name)) == evm_account_balance);
+  BOOST_REQUIRE(*evm_balance(token_addr) == 50_ether);
+
+  // Advance block so we do not generate same transaction.
+  produce_block();
+
+  // No enough gas
+  BOOST_REQUIRE_EXCEPTION(admincall_testpay(token_addr, *((uint128_t*)intx::as_words(50_ether)), evm2, evm_account_name),
+                          eosio_assert_message_exception, eosio_assert_message_is("validate_transaction error: 23 Insufficient funds"));
+  BOOST_REQUIRE(evm_balance(evm2) == evm2_balance);
+  BOOST_REQUIRE(intx::uint256(vault_balance(evm_account_name)) == evm_account_balance);
+  BOOST_REQUIRE(*evm_balance(token_addr) == 50_ether);
+
+  admincall_testpay(token_addr, *((uint128_t*)intx::as_words(10_ether)), evm2, evm_account_name);   
+
+  evm2_balance -= gas_fee_testpay;
+  evm2_balance -= 10_ether;
+  evm_account_balance += gas_fee_testpay;
+
+  BOOST_REQUIRE(evm_balance(evm2) == evm2_balance);
+  BOOST_REQUIRE(intx::uint256(vault_balance(evm_account_name)) == evm_account_balance);                
+  BOOST_REQUIRE(*evm_balance(token_addr) == 60_ether);
 
 } FC_LOG_AND_RETHROW()
 
