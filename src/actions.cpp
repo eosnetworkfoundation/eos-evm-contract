@@ -594,7 +594,7 @@ void evm_contract::call(eosio::name from, const bytes& to, uint128_t value, cons
     assert_unfrozen();
     require_auth(from);
 
-    call_(from.value, to, intx::uint256(value), data, gas_limit, get_and_increment_nonce(from));
+    call_(from.value, to, intx::uint256(intx::uint128(value)), data, gas_limit, get_and_increment_nonce(from));
 }
 
 void evm_contract::admincall(const bytes& from, const bytes& to, uint128_t value, const bytes& data, uint64_t gas_limit) {
@@ -623,7 +623,7 @@ void evm_contract::admincall(const bytes& from, const bytes& to, uint128_t value
         nonce = account->nonce;
     }
     
-    call_(s, to, intx::uint256(value), data, gas_limit, nonce);
+    call_(s, to, intx::uint256(intx::uint128(value)), data, gas_limit, nonce);
 }
 
 #ifdef WITH_TEST_ACTIONS
