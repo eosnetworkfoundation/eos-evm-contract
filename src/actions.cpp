@@ -590,16 +590,24 @@ void evm_contract::call_(intx::uint256 s, const bytes& to, intx::uint256 value, 
     pushtx_act.send(get_self(), rlp);
 }
 
-void evm_contract::call(eosio::name from, const bytes& to, uint128_t value, const bytes& data, uint64_t gas_limit) {
+void evm_contract::call(eosio::name from, const bytes& to, const bytes& value, const bytes& data, uint64_t gas_limit) {
     assert_unfrozen();
     require_auth(from);
 
-    call_(from.value, to, intx::uint256(intx::uint128(value)), data, gas_limit, get_and_increment_nonce(from));
+    // Prepare v
+    eosio::check(value.size() == sizeof(intx::uint256), "invalid value");
+    intx::uint256 v = intx::be::unsafe::load<intx::uint256>((const uint8_t *)value.data());
+
+    call_(from.value, to, v, data, gas_limit, get_and_increment_nonce(from));
 }
 
-void evm_contract::admincall(const bytes& from, const bytes& to, uint128_t value, const bytes& data, uint64_t gas_limit) {
+void evm_contract::admincall(const bytes& from, const bytes& to, const bytes& value, const bytes& data, uint64_t gas_limit) {
     assert_unfrozen();
     require_auth(get_self());
+
+    // Prepare v
+    eosio::check(value.size() == sizeof(intx::uint256), "invalid value");
+    intx::uint256 v = intx::be::unsafe::load<intx::uint256>((const uint8_t *)value.data());
     
     // Prepare s
     eosio::check(from.size() == kAddressLength, err_msg_invalid_addr);
@@ -623,7 +631,7 @@ void evm_contract::admincall(const bytes& from, const bytes& to, uint128_t value
         nonce = account->nonce;
     }
     
-    call_(s, to, intx::uint256(intx::uint128(value)), data, gas_limit, nonce);
+    call_(s, to, v, data, gas_limit, nonce);
 }
 
 #ifdef WITH_TEST_ACTIONS

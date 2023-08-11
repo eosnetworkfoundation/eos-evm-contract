@@ -85,8 +85,8 @@ public:
    [[eosio::action]] bool gc(uint32_t max);
 
    
-   [[eosio::action]] void call(eosio::name from, const bytes& to, uint128_t value, const bytes& data, uint64_t gas_limit);
-   [[eosio::action]] void admincall(const bytes& from, const bytes& to, uint128_t value, const bytes& data, uint64_t gas_limit);
+   [[eosio::action]] void call(eosio::name from, const bytes& to, const bytes& value, const bytes& data, uint64_t gas_limit);
+   [[eosio::action]] void admincall(const bytes& from, const bytes& to, const bytes& value, const bytes& data, uint64_t gas_limit);
 
 #ifdef WITH_TEST_ACTIONS
    [[eosio::action]] void testtx(const std::optional<bytes>& orlptx, const evm_runtime::test::block_info& bi);

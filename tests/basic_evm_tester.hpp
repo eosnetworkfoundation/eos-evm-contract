@@ -200,8 +200,8 @@ public:
 
    transaction_trace_ptr exec(const exec_input& input, const std::optional<exec_callback>& callback);
    void pushtx(const silkworm::Transaction& trx, name miner = evm_account_name);
-   void call(name from, const evmc::bytes& to, uint128_t value, evmc::bytes& data, uint64_t gas_limit, name actor);
-   void admincall(const evmc::bytes& from, const evmc::bytes& to, uint128_t value, evmc::bytes& data, uint64_t gas_limit, name actor);
+   void call(name from, const evmc::bytes& to, const evmc::bytes& value, evmc::bytes& data, uint64_t gas_limit, name actor);
+   void admincall(const evmc::bytes& from, const evmc::bytes& to, const evmc::bytes& value, evmc::bytes& data, uint64_t gas_limit, name actor);
    evmc::address deploy_contract(evm_eoa& eoa, evmc::bytes bytecode);
 
    void addegress(const std::vector<name>& accounts);

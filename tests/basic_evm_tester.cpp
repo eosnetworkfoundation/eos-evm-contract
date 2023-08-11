@@ -291,7 +291,7 @@ transaction_trace_ptr basic_evm_tester::exec(const exec_input& input, const std:
    return basic_evm_tester::push_action(evm_account_name, "exec"_n, evm_account_name, bytes{binary_data.begin(), binary_data.end()});
 }
 
-void basic_evm_tester::call(name from, const evmc::bytes& to, uint128_t value, evmc::bytes& data, uint64_t gas_limit, name actor)
+void basic_evm_tester::call(name from, const evmc::bytes& to, const evmc::bytes& value, evmc::bytes& data, uint64_t gas_limit, name actor)
 {
    bytes to_bytes;
    to_bytes.resize(to.size());
@@ -301,10 +301,14 @@ void basic_evm_tester::call(name from, const evmc::bytes& to, uint128_t value, e
    data_bytes.resize(data.size());
    memcpy(data_bytes.data(), data.data(), data.size());
 
-   push_action(evm_account_name, "call"_n, actor,  mvo()("from", from)("to", to_bytes)("value", value)("data", data_bytes)("gas_limit", gas_limit));
+   bytes value_bytes;
+   value_bytes.resize(value.size());
+   memcpy(value_bytes.data(), value.data(), value.size());
+
+   push_action(evm_account_name, "call"_n, actor,  mvo()("from", from)("to", to_bytes)("value", value_bytes)("data", data_bytes)("gas_limit", gas_limit));
 }
 
-void basic_evm_tester::admincall(const evmc::bytes& from, const evmc::bytes& to, uint128_t value, evmc::bytes& data, uint64_t gas_limit, name actor)
+void basic_evm_tester::admincall(const evmc::bytes& from, const evmc::bytes& to, const evmc::bytes& value, evmc::bytes& data, uint64_t gas_limit, name actor)
 {
    bytes to_bytes;
    to_bytes.resize(to.size());
@@ -318,7 +322,11 @@ void basic_evm_tester::admincall(const evmc::bytes& from, const evmc::bytes& to,
    from_bytes.resize(from.size());
    memcpy(from_bytes.data(), from.data(), from.size());
 
-   push_action(evm_account_name, "admincall"_n, actor,  mvo()("from", from_bytes)("to", to_bytes)("value", value)("data", data_bytes)("gas_limit", gas_limit));
+   bytes value_bytes;
+   value_bytes.resize(value.size());
+   memcpy(value_bytes.data(), value.data(), value.size());
+
+   push_action(evm_account_name, "admincall"_n, actor,  mvo()("from", from_bytes)("to", to_bytes)("value", value_bytes)("data", data_bytes)("gas_limit", gas_limit));
 }
 
 void basic_evm_tester::pushtx(const silkworm::Transaction& trx, name miner)

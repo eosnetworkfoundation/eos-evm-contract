@@ -70,7 +70,10 @@ struct call_evm_tester : basic_evm_tester {
       data += evmc::from_hex("29e99f07").value();   // sha3(test(uint256))[:4]
       data += evmc::bytes32{amount};                // value
 
-      call(eos, to, 0, data, 500000, actor);
+      evmc::bytes32 v;
+      intx::be::store(v.bytes, intx::uint256(0));
+
+      call(eos, to, silkworm::Bytes(v), data, 500000, actor);
     }
 
     void call_testpay(const evmc::address& contract_addr, uint128_t amount, name eos, name actor) {
@@ -80,7 +83,10 @@ struct call_evm_tester : basic_evm_tester {
       silkworm::Bytes data;
       data += evmc::from_hex("a1a7d817").value();   // sha3(testpay())[:4]
 
-      call(eos, to, amount, data, 500000, actor);
+      evmc::bytes32 v;
+      intx::be::store(v.bytes, intx::uint256(intx::uint128(amount)));
+
+      call(eos, to, silkworm::Bytes(v), data, 500000, actor);
     }
 
     void call_notpayable(const evmc::address& contract_addr, uint128_t amount, name eos, name actor) {
@@ -90,7 +96,10 @@ struct call_evm_tester : basic_evm_tester {
       silkworm::Bytes data;
       data += evmc::from_hex("d79e1b6a").value();   // sha3(notpayable())[:4]
 
-      call(eos, to, amount, data, 500000, actor);
+      evmc::bytes32 v;
+      intx::be::store(v.bytes, intx::uint256(intx::uint128(amount)));
+
+      call(eos, to, silkworm::Bytes(v), data, 500000, actor);
     }
 
   void admincall_testpay(const evmc::address& contract_addr, uint128_t amount, evm_eoa& eoa, name actor) {
@@ -101,7 +110,10 @@ struct call_evm_tester : basic_evm_tester {
       silkworm::Bytes data;
       data += evmc::from_hex("a1a7d817").value();   // sha3(testpay())[:4]
 
-      admincall(from, to, amount, data, 500000, actor);
+      evmc::bytes32 v;
+      intx::be::store(v.bytes, intx::uint256(intx::uint128(amount)));
+
+      admincall(from, to, silkworm::Bytes(v), data, 500000, actor);
     }
 
     void admincall_notpayable(const evmc::address& contract_addr, uint128_t amount, evm_eoa& eoa, name actor) {
@@ -112,7 +124,10 @@ struct call_evm_tester : basic_evm_tester {
       silkworm::Bytes data;
       data += evmc::from_hex("d79e1b6a").value();   // sha3(notpayable())[:4]
 
-      admincall(from, to, amount, data, 500000, actor);
+      evmc::bytes32 v;
+      intx::be::store(v.bytes, intx::uint256(intx::uint128(amount)));
+
+      admincall(from, to, silkworm::Bytes(v), data, 500000, actor);
     }
 
     void admincall_test(const evmc::address& contract_addr, uint64_t amount, evm_eoa& eoa, name actor) {
@@ -122,7 +137,10 @@ struct call_evm_tester : basic_evm_tester {
       data += evmc::from_hex("29e99f07").value();   // sha3(test(uint256))[:4]
       data += evmc::bytes32{amount};                // value
 
-      admincall(from, to, 0, data, 500000, actor);
+      evmc::bytes32 v;
+      intx::be::store(v.bytes, intx::uint256(0));
+
+      admincall(from, to, silkworm::Bytes(v), data, 500000, actor);
     }
 
     intx::uint256 get_count(const evmc::address& contract_addr, std::optional<exec_callback> callback={}, std::optional<bytes> context={}) {
@@ -446,13 +464,15 @@ BOOST_FIXTURE_TEST_CASE(deploy_contract_function, call_evm_tester) try {
   auto alice_addr = make_reserved_address("alice"_n.to_uint64_t());
   open("alice"_n);
   transfer_token("alice"_n, evm_account_name, make_asset(1000000), "alice");
-
+  
+  
+  evmc::bytes32 v;
 
   auto to = evmc::bytes();
 
   auto data = evmc::from_hex(contract_bytecode);
 
-  call("alice"_n, to, 0, *data, 1000000, "alice"_n); // nonce 0->1
+  call("alice"_n, to, silkworm::Bytes(v), *data, 1000000, "alice"_n); // nonce 0->1
   
   auto addr = silkworm::create_address(alice_addr, 0); 
 
@@ -465,7 +485,7 @@ BOOST_FIXTURE_TEST_CASE(deploy_contract_function, call_evm_tester) try {
 
   auto from = evmc::bytes{std::begin(alice_addr.bytes), std::end(alice_addr.bytes)};
 
-  admincall(from, to, 0, *data, 1000000, evm_account_name); // nonce 2->3
+  admincall(from, to, silkworm::Bytes(v), *data, 1000000, evm_account_name); // nonce 2->3
   
   addr = silkworm::create_address(alice_addr, 2); 
   call_test(addr, 2222, "alice"_n, "alice"_n); // nonce 3->4
