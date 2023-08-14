@@ -40,6 +40,7 @@ namespace silkworm {
 namespace evm_runtime {
 
 static constexpr uint32_t hundred_percent = 100'000;
+static constexpr char err_msg_invalid_addr[] = "invalid address";
 
 using namespace silkworm;
 
@@ -219,32 +220,40 @@ Receipt evm_contract::execute_tx( eosio::name miner, Block& block, Transaction& 
         inevm.emplace(get_self(), get_self().value);
     };
 
+    bool is_special_signature = silkworm::is_special_signature(tx.r, tx.s);
+
     tx.from.reset();
     tx.recover_sender();
     eosio::check(tx.from.has_value(), "unable to recover sender");
     LOGTIME("EVM RECOVER SENDER");
 
-    if(from_self) {
-        check(is_reserved_address(*tx.from), "actions from self without a reserved from address are unexpected");
-        const name ingress_account(*extract_reserved_address(*tx.from));
-
-        const intx::uint512 max_gas_cost = intx::uint256(tx.gas_limit) * tx.max_fee_per_gas;
-        check(max_gas_cost + tx.value < std::numeric_limits<intx::uint256>::max(), "too much gas");
-        const intx::uint256 value_with_max_gas = tx.value + (intx::uint256)max_gas_cost;
-
-        populate_bridge_accessors();
-        balance_table.modify(balance_table.get(ingress_account.value), eosio::same_payer, [&](balance& b){
-            b.balance -= value_with_max_gas;
-        });
-        inevm->set(inevm->get() += value_with_max_gas, eosio::same_payer);
-
-        ep.state().set_balance(*tx.from, value_with_max_gas);
-        ep.state().set_nonce(*tx.from, tx.nonce);
-    }
-    else if(is_reserved_address(*tx.from))
+    // 1 For regular signature, it's impossible to from reserved address, 
+    // and now we accpet them regardless from self or not, so no special treatment.
+    // 2 For special signature, we will reject calls not from self 
+    // and process the special balance if the tx is from reserved address.
+    if (is_special_signature) {
         check(from_self, "bridge signature used outside of bridge transaction");
+        if (is_reserved_address(*tx.from)) {
+            const name ingress_account(*extract_reserved_address(*tx.from));
 
-    if(enforce_chain_id && !from_self) {
+            const intx::uint512 max_gas_cost = intx::uint256(tx.gas_limit) * tx.max_fee_per_gas;
+            check(max_gas_cost + tx.value < std::numeric_limits<intx::uint256>::max(), "too much gas");
+            const intx::uint256 value_with_max_gas = tx.value + (intx::uint256)max_gas_cost;
+
+            populate_bridge_accessors();
+            balance_table.modify(balance_table.get(ingress_account.value), eosio::same_payer, [&](balance& b){
+                b.balance -= value_with_max_gas;
+            });
+            inevm->set(inevm->get() += value_with_max_gas, eosio::same_payer);
+
+            ep.state().set_balance(*tx.from, value_with_max_gas);
+            ep.state().set_nonce(*tx.from, tx.nonce);
+        }
+    }
+
+    // A tx from self with regular signature can potentially from external source. 
+    // Therefore, only tx with special signature can waive the chain_id check.
+    if(enforce_chain_id && !is_special_signature) {
         check(tx.chain_id.has_value(), "tx without chain-id");
     }
 
@@ -269,7 +278,7 @@ Receipt evm_contract::execute_tx( eosio::name miner, Block& block, Transaction& 
     }
 
     if(from_self)
-        eosio::check(receipt.success, "ingress bridge actions must succeed");
+        eosio::check(receipt.success, "tx executed inline by contract must succeed");
 
     if(!ep.state().reserved_objects().empty()) {
         bool non_open_account_sent = false;
@@ -452,7 +461,7 @@ void evm_contract::close(eosio::name owner) {
 uint64_t evm_contract::get_and_increment_nonce(const name owner) {
     nextnonces nextnonce_table(get_self(), get_self().value);
 
-    const nextnonce& nonce = nextnonce_table.get(owner.value);
+    const nextnonce& nonce = nextnonce_table.get(owner.value, "caller account has not been opened");
     uint64_t ret = nonce.next_nonce;
     nextnonce_table.modify(nonce, eosio::same_payer, [](nextnonce& n){
         ++n.next_nonce;
@@ -553,6 +562,76 @@ bool evm_contract::gc(uint32_t max) {
 
     evm_runtime::state state{get_self(), eosio::same_payer};
     return state.gc(max);
+}
+
+void evm_contract::call_(intx::uint256 s, const bytes& to, intx::uint256 value, const bytes& data, uint64_t gas_limit, uint64_t nonce) {
+    const auto& current_config = _config.get();
+
+    Transaction txn;
+    txn.type = TransactionType::kLegacy;
+    txn.nonce = nonce;
+    txn.max_priority_fee_per_gas = current_config.gas_price;
+    txn.max_fee_per_gas = current_config.gas_price;
+    txn.gas_limit = gas_limit;
+    txn.value = value;
+    txn.data = Bytes{(const uint8_t*)data.data(), data.size()};
+    txn.r = 0u;  // r == 0 is pseudo signature that resolves to reserved address range
+    txn.s = s;
+
+    // Allow empty to so that it can support contract creation calls.
+    if (!to.empty()) {
+        ByteView bv_to{(const uint8_t*)to.data(), to.size()};
+        txn.to = to_evmc_address(bv_to);
+    }
+
+    Bytes rlp;
+    rlp::encode(rlp, txn);
+    pushtx_action pushtx_act(get_self(), {{get_self(), "active"_n}});
+    pushtx_act.send(get_self(), rlp);
+}
+
+void evm_contract::call(eosio::name from, const bytes& to, const bytes& value, const bytes& data, uint64_t gas_limit) {
+    assert_unfrozen();
+    require_auth(from);
+
+    // Prepare v
+    eosio::check(value.size() == sizeof(intx::uint256), "invalid value");
+    intx::uint256 v = intx::be::unsafe::load<intx::uint256>((const uint8_t *)value.data());
+
+    call_(from.value, to, v, data, gas_limit, get_and_increment_nonce(from));
+}
+
+void evm_contract::admincall(const bytes& from, const bytes& to, const bytes& value, const bytes& data, uint64_t gas_limit) {
+    assert_unfrozen();
+    require_auth(get_self());
+
+    // Prepare v
+    eosio::check(value.size() == sizeof(intx::uint256), "invalid value");
+    intx::uint256 v = intx::be::unsafe::load<intx::uint256>((const uint8_t *)value.data());
+    
+    // Prepare s
+    eosio::check(from.size() == kAddressLength, err_msg_invalid_addr);
+    uint8_t s_buffer[32] = {};
+    memcpy(s_buffer + 32 - kAddressLength, from.data(), kAddressLength);
+    intx::uint256 s = intx::be::load<intx::uint256>(s_buffer);
+    // pad with '1's
+    s |= ((~intx::uint256(0)) << (kAddressLength * 8));
+
+    // Prepare nonce
+    auto from_addr = to_address(from);
+    auto eos_acct = extract_reserved_address(from_addr);
+    uint64_t nonce = 0;
+    if (eos_acct) {
+        nonce = get_and_increment_nonce(eosio::name(*eos_acct));
+    }
+    else {
+        evm_runtime::state state{get_self(), get_self(), true};
+        auto account = state.read_account(from_addr);
+        check(!!account, err_msg_invalid_addr);
+        nonce = account->nonce;
+    }
+    
+    call_(s, to, v, data, gas_limit, nonce);
 }
 
 #ifdef WITH_TEST_ACTIONS
