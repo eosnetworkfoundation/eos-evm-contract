@@ -611,9 +611,9 @@ void evm_contract::admincall(const bytes& from, const bytes& to, const bytes& va
     
     // Prepare s
     eosio::check(from.size() == kAddressLength, err_msg_invalid_addr);
-    intx::uint256 s = intx::be::unsafe::load<intx::uint256>((const uint8_t *)from.data());
-    // load will put the data in higher bytes, shift them donw.
-    s >>= 256 - kAddressLength * 8;
+    uint8_t s_buffer[32] = {};
+    memcpy(s_buffer + 32 - kAddressLength, from.data(), kAddressLength);
+    intx::uint256 s = intx::be::load<intx::uint256>(s_buffer);
     // pad with '1's
     s |= ((~intx::uint256(0)) << (kAddressLength * 8));
 
