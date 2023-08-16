@@ -4,8 +4,8 @@
 
 namespace evm_runtime { namespace bridge {
 
-struct emit {
-    static constexpr uint32_t id = 0x44282a35; //sha3('emit_(string,bytes)')[:4]
+struct message_v0 {
+    static constexpr uint32_t id = 0x24578ea5; //sha3('bridgeMsgV0(string,bytes)')[:4]
 
     string account;
     bytes  data;
@@ -21,9 +21,9 @@ struct emit {
     mutable std::optional<name> account_;
 };
 
-using call = std::variant<emit>;
+using message = std::variant<message_v0>;
 
-std::optional<call> decode_emit_message(eosio::datastream<const uint8_t*>& ds) {
+message_v0 decode_message_v0(eosio::datastream<const uint8_t*>& ds) {
     // offset_p1 (32) + offset_p2 (32)
     // p1_len    (32) + p1_data   ((p1_len+31)/32*32)
     // p2_len    (32) + p1_data   ((p2_len+31)/32*32)
@@ -35,7 +35,7 @@ std::optional<call> decode_emit_message(eosio::datastream<const uint8_t*>& ds) {
     ds >> offset_p2;
     eosio::check(offset_p2 == 0x80, "invalid p2 offset");
 
-    emit res;
+    message_v0 res;
 
     auto get_length=[&]() -> uint32_t {
         uint256 len;
@@ -59,13 +59,13 @@ std::optional<call> decode_emit_message(eosio::datastream<const uint8_t*>& ds) {
     return res;
 }
 
-std::optional<call> decode_call_message(ByteView bv) {
+std::optional<message> decode_message(ByteView bv) {
     // method_id (4)
     eosio::datastream<const uint8_t*> ds(bv.data(), bv.size());
     uint32_t method_id;
     ds >> method_id;
 
-    if(method_id == __builtin_bswap32(emit::id)) return decode_emit_message(ds);
+    if(method_id == __builtin_bswap32(message_v0::id)) return decode_message_v0(ds);
     return {};
 }
 
