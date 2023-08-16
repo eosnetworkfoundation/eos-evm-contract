@@ -228,6 +228,7 @@ public:
    void close(name owner);
    void withdraw(name owner, asset quantity);
 
+   balance_and_dust inevm() const;
    balance_and_dust vault_balance(name owner) const;
    std::optional<intx::uint256> evm_balance(const evmc::address& address) const;
    std::optional<intx::uint256> evm_balance(const evm_eoa& account) const;
