@@ -51,11 +51,6 @@ struct native_token_evm_tester : basic_evm_tester {
    uint64_t vault_balance_dust(name owner) const {
       return vault_balance(owner).dust;
    }
-
-   balance_and_dust inevm() const
-   {
-      return fc::raw::unpack<balance_and_dust>(get_row_by_account("evm"_n, "evm"_n, "inevm"_n, "inevm"_n));
-   }
 };
 
 struct native_token_evm_tester_EOS : native_token_evm_tester {

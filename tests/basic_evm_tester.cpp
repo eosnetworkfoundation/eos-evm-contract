@@ -400,6 +400,10 @@ void basic_evm_tester::withdraw(name owner, asset quantity)
    push_action(evm_account_name, "withdraw"_n, owner, mvo()("owner", owner)("quantity", quantity));
 }
 
+balance_and_dust basic_evm_tester::inevm() const {
+   return fc::raw::unpack<balance_and_dust>(get_row_by_account(evm_account_name, evm_account_name, "inevm"_n, "inevm"_n));
+}
+
 balance_and_dust basic_evm_tester::vault_balance(name owner) const
 {
    const vector<char> d = get_row_by_account(evm_account_name, evm_account_name, "balances"_n, owner);
