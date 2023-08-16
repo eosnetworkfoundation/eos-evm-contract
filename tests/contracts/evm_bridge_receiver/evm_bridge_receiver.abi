@@ -1,10 +1,15 @@
 {
     "____comment": "This file was generated with eosio-abigen. DO NOT EDIT ",
     "version": "eosio::abi/1.2",
-    "types": [],
+    "types": [
+        {
+            "new_type_name": "bridge_message",
+            "type": "variant_bridge_message_v0"
+        }
+    ],
     "structs": [
         {
-            "name": "onbridgemsg",
+            "name": "bridge_message_v0",
             "base": "",
             "fields": [
                 {
@@ -28,6 +33,16 @@
                     "type": "bytes"
                 }
             ]
+        },
+        {
+            "name": "onbridgemsg",
+            "base": "",
+            "fields": [
+                {
+                    "name": "msg",
+                    "type": "bridge_message"
+                }
+            ]
         }
     ],
     "actions": [
@@ -39,6 +54,11 @@
     ],
     "tables": [],
     "ricardian_clauses": [],
-    "variants": [],
+    "variants": [
+        {
+            "name": "variant_bridge_message_v0",
+            "types": ["bridge_message_v0"]
+        }
+    ],
     "action_results": []
 }

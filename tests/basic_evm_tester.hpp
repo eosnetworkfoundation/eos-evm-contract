@@ -114,13 +114,15 @@ struct message_receiver {
     asset min_fee;
 };
 
-struct bridge_emit_message {
+struct bridge_message_v0 {
    name       receiver;
    bytes      sender;
    time_point timestamp;
    bytes      value;
    bytes      data;
 };
+
+using bridge_message = std::variant<bridge_message_v0>;
 
 } // namespace evm_test
 
@@ -137,7 +139,7 @@ FC_REFLECT(evm_test::exec_callback, (contract)(action))
 FC_REFLECT(evm_test::exec_output, (status)(data)(context))
 
 FC_REFLECT(evm_test::message_receiver, (account)(min_fee));
-FC_REFLECT(evm_test::bridge_emit_message, (receiver)(sender)(timestamp)(value)(data));
+FC_REFLECT(evm_test::bridge_message_v0, (receiver)(sender)(timestamp)(value)(data));
 
 namespace evm_test {
 class evm_eoa

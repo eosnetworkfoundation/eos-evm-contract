@@ -419,20 +419,20 @@ void evm_contract::pushtx( eosio::name miner, const bytes& rlptx ) {
     // Filter EVM messages (with data) that are sent to the reserved address
     // corresponding to the EOS account holding the contract (self)
     ep.set_evm_message_filter([&](const evmc_message& message) -> bool {
-        auto me = make_reserved_address(get_self().value);
+        static auto me = make_reserved_address(get_self().value);
         return message.recipient == me && message.input_size > 0;
     });
 
     auto receipt = execute_tx(miner, block, tx, ep, true);
 
-    for(const auto& msg : ep.state().filtered_messages()) {
+    for(const auto& rawmsg : ep.state().filtered_messages()) {
 
-        auto call = bridge::decode_call_message(ByteView{msg.data});
-        eosio::check(call.has_value(), "unable to decode call message");
+        auto msg = bridge::decode_message(ByteView{rawmsg.data});
+        eosio::check(msg.has_value(), "unable to decode bridge message");
 
-        auto& emit = std::get<bridge::emit>(call.value());
+        auto& msg_v0 = std::get<bridge::message_v0>(msg.value());
 
-        const auto& receiver = emit.get_account_as_name();
+        const auto& receiver = msg_v0.get_account_as_name();
         eosio::check(eosio::is_account(receiver), "receiver is not account");
 
         message_receiver_table message_receivers(get_self(), get_self().value);
@@ -442,20 +442,20 @@ void evm_contract::pushtx( eosio::name miner, const bytes& rlptx ) {
         intx::uint256 min_fee((uint64_t)it->min_fee.amount);
         min_fee *= minimum_natively_representable;
 
-        auto value = intx::be::unsafe::load<uint256>(msg.value.bytes);
+        auto value = intx::be::unsafe::load<uint256>(rawmsg.value.bytes);
         eosio::check(value >= min_fee, "min_fee not covered");
 
         balances balance_table(get_self(), get_self().value);
-        const balance& receiver_account = balance_table.get(emit.get_account_as_name().value, "receiver account is not open");
+        const balance& receiver_account = balance_table.get(msg_v0.get_account_as_name().value, "receiver account is not open");
 
-        action(std::vector<permission_level>{}, emit.get_account_as_name(), "onbridgemsg"_n,
-            bridge_emit_message{
-                .receiver  = emit.get_account_as_name(),
-                .sender    = to_bytes(msg.sender),
+        action(std::vector<permission_level>{}, msg_v0.get_account_as_name(), "onbridgemsg"_n,
+            bridge_message{ bridge_message_v0 {
+                .receiver  = msg_v0.get_account_as_name(),
+                .sender    = to_bytes(rawmsg.sender),
                 .timestamp = eosio::current_time_point(),
-                .value     = to_bytes(msg.value),
-                .data      = emit.data
-            }
+                .value     = to_bytes(rawmsg.value),
+                .data      = msg_v0.data
+            } }
         ).send();
 
         balance_table.modify(receiver_account, eosio::same_payer, [&](balance& row) {
