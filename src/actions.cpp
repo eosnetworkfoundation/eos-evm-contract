@@ -452,11 +452,6 @@ void evm_contract::pushtx( eosio::name miner, const bytes& rlptx ) {
         balance_table.modify(receiver_account, eosio::same_payer, [&](balance& row) {
             row.balance += value;
         });
-
-        const balance& self_account = balance_table.get(get_self().value, "self account is not open");
-        balance_table.modify(self_account, eosio::same_payer, [&](balance& row) {
-            row.balance -= value;
-        });
     }
 
     engine.finalize(ep.state(), ep.evm().block());
