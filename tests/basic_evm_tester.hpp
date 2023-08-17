@@ -109,6 +109,21 @@ struct exec_output {
    std::optional<bytes> context;
 };
 
+struct message_receiver {
+    name  account;
+    asset min_fee;
+};
+
+struct bridge_message_v0 {
+   name       receiver;
+   bytes      sender;
+   time_point timestamp;
+   bytes      value;
+   bytes      data;
+};
+
+using bridge_message = std::variant<bridge_message_v0>;
+
 } // namespace evm_test
 
 
@@ -122,6 +137,9 @@ FC_REFLECT(evm_test::fee_parameters, (gas_price)(miner_cut)(ingress_bridge_fee))
 FC_REFLECT(evm_test::exec_input, (context)(from)(to)(data)(value))
 FC_REFLECT(evm_test::exec_callback, (contract)(action))
 FC_REFLECT(evm_test::exec_output, (status)(data)(context))
+
+FC_REFLECT(evm_test::message_receiver, (account)(min_fee));
+FC_REFLECT(evm_test::bridge_message_v0, (receiver)(sender)(timestamp)(value)(data));
 
 namespace evm_test {
 class evm_eoa
@@ -166,6 +184,7 @@ public:
    const symbol native_symbol;
 
    static evmc::address make_reserved_address(uint64_t account);
+   static evmc::address make_reserved_address(name account);
 
    explicit basic_evm_tester(std::string native_symbol_str = "4,EOS");
 
@@ -198,10 +217,12 @@ public:
    silkworm::Transaction
    generate_tx(const evmc::address& to, const intx::uint256& value, uint64_t gas_limit = 21000) const;
 
-   transaction_trace_ptr exec(const exec_input& input, const std::optional<exec_callback>& callback);
-   void pushtx(const silkworm::Transaction& trx, name miner = evm_account_name);
    void call(name from, const evmc::bytes& to, const evmc::bytes& value, evmc::bytes& data, uint64_t gas_limit, name actor);
    void admincall(const evmc::bytes& from, const evmc::bytes& to, const evmc::bytes& value, evmc::bytes& data, uint64_t gas_limit, name actor);
+   transaction_trace_ptr bridgereg(name receiver, asset min_fee, vector<account_name> extra_signers={evm_account_name});
+   transaction_trace_ptr bridgeunreg(name receiver);
+   transaction_trace_ptr exec(const exec_input& input, const std::optional<exec_callback>& callback);
+   transaction_trace_ptr pushtx(const silkworm::Transaction& trx, name miner = evm_account_name);
    evmc::address deploy_contract(evm_eoa& eoa, evmc::bytes bytecode);
 
    void addegress(const std::vector<name>& accounts);
@@ -211,6 +232,7 @@ public:
    void close(name owner);
    void withdraw(name owner, asset quantity);
 
+   balance_and_dust inevm() const;
    balance_and_dust vault_balance(name owner) const;
    std::optional<intx::uint256> evm_balance(const evmc::address& address) const;
    std::optional<intx::uint256> evm_balance(const evm_eoa& account) const;

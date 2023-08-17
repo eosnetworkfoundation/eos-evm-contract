@@ -84,6 +84,8 @@ public:
    /// @return true if all garbage has been collected
    [[eosio::action]] bool gc(uint32_t max);
 
+   [[eosio::action]] void bridgereg(eosio::name receiver, const eosio::asset& min_fee);
+   [[eosio::action]] void bridgeunreg(eosio::name receiver);
    
    [[eosio::action]] void call(eosio::name from, const bytes& to, const bytes& value, const bytes& data, uint64_t gas_limit);
    [[eosio::action]] void admincall(const bytes& from, const bytes& to, const bytes& value, const bytes& data, uint64_t gas_limit);

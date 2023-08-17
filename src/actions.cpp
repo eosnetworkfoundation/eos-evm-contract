@@ -7,6 +7,7 @@
 #include <evm_runtime/state.hpp>
 #include <evm_runtime/intrinsics.hpp>
 #include <evm_runtime/eosio.token.hpp>
+#include <evm_runtime/bridge.hpp>
 
 #include <eosevm/block_mapping.hpp>
 
@@ -415,7 +416,52 @@ void evm_contract::pushtx( eosio::name miner, const bytes& rlptx ) {
     check(tx.max_priority_fee_per_gas == tx.max_fee_per_gas, "max_priority_fee_per_gas must be equal to max_fee_per_gas");
     check(tx.max_fee_per_gas >= current_config.gas_price, "gas price is too low");
 
+    // Filter EVM messages (with data) that are sent to the reserved address
+    // corresponding to the EOS account holding the contract (self)
+    ep.set_evm_message_filter([&](const evmc_message& message) -> bool {
+        static auto me = make_reserved_address(get_self().value);
+        return message.recipient == me && message.input_size > 0;
+    });
+
     auto receipt = execute_tx(miner, block, tx, ep, true);
+
+    for(const auto& rawmsg : ep.state().filtered_messages()) {
+
+        auto msg = bridge::decode_message(ByteView{rawmsg.data});
+        eosio::check(msg.has_value(), "unable to decode bridge message");
+
+        auto& msg_v0 = std::get<bridge::message_v0>(msg.value());
+
+        const auto& receiver = msg_v0.get_account_as_name();
+        eosio::check(eosio::is_account(receiver), "receiver is not account");
+
+        message_receiver_table message_receivers(get_self(), get_self().value);
+        auto it = message_receivers.find(receiver.value);
+        eosio::check(it != message_receivers.end(), "receiver not registered");
+
+        intx::uint256 min_fee((uint64_t)it->min_fee.amount);
+        min_fee *= minimum_natively_representable;
+
+        auto value = intx::be::unsafe::load<uint256>(rawmsg.value.bytes);
+        eosio::check(value >= min_fee, "min_fee not covered");
+
+        balances balance_table(get_self(), get_self().value);
+        const balance& receiver_account = balance_table.get(msg_v0.get_account_as_name().value, "receiver account is not open");
+
+        action(std::vector<permission_level>{}, msg_v0.get_account_as_name(), "onbridgemsg"_n,
+            bridge_message{ bridge_message_v0 {
+                .receiver  = msg_v0.get_account_as_name(),
+                .sender    = to_bytes(rawmsg.sender),
+                .timestamp = eosio::current_time_point(),
+                .value     = to_bytes(rawmsg.value),
+                .data      = msg_v0.data
+            } }
+        ).send();
+
+        balance_table.modify(receiver_account, eosio::same_payer, [&](balance& row) {
+            row.balance += value;
+        });
+    }
 
     engine.finalize(ep.state(), ep.evm().block());
     ep.state().write_to_db(ep.evm().block().header.number);
@@ -562,6 +608,41 @@ bool evm_contract::gc(uint32_t max) {
 
     evm_runtime::state state{get_self(), eosio::same_payer};
     return state.gc(max);
+}
+
+void evm_contract::bridgereg(eosio::name receiver, const eosio::asset& min_fee) {
+    assert_unfrozen();
+    require_auth(receiver);
+    require_auth(get_self());  // to temporarily prevent registration of unauthorized accounts
+
+    eosio::check(min_fee.symbol == token_symbol, "unexpected symbol");
+    eosio::check(min_fee.amount >= 0, "min_fee cannot be negative");
+
+    auto update_row = [&](auto& row) {
+        row.account = receiver;
+        row.min_fee = min_fee;
+    };
+
+    message_receiver_table message_receivers(get_self(), get_self().value);
+    auto it = message_receivers.find(receiver.value);
+
+    if(it == message_receivers.end()) {
+        message_receivers.emplace(receiver, update_row);
+    } else {
+        message_receivers.modify(*it, eosio::same_payer, update_row);
+    }
+
+    open(receiver);
+}
+
+void evm_contract::bridgeunreg(eosio::name receiver) {
+    assert_unfrozen();
+    require_auth(receiver);
+
+    message_receiver_table message_receivers(get_self(), get_self().value);
+    auto it = message_receivers.find(receiver.value);
+    eosio::check(it != message_receivers.end(), "receiver not found");
+    message_receivers.erase(*it);
 }
 
 void evm_contract::call_(intx::uint256 s, const bytes& to, intx::uint256 value, const bytes& data, uint64_t gas_limit, uint64_t nonce) {
