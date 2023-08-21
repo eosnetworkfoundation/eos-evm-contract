@@ -549,4 +549,38 @@ bool basic_evm_tester::scan_account_storage(uint64_t account_id, std::function<b
    return successful;
 }
 
+void basic_evm_tester::scan_balances(std::function<bool(vault_balance_row)> visitor) const {
+   static constexpr eosio::chain::name balances_table_name = "balances"_n;
+   scan_table<vault_balance_row>(
+      balances_table_name, evm_account_name, [this, &visitor](vault_balance_row&& row) {
+         return visitor(row);
+      }
+   );
+}
+
+asset basic_evm_tester::get_eos_balance( const account_name& act ) {
+   vector<char> data = get_row_by_account( "eosio.token"_n, act, "accounts"_n, name(native_symbol.to_symbol_code().value) );
+   return data.empty() ? asset(0, native_symbol) : fc::raw::unpack<asset>(data);
+}
+
+void basic_evm_tester::check_balances() {
+   intx::uint256 total_in_evm_accounts;
+   scan_accounts([&](account_object&& account) -> bool {
+      total_in_evm_accounts += account.balance;
+      return false;
+   });
+
+   auto in_evm = intx::uint256(inevm());
+   BOOST_REQUIRE(total_in_evm_accounts == in_evm);
+
+   intx::uint256 total_in_accounts;
+   scan_balances([&](vault_balance_row&& row) -> bool {
+      total_in_accounts += intx::uint256(balance_and_dust{.balance=row.balance, .dust=row.dust});
+      return false;
+   });
+
+   auto evm_eos_balance = intx::uint256(balance_and_dust{.balance=get_eos_balance(evm_account_name), .dust=0});
+   BOOST_REQUIRE(evm_eos_balance == total_in_accounts+total_in_evm_accounts);
+}
+
 } // namespace evm_test

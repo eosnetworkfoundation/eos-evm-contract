@@ -110,8 +110,9 @@ struct exec_output {
 };
 
 struct message_receiver {
-    name  account;
-    asset min_fee;
+    name     account;
+    asset    min_fee;
+    uint32_t flags;
 };
 
 struct bridge_message_v0 {
@@ -138,7 +139,7 @@ FC_REFLECT(evm_test::exec_input, (context)(from)(to)(data)(value))
 FC_REFLECT(evm_test::exec_callback, (contract)(action))
 FC_REFLECT(evm_test::exec_output, (status)(data)(context))
 
-FC_REFLECT(evm_test::message_receiver, (account)(min_fee));
+FC_REFLECT(evm_test::message_receiver, (account)(min_fee)(flags));
 FC_REFLECT(evm_test::bridge_message_v0, (receiver)(sender)(timestamp)(value)(data));
 
 namespace evm_test {
@@ -165,6 +166,7 @@ private:
    std::basic_string<uint8_t> public_key;
 };
 
+struct vault_balance_row;
 class basic_evm_tester : public testing::validating_tester
 {
 public:
@@ -237,6 +239,10 @@ public:
    std::optional<intx::uint256> evm_balance(const evmc::address& address) const;
    std::optional<intx::uint256> evm_balance(const evm_eoa& account) const;
 
+   asset get_eos_balance( const account_name& act );
+
+   void check_balances();
+
    template <typename T, typename Visitor>
    void scan_table(eosio::chain::name table_name, eosio::chain::name scope_name, Visitor&& visitor) const
    {
@@ -266,6 +272,7 @@ public:
    std::optional<account_object> scan_for_account_by_address(const evmc::address& address) const;
    std::optional<account_object> find_account_by_address(const evmc::address& address) const;
    bool scan_account_storage(uint64_t account_id, std::function<bool(storage_slot)> visitor) const;
+   void scan_balances(std::function<bool(vault_balance_row)> visitor) const;
 };
 
 inline constexpr intx::uint256 operator"" _wei(const char* s) { return intx::from_string<intx::uint256>(s); }
