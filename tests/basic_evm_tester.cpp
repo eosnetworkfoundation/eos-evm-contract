@@ -344,11 +344,6 @@ transaction_trace_ptr basic_evm_tester::bridgeunreg(name receiver) {
       mvo()("receiver", receiver));
 }
 
-transaction_trace_ptr basic_evm_tester::exec(const exec_input& input, const std::optional<exec_callback>& callback) {
-   auto binary_data = fc::raw::pack<exec_input, std::optional<exec_callback>>(input, callback);
-   return basic_evm_tester::push_action(evm_account_name, "exec"_n, evm_account_name, bytes{binary_data.begin(), binary_data.end()});
-}
-
 transaction_trace_ptr basic_evm_tester::pushtx(const silkworm::Transaction& trx, name miner)
 {
    silkworm::Bytes rlp;
