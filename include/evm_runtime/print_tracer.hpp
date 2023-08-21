@@ -1,8 +1,9 @@
 #pragma once
 #include <evmc/instructions.h>
+#include <eosio/eosio.hpp>
 namespace evm_runtime {
 
-struct print_tracer : EvmTracer {
+struct print_tracer : silkworm::EvmTracer {
 
     const char* const* opcode_names_ = nullptr;
 
@@ -19,27 +20,28 @@ struct print_tracer : EvmTracer {
     }
 
     void on_instruction_start(uint32_t pc, const intx::uint256* stack_top, int stack_height,
-                                      const evmone::ExecutionState& state,
-                                      const IntraBlockState& intra_block_state) noexcept override {
-        const auto opcode = state.code[pc];
+                                int64_t gas, const evmone::ExecutionState& state,
+                                const silkworm::IntraBlockState& intra_block_state) override {
+
+        const auto opcode = state.original_code[pc];
         auto opcode_name = get_opcode_name(opcode_names_, opcode);
         eosio::print(opcode_name.c_str(), "\n");
     }
 
-    void on_execution_end(const evmc_result& result, const IntraBlockState& intra_block_state) noexcept override {
+    void on_execution_end(const evmc_result& result, const silkworm::IntraBlockState& intra_block_state) noexcept override {
         eosio::print("TRACE: end\n");
     }
 
-    void on_creation_completed(const evmc_result& result, const IntraBlockState& intra_block_state) noexcept override {
+    void on_creation_completed(const evmc_result& result, const silkworm::IntraBlockState& intra_block_state) noexcept override {
 
     }
 
     void on_precompiled_run(const evmc_result& result, int64_t gas,
-                                    const IntraBlockState& intra_block_state) noexcept override {
+                                    const silkworm::IntraBlockState& intra_block_state) noexcept override {
 
     }
 
-    void on_reward_granted(const CallResult& result, const IntraBlockState& intra_block_state) noexcept override {
+    void on_reward_granted(const silkworm::CallResult& result, const silkworm::IntraBlockState& intra_block_state) noexcept override {
 
     }
 

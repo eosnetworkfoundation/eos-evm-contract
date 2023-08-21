@@ -385,6 +385,61 @@ void evm_contract::exec(const exec_input& input, const std::optional<exec_callba
     }
 }
 
+void evm_contract::process_filtered_messages(const std::vector<silkworm::FilteredMessage>& filtered_messages ) {
+
+    intx::uint256 accumulated_value;
+    for(const auto& rawmsg : filtered_messages) {
+        auto msg = bridge::decode_message(ByteView{rawmsg.data});
+        eosio::check(msg.has_value(), "unable to decode bridge message");
+
+        auto& msg_v0 = std::get<bridge::message_v0>(msg.value());
+        eosio::print("FIL MESSAGE: ", uint64_t(msg_v0.force_atomic), "\n");
+
+        const auto& receiver = msg_v0.get_account_as_name();
+        eosio::check(eosio::is_account(receiver), "receiver is not account");
+
+        message_receiver_table message_receivers(get_self(), get_self().value);
+        auto it = message_receivers.find(receiver.value);
+        eosio::check(it != message_receivers.end(), "receiver not registered");
+
+        eosio::check(msg_v0.force_atomic == false || it->has_flag(message_receiver::FORCE_ATOMIC), "unable to process message");
+
+        intx::uint256 min_fee((uint64_t)it->min_fee.amount);
+        min_fee *= minimum_natively_representable;
+
+        auto value = intx::be::unsafe::load<uint256>(rawmsg.value.bytes);
+        eosio::check(value >= min_fee, "min_fee not covered");
+
+        balances balance_table(get_self(), get_self().value);
+        const balance& receiver_account = balance_table.get(msg_v0.get_account_as_name().value, "receiver account is not open");
+
+        action(std::vector<permission_level>{}, msg_v0.get_account_as_name(), "onbridgemsg"_n,
+            bridge_message{ bridge_message_v0 {
+                .receiver  = msg_v0.get_account_as_name(),
+                .sender    = to_bytes(rawmsg.sender),
+                .timestamp = eosio::current_time_point(),
+                .value     = to_bytes(rawmsg.value),
+                .data      = msg_v0.data
+            } }
+        ).send();
+
+        balance_table.modify(receiver_account, eosio::same_payer, [&](balance& row) {
+            row.balance += value;
+        });
+
+        accumulated_value += value;
+    }
+
+    if(accumulated_value > 0) {
+        balances balance_table(get_self(), get_self().value);
+        const balance& self_balance = balance_table.get(get_self().value);
+        balance_table.modify(self_balance, eosio::same_payer, [&](balance& row) {
+            row.balance -= accumulated_value;
+        });
+    }
+
+}
+
 void evm_contract::pushtx( eosio::name miner, const bytes& rlptx ) {
     LOGTIME("EVM START");
 
@@ -425,43 +480,7 @@ void evm_contract::pushtx( eosio::name miner, const bytes& rlptx ) {
 
     auto receipt = execute_tx(miner, block, tx, ep, true);
 
-    for(const auto& rawmsg : ep.state().filtered_messages()) {
-
-        auto msg = bridge::decode_message(ByteView{rawmsg.data});
-        eosio::check(msg.has_value(), "unable to decode bridge message");
-
-        auto& msg_v0 = std::get<bridge::message_v0>(msg.value());
-
-        const auto& receiver = msg_v0.get_account_as_name();
-        eosio::check(eosio::is_account(receiver), "receiver is not account");
-
-        message_receiver_table message_receivers(get_self(), get_self().value);
-        auto it = message_receivers.find(receiver.value);
-        eosio::check(it != message_receivers.end(), "receiver not registered");
-
-        intx::uint256 min_fee((uint64_t)it->min_fee.amount);
-        min_fee *= minimum_natively_representable;
-
-        auto value = intx::be::unsafe::load<uint256>(rawmsg.value.bytes);
-        eosio::check(value >= min_fee, "min_fee not covered");
-
-        balances balance_table(get_self(), get_self().value);
-        const balance& receiver_account = balance_table.get(msg_v0.get_account_as_name().value, "receiver account is not open");
-
-        action(std::vector<permission_level>{}, msg_v0.get_account_as_name(), "onbridgemsg"_n,
-            bridge_message{ bridge_message_v0 {
-                .receiver  = msg_v0.get_account_as_name(),
-                .sender    = to_bytes(rawmsg.sender),
-                .timestamp = eosio::current_time_point(),
-                .value     = to_bytes(rawmsg.value),
-                .data      = msg_v0.data
-            } }
-        ).send();
-
-        balance_table.modify(receiver_account, eosio::same_payer, [&](balance& row) {
-            row.balance += value;
-        });
-    }
+    process_filtered_messages(ep.state().filtered_messages());
 
     engine.finalize(ep.state(), ep.evm().block());
     ep.state().write_to_db(ep.evm().block().header.number);
@@ -621,6 +640,7 @@ void evm_contract::bridgereg(eosio::name receiver, const eosio::asset& min_fee) 
     auto update_row = [&](auto& row) {
         row.account = receiver;
         row.min_fee = min_fee;
+        row.flags   = message_receiver::flag::FORCE_ATOMIC;
     };
 
     message_receiver_table message_receivers(get_self(), get_self().value);

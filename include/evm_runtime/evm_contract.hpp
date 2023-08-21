@@ -138,6 +138,7 @@ private:
    }
 
    silkworm::Receipt execute_tx(eosio::name miner, silkworm::Block& block, silkworm::Transaction& tx, silkworm::ExecutionProcessor& ep, bool enforce_chain_id);
+   void process_filtered_messages(const std::vector<silkworm::FilteredMessage>& filtered_messages);
 
    uint64_t get_and_increment_nonce(const name owner);
 
