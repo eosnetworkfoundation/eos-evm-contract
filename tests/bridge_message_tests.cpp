@@ -299,8 +299,8 @@ BOOST_FIXTURE_TEST_CASE(test_send_message_from_solidity, bridge_message_tester) 
   uint64_t contract_account_id = find_account_by_address(contract_addr).value().id;
   produce_blocks(1);
 
-  // Call method "go" on emiter contract (sha3('go(string,uint)') = 0xa5cc93e4)
-  // ===> go('rec1', 3)
+  // Call method "go" on emiter contract (sha3('go(string,bool,uint)') = 0xe1963a31)
+  // ===> go('rec1', true, 3)
   auto txn = generate_tx(contract_addr, 0, 500'000);
   txn.data  = evmc::from_hex("e1963a31").value();
   txn.data += evmc::from_hex(int_str32(96)).value(); //offset of param1
