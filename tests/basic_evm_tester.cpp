@@ -139,6 +139,10 @@ evmc::address basic_evm_tester::make_reserved_address(uint64_t account)
    // clang-format on
 }
 
+evmc::address basic_evm_tester::make_reserved_address(name account) {
+   return make_reserved_address(account.to_uint64_t());
+}
+
 basic_evm_tester::basic_evm_tester(std::string native_symbol_str) :
    native_symbol(symbol::from_string(native_symbol_str))
 {
@@ -329,7 +333,18 @@ void basic_evm_tester::admincall(const evmc::bytes& from, const evmc::bytes& to,
    push_action(evm_account_name, "admincall"_n, actor,  mvo()("from", from_bytes)("to", to_bytes)("value", value_bytes)("data", data_bytes)("gas_limit", gas_limit));
 }
 
-void basic_evm_tester::pushtx(const silkworm::Transaction& trx, name miner)
+transaction_trace_ptr basic_evm_tester::bridgereg(name receiver, asset min_fee, vector<account_name> extra_signers) {
+   extra_signers.push_back(receiver);
+   return basic_evm_tester::push_action(evm_account_name, "bridgereg"_n, extra_signers, 
+      mvo()("receiver", receiver)("min_fee", min_fee));
+}
+
+transaction_trace_ptr basic_evm_tester::bridgeunreg(name receiver) {
+   return basic_evm_tester::push_action(evm_account_name, "bridgeunreg"_n, receiver, 
+      mvo()("receiver", receiver));
+}
+
+transaction_trace_ptr basic_evm_tester::pushtx(const silkworm::Transaction& trx, name miner)
 {
    silkworm::Bytes rlp;
    silkworm::rlp::encode(rlp, trx);
@@ -338,7 +353,7 @@ void basic_evm_tester::pushtx(const silkworm::Transaction& trx, name miner)
    rlp_bytes.resize(rlp.size());
    memcpy(rlp_bytes.data(), rlp.data(), rlp.size());
 
-   push_action(evm_account_name, "pushtx"_n, miner, mvo()("miner", miner)("rlptx", rlp_bytes));
+   return push_action(evm_account_name, "pushtx"_n, miner, mvo()("miner", miner)("rlptx", rlp_bytes));
 }
 
 evmc::address basic_evm_tester::deploy_contract(evm_eoa& eoa, evmc::bytes bytecode)
@@ -378,6 +393,10 @@ void basic_evm_tester::close(name owner) { push_action(evm_account_name, "close"
 void basic_evm_tester::withdraw(name owner, asset quantity)
 {
    push_action(evm_account_name, "withdraw"_n, owner, mvo()("owner", owner)("quantity", quantity));
+}
+
+balance_and_dust basic_evm_tester::inevm() const {
+   return fc::raw::unpack<balance_and_dust>(get_row_by_account(evm_account_name, evm_account_name, "inevm"_n, "inevm"_n));
 }
 
 balance_and_dust basic_evm_tester::vault_balance(name owner) const
@@ -523,6 +542,40 @@ bool basic_evm_tester::scan_account_storage(uint64_t account_id, std::function<b
       });
 
    return successful;
+}
+
+void basic_evm_tester::scan_balances(std::function<bool(vault_balance_row)> visitor) const {
+   static constexpr eosio::chain::name balances_table_name = "balances"_n;
+   scan_table<vault_balance_row>(
+      balances_table_name, evm_account_name, [this, &visitor](vault_balance_row&& row) {
+         return visitor(row);
+      }
+   );
+}
+
+asset basic_evm_tester::get_eos_balance( const account_name& act ) {
+   vector<char> data = get_row_by_account( "eosio.token"_n, act, "accounts"_n, name(native_symbol.to_symbol_code().value) );
+   return data.empty() ? asset(0, native_symbol) : fc::raw::unpack<asset>(data);
+}
+
+void basic_evm_tester::check_balances() {
+   intx::uint256 total_in_evm_accounts;
+   scan_accounts([&](account_object&& account) -> bool {
+      total_in_evm_accounts += account.balance;
+      return false;
+   });
+
+   auto in_evm = intx::uint256(inevm());
+   BOOST_REQUIRE(total_in_evm_accounts == in_evm);
+
+   intx::uint256 total_in_accounts;
+   scan_balances([&](vault_balance_row&& row) -> bool {
+      total_in_accounts += intx::uint256(balance_and_dust{.balance=row.balance, .dust=row.dust});
+      return false;
+   });
+
+   auto evm_eos_balance = intx::uint256(balance_and_dust{.balance=get_eos_balance(evm_account_name), .dust=0});
+   BOOST_REQUIRE(evm_eos_balance == total_in_accounts+total_in_evm_accounts);
 }
 
 } // namespace evm_test

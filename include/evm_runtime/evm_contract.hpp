@@ -88,6 +88,9 @@ public:
    [[eosio::action]] void call(eosio::name from, const bytes& to, const bytes& value, const bytes& data, uint64_t gas_limit);
    [[eosio::action]] void admincall(const bytes& from, const bytes& to, const bytes& value, const bytes& data, uint64_t gas_limit);
 
+   [[eosio::action]] void bridgereg(eosio::name receiver, const eosio::asset& min_fee);
+   [[eosio::action]] void bridgeunreg(eosio::name receiver);
+
 #ifdef WITH_TEST_ACTIONS
    [[eosio::action]] void testtx(const std::optional<bytes>& orlptx, const evm_runtime::test::block_info& bi);
    [[eosio::action]] void
@@ -136,6 +139,7 @@ private:
    }
 
    silkworm::Receipt execute_tx(eosio::name miner, silkworm::Block& block, silkworm::Transaction& tx, silkworm::ExecutionProcessor& ep, bool enforce_chain_id);
+   void process_filtered_messages(const std::vector<silkworm::FilteredMessage>& filtered_messages);
 
    uint64_t get_and_increment_nonce(const name owner);
 

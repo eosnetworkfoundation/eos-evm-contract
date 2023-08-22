@@ -1,0 +1,64 @@
+{
+    "____comment": "This file was generated with eosio-abigen. DO NOT EDIT ",
+    "version": "eosio::abi/1.2",
+    "types": [
+        {
+            "new_type_name": "bridge_message",
+            "type": "variant_bridge_message_v0"
+        }
+    ],
+    "structs": [
+        {
+            "name": "bridge_message_v0",
+            "base": "",
+            "fields": [
+                {
+                    "name": "receiver",
+                    "type": "name"
+                },
+                {
+                    "name": "sender",
+                    "type": "bytes"
+                },
+                {
+                    "name": "timestamp",
+                    "type": "time_point"
+                },
+                {
+                    "name": "value",
+                    "type": "bytes"
+                },
+                {
+                    "name": "data",
+                    "type": "bytes"
+                }
+            ]
+        },
+        {
+            "name": "onbridgemsg",
+            "base": "",
+            "fields": [
+                {
+                    "name": "msg",
+                    "type": "bridge_message"
+                }
+            ]
+        }
+    ],
+    "actions": [
+        {
+            "name": "onbridgemsg",
+            "type": "onbridgemsg",
+            "ricardian_contract": ""
+        }
+    ],
+    "tables": [],
+    "ricardian_clauses": [],
+    "variants": [
+        {
+            "name": "variant_bridge_message_v0",
+            "types": ["bridge_message_v0"]
+        }
+    ],
+    "action_results": []
+}

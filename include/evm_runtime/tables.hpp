@@ -182,4 +182,24 @@ struct [[eosio::table]] [[eosio::contract("evm_contract")]] allowed_egress_accou
 
 typedef eosio::multi_index<"egresslist"_n, allowed_egress_account> egresslist;
 
+struct [[eosio::table]] [[eosio::contract("evm_contract")]] message_receiver {
+
+    enum flag : uint32_t {
+        FORCE_ATOMIC = 0x1
+    };
+
+    name     account;
+    asset    min_fee;
+    uint32_t flags;
+
+    uint64_t primary_key() const { return account.value; }
+    bool has_flag(flag f) const {
+        return (flags & f) != 0;
+    }
+
+    EOSLIB_SERIALIZE(message_receiver, (account)(min_fee)(flags));
+};
+
+typedef eosio::multi_index<"msgreceiver"_n, message_receiver> message_receiver_table;
+
 } //namespace evm_runtime
