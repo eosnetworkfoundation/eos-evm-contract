@@ -16,6 +16,9 @@ option(WITH_LOGTIME
 option(WITH_LARGE_STACK
    "Build with 50MB of stack size, needed for unit tests" OFF)
 
+option(WITH_ADMIN_ACTIONS
+   "Enables admin actions" ON)
+
 ExternalProject_Add(
    evm_runtime_project
    SOURCE_DIR ${CMAKE_SOURCE_DIR}/src
@@ -25,6 +28,7 @@ ExternalProject_Add(
               -DWITH_TEST_ACTIONS=${WITH_TEST_ACTIONS}
               -DWITH_LOGTIME=${WITH_LOGTIME}
               -DWITH_LARGE_STACK=${WITH_LARGE_STACK}
+              -DWITH_ADMIN_ACTIONS=${WITH_ADMIN_ACTIONS}
    UPDATE_COMMAND ""
    PATCH_COMMAND ""
    TEST_COMMAND ""

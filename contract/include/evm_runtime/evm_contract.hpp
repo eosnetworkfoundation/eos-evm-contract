@@ -84,6 +84,15 @@ public:
    /// @return true if all garbage has been collected
    [[eosio::action]] bool gc(uint32_t max);
 
+#ifdef WITH_ADMIN_ACTIONS
+   [[eosio::action]] void rmgcstore(uint64_t id);
+   [[eosio::action]] void setkvstore(uint64_t account_id, const bytes& key, const std::optional<bytes>& value);
+   [[eosio::action]] void rmaccount(uint64_t id);
+   [[eosio::action]] void addevmbal(uint64_t id, const bytes& delta, bool subtract);
+   [[eosio::action]] void addopenbal(name account, const asset& delta);
+   [[eosio::action]] void freezeaccnt(uint64_t id, bool value);
+#endif
+
 #ifdef WITH_TEST_ACTIONS
    [[eosio::action]] void testtx(const std::optional<bytes>& orlptx, const evm_runtime::test::block_info& bi);
    [[eosio::action]] void

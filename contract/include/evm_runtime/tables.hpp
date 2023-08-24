@@ -4,17 +4,36 @@
 #include <eosio/fixed_bytes.hpp>
 #include <eosio/asset.hpp>
 #include <eosio/singleton.hpp>
+#include <eosio/binary_extension.hpp>
+
 #include <evm_runtime/types.hpp>
 #include <silkworm/common/base.hpp>
 namespace evm_runtime {
 
 using namespace eosio;
 struct [[eosio::table]] [[eosio::contract("evm_contract")]] account {
+    enum class flag : uint32_t {
+        frozen = 0x1
+    };
+
     uint64_t    id;
     bytes       eth_address;
     uint64_t    nonce;
     bytes       balance;
-    std::optional<uint64_t>       code_id;
+    std::optional<uint64_t> code_id;
+    binary_extension<uint32_t> flags=0;
+
+    void set_flag(flag f) {
+        flags.value() |= static_cast<uint32_t>(f);
+    }
+
+    void clear_flag(flag f) {
+        flags.value() &= ~static_cast<uint32_t>(f);
+    }
+
+    inline bool has_flag(flag f)const {
+        return (flags.value() & static_cast<uint32_t>(f) != 0);
+    }
 
     uint64_t primary_key()const { return id; }
 
@@ -28,7 +47,7 @@ struct [[eosio::table]] [[eosio::contract("evm_contract")]] account {
         return res;
     }
 
-    EOSLIB_SERIALIZE(account, (id)(eth_address)(nonce)(balance)(code_id));
+    EOSLIB_SERIALIZE(account, (id)(eth_address)(nonce)(balance)(code_id)(flags));
 };
 
 typedef multi_index< "account"_n, account,
