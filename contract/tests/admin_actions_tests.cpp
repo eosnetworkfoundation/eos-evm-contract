@@ -267,8 +267,8 @@ BOOST_FIXTURE_TEST_CASE(freezeaccnt_tests, admin_action_tester) try {
    auto [contract_addr, contract_account_id] = deploy_simple_contract(evm1);
    freezeaccnt(contract_account_id, true);
 
-   BOOST_REQUIRE_EXCEPTION(getval(contract_addr),
-         eosio_assert_message_exception, eosio_assert_message_is("account is frozen"));
+   // We allow evm::exec action to work with frozen accounts
+   BOOST_REQUIRE(getval(contract_addr) == 0);
 
    BOOST_REQUIRE_EXCEPTION(transfer_token("alice"_n, evm_account_name, make_asset(to_bridge), fc::variant(contract_addr).as_string()),
          eosio_assert_message_exception, eosio_assert_message_is("account is frozen"));

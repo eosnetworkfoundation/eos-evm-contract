@@ -341,7 +341,7 @@ void evm_contract::exec(const exec_input& input, const std::optional<exec_callba
     evm_common::prepare_block_header(block.header, bm, get_self().value,
         bm.timestamp_to_evm_block_num(eosio::current_time_point().time_since_epoch().count()));
 
-    evm_runtime::state state{get_self(), get_self(), true};
+    evm_runtime::state state{get_self(), get_self(), true, true};
     IntraBlockState ibstate{state};
 
     EVM evm{block, ibstate, *found_chain_config.value().second};
@@ -390,7 +390,7 @@ void evm_contract::pushtx( eosio::name miner, const bytes& rlptx ) {
 
     silkworm::consensus::TrustEngine engine{*found_chain_config->second};
 
-    evm_runtime::state state{get_self(), get_self()};
+    evm_runtime::state state{get_self(), get_self(), false, false};
     silkworm::ExecutionProcessor ep{block, engine, state, *found_chain_config->second};
 
     Transaction tx;

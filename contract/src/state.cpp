@@ -16,7 +16,7 @@ std::optional<Account> state::read_account(const evmc::address& address) const n
     if (itr == inx.end()) {
         return {};
     }
-    eosio::check(!itr->has_flag(account::flag::frozen), "account is frozen");
+    eosio::check(_allow_frozen || !itr->has_flag(account::flag::frozen), "account is frozen");
 
     addr2id[address] = itr->id;
 
