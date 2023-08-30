@@ -437,9 +437,9 @@ BOOST_FIXTURE_TEST_CASE(addopenbal_tests, admin_action_tester) try {
    BOOST_REQUIRE_THROW(check_balances(), std::runtime_error);
    produce_blocks(1);
 
-   // This combination is to adjust just the eosio.token EOS balance of alice
+   // This combination is to adjust just the eosio.token EOS balance of the `evm_account_name`
    transfer_token("alice"_n, evm_account_name, make_asset(1), evm_account_name.to_string());
-   addopenbal("alice"_n, make_asset(-1));
+   addopenbal(evm_account_name, make_asset(-1));
 
    check_balances();
 
