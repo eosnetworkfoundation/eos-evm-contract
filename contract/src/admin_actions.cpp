@@ -55,6 +55,12 @@ namespace evm_runtime {
         }
     }
 
+    gc_store_table gc(get_self(), get_self().value);
+    gc.emplace(get_self(), [&](auto& row){
+        row.id = gc.available_primary_key();
+        row.storage_id = itr->id;
+    });
+
     accounts.erase(*itr);
 }
 

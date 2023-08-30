@@ -69,6 +69,15 @@ struct admin_action_tester : basic_evm_tester {
       return std::make_tuple(contract_addr, contract_account_id);
    }
 
+   size_t total_gcrows() {
+      size_t total=0;
+      scan_gcstore([&total](evm_test::gcstore row) -> bool {
+         ++total;
+         return false;
+      });
+      return total;
+   };
+
    size_t total_evm_accounts() {
       size_t total=0;
       scan_accounts([&total](evm_test::account_object) -> bool {
@@ -98,15 +107,6 @@ BOOST_FIXTURE_TEST_CASE(rmgcstore_tests, admin_action_tester) try {
    transfer_token("alice"_n, evm_account_name, make_asset(to_bridge), evm1.address_0x());
 
    auto [contract_addr, contract_account_id] = deploy_simple_contract(evm1);
-
-   auto total_gcrows = [&]() -> size_t {
-      size_t total=0;
-      scan_gcstore([&total](evm_test::gcstore row) -> bool {
-         ++total;
-         return false;
-      });
-      return total;
-   };
 
    BOOST_REQUIRE(total_gcrows() == 0);
    BOOST_REQUIRE(total_evm_accounts() == 2);
@@ -211,6 +211,7 @@ BOOST_FIXTURE_TEST_CASE(rmaccount_tests, admin_action_tester) try {
    
    BOOST_REQUIRE(total_evm_accounts() == 3);
    BOOST_REQUIRE(total_account_code() == 1);
+   BOOST_REQUIRE(total_gcrows() == 0);
 
    BOOST_REQUIRE_EXCEPTION(rmaccount(contract_account_id, "alice"_n),
       missing_auth_exception, eosio::testing::fc_exception_message_starts_with("missing authority"));
@@ -218,10 +219,15 @@ BOOST_FIXTURE_TEST_CASE(rmaccount_tests, admin_action_tester) try {
    rmaccount(contract_account_id);
    BOOST_REQUIRE(total_evm_accounts() == 2);
    BOOST_REQUIRE(total_account_code() == 1);
+   BOOST_REQUIRE(total_gcrows() == 1);
+   BOOST_REQUIRE(get_gcstore(0).storage_id == contract_account_id);
 
    rmaccount(contract_account_id2);
    BOOST_REQUIRE(total_evm_accounts() == 1);
    BOOST_REQUIRE(total_account_code() == 0);
+   BOOST_REQUIRE(total_gcrows() == 2);
+   BOOST_REQUIRE(get_gcstore(0).storage_id == contract_account_id);
+   BOOST_REQUIRE(get_gcstore(1).storage_id == contract_account_id2);
 
    produce_blocks(5);
 
