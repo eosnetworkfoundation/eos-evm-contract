@@ -411,7 +411,7 @@ void evm_contract::process_filtered_messages(const std::vector<silkworm::Filtere
         eosio::check(value >= min_fee, "min_fee not covered");
 
         balances balance_table(get_self(), get_self().value);
-        const balance& handler_account = balance_table.get(it->handler.value, "handler account is not open");
+        const balance& receiver_account = balance_table.get(receiver.value, "receiver account is not open");
 
         action(std::vector<permission_level>{}, it->handler, "onbridgemsg"_n,
             bridge_message{ bridge_message_v0 {
@@ -423,7 +423,7 @@ void evm_contract::process_filtered_messages(const std::vector<silkworm::Filtere
             } }
         ).send();
 
-        balance_table.modify(handler_account, eosio::same_payer, [&](balance& row) {
+        balance_table.modify(receiver_account, eosio::same_payer, [&](balance& row) {
             row.balance += value;
         });
 
@@ -723,7 +723,7 @@ void evm_contract::bridgereg(eosio::name receiver, eosio::name handler, const eo
         message_receivers.modify(*it, eosio::same_payer, update_row);
     }
 
-    open(handler);
+    open(receiver);
 }
 
 void evm_contract::bridgeunreg(eosio::name receiver) {

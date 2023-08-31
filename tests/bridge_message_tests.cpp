@@ -263,7 +263,7 @@ BOOST_FIXTURE_TEST_CASE(test_bridge_errors, bridge_message_tester) try {
                                                      evmc::from_hex(data_str32(str_to_hex("abcd"))).value() +
                                                      evmc::from_hex(int_str32(4)).value() +
                                                      evmc::from_hex(data_str32(str_to_hex("data"))).value()),
-    eosio_assert_message_exception, eosio_assert_message_is("handler account is not open"));
+    eosio_assert_message_exception, eosio_assert_message_is("receiver account is not open"));
 } FC_LOG_AND_RETHROW()
 
 BOOST_FIXTURE_TEST_CASE(test_send_message_from_solidity, bridge_message_tester) try {
@@ -369,9 +369,9 @@ BOOST_FIXTURE_TEST_CASE(handler_tests, bridge_message_tester) try {
   bridgereg("receiver"_n, "handler"_n, make_asset(1000'0000));
 
 
-  // Corner case: handler account is not open
-  // We can only test in this way because bridgereg will open handler.
-  close("handler"_n);
+  // Corner case: receiver account is not open
+  // We can only test in this way because bridgereg will open receiver.
+  close("receiver"_n);
   
   BOOST_REQUIRE_EXCEPTION(send_raw_message(evm1, emv_reserved_address, 1000_ether,
                                                      evmc::from_hex(bridgeMsgV0_method_id).value() +
@@ -382,18 +382,18 @@ BOOST_FIXTURE_TEST_CASE(handler_tests, bridge_message_tester) try {
                                                      evmc::from_hex(data_str32(str_to_hex("receiver"))).value() +
                                                      evmc::from_hex(int_str32(4)).value() +
                                                      evmc::from_hex(data_str32(str_to_hex("data"))).value()),
-    eosio_assert_message_exception, eosio_assert_message_is("handler account is not open"));
+    eosio_assert_message_exception, eosio_assert_message_is("receiver account is not open"));
   evm1.next_nonce--;
-  open("handler"_n);
+  open("receiver"_n);
 
   // Check handler balance before sending the message
-  BOOST_REQUIRE(vault_balance("handler"_n) == (balance_and_dust{make_asset(0), 0}));
+  BOOST_REQUIRE(vault_balance("receiver"_n) == (balance_and_dust{make_asset(0), 0}));
 
   // Emit message
   auto res = send_bridge_message(evm1, "receiver", 1000_ether, "0102030405060708090a");
 
   // Check handler balance after sending the message
-  BOOST_REQUIRE(vault_balance("handler"_n) == (balance_and_dust{make_asset(1000'0000), 0}));
+  BOOST_REQUIRE(vault_balance("receiver"_n) == (balance_and_dust{make_asset(1000'0000), 0}));
 
   // Recover message form the return value of handler contract
   // Make sure "handler" received a message sent to "receiver"
