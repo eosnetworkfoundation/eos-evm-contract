@@ -735,6 +735,19 @@ void evm_contract::bridgeunreg(eosio::name receiver) {
     message_receivers.erase(*it);
 }
 
+
+void evm_contract::assertnonce(eosio::name account, uint64_t next_nonce) { 
+    nextnonces nextnonce_table(get_self(), get_self().value);
+
+    auto next_nonce_iter = nextnonce_table.find(account.value);
+    if (next_nonce_iter == nextnonce_table.end()) {
+        eosio::check(0 == next_nonce, "wrong nonce");
+    }
+    else {
+        eosio::check(next_nonce_iter->next_nonce == next_nonce, "wrong nonce");
+    }
+}
+
 #ifdef WITH_TEST_ACTIONS
 [[eosio::action]] void evm_contract::testtx( const std::optional<bytes>& orlptx, const evm_runtime::test::block_info& bi ) {
     assert_unfrozen();

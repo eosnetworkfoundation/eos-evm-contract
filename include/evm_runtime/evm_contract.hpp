@@ -91,6 +91,8 @@ public:
    [[eosio::action]] void bridgereg(eosio::name receiver, const eosio::asset& min_fee);
    [[eosio::action]] void bridgeunreg(eosio::name receiver);
 
+   [[eosio::action]] void assertnonce(eosio::name account, uint64_t next_nonce);
+
 #ifdef WITH_TEST_ACTIONS
    [[eosio::action]] void testtx(const std::optional<bytes>& orlptx, const evm_runtime::test::block_info& bi);
    [[eosio::action]] void

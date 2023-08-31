@@ -471,12 +471,13 @@ BOOST_FIXTURE_TEST_CASE(deploy_contract_function, call_evm_tester) try {
   auto to = evmc::bytes();
 
   auto data = evmc::from_hex(contract_bytecode);
-
+  assertnonce("alice"_n, 0);
   call("alice"_n, to, silkworm::Bytes(v), *data, 1000000, "alice"_n); // nonce 0->1
   
   auto addr = silkworm::create_address(alice_addr, 0); 
-
+  assertnonce("alice"_n, 1);
   call_test(addr, 1234, "alice"_n, "alice"_n); // nonce 1->2
+  
   auto count = get_count(addr);
   BOOST_REQUIRE(count == 1234);
 
@@ -484,13 +485,70 @@ BOOST_FIXTURE_TEST_CASE(deploy_contract_function, call_evm_tester) try {
   produce_block();
 
   auto from = evmc::bytes{std::begin(alice_addr.bytes), std::end(alice_addr.bytes)};
-
+  assertnonce("alice"_n, 2);
   admincall(from, to, silkworm::Bytes(v), *data, 1000000, evm_account_name); // nonce 2->3
-  
+
   addr = silkworm::create_address(alice_addr, 2); 
+  assertnonce("alice"_n, 3);
   call_test(addr, 2222, "alice"_n, "alice"_n); // nonce 3->4
+  assertnonce("alice"_n, 4);
   count = get_count(addr);
   BOOST_REQUIRE(count == 2222);
+} FC_LOG_AND_RETHROW()
+
+BOOST_FIXTURE_TEST_CASE(assetnonce_test, call_evm_tester) try {
+  auto alice_addr = make_reserved_address("alice"_n.to_uint64_t());
+
+  // nonce for not opened account is zero.
+  assertnonce("alice"_n, 0);
+  BOOST_REQUIRE_EXCEPTION(assertnonce("alice"_n, 1),
+                          eosio_assert_message_exception, eosio_assert_message_is("wrong nonce"));
+
+  // Advance block so we do not generate same transaction.
+  produce_block();
+
+  open("alice"_n);
+  transfer_token("alice"_n, evm_account_name, make_asset(1000000), "alice");
+
+  evm_eoa evm1;
+  evmc::bytes32 v;
+
+  auto to = evmc::bytes();
+
+  auto data = evmc::from_hex(contract_bytecode);
+
+  // Fail when nonce is 0 but tested with non-zero value
+  BOOST_REQUIRE_EXCEPTION(assertnonce("alice"_n, 1),
+                          eosio_assert_message_exception, eosio_assert_message_is("wrong nonce"));
+
+  assertnonce("alice"_n, 0);
+  call("alice"_n, to, silkworm::Bytes(v), *data, 1000000, "alice"_n); // nonce 0->1
+  
+  // Advance block so we do not generate same transaction.
+  produce_block();
+
+  assertnonce("alice"_n, 1);
+  assertnonce(evm_account_name, 0);
+  // Fund evm1 address with 100 EOS, should NOT increase alice nonce, but increase evm nonce.
+  transfer_token("alice"_n, evm_account_name, make_asset(1000000), evm1.address_0x());
+
+  // Advance block so we do not generate same transaction.
+  produce_block();
+  assertnonce("alice"_n, 1);
+  assertnonce(evm_account_name, 1);
+
+  // Advance block so we do not generate same transaction.
+  produce_block();
+
+  // Fail when nonce is non-zero but tested with another value
+  BOOST_REQUIRE_EXCEPTION(assertnonce("alice"_n, 2),
+                          eosio_assert_message_exception, eosio_assert_message_is("wrong nonce"));
+  // Fail when nonce is non-zero but tested with 0
+  BOOST_REQUIRE_EXCEPTION(assertnonce("alice"_n, 0),
+                          eosio_assert_message_exception, eosio_assert_message_is("wrong nonce"));
+
+  
+
 } FC_LOG_AND_RETHROW()
 
 
