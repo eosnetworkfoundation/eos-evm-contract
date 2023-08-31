@@ -333,10 +333,12 @@ void basic_evm_tester::admincall(const evmc::bytes& from, const evmc::bytes& to,
    push_action(evm_account_name, "admincall"_n, actor,  mvo()("from", from_bytes)("to", to_bytes)("value", value_bytes)("data", data_bytes)("gas_limit", gas_limit));
 }
 
-transaction_trace_ptr basic_evm_tester::bridgereg(name receiver, asset min_fee, vector<account_name> extra_signers) {
+transaction_trace_ptr basic_evm_tester::bridgereg(name receiver, name handler, asset min_fee, vector<account_name> extra_signers) {
    extra_signers.push_back(receiver);
+   if (receiver != handler)
+      extra_signers.push_back(handler);
    return basic_evm_tester::push_action(evm_account_name, "bridgereg"_n, extra_signers, 
-      mvo()("receiver", receiver)("min_fee", min_fee));
+      mvo()("receiver", receiver)("handler", handler)("min_fee", min_fee));
 }
 
 transaction_trace_ptr basic_evm_tester::bridgeunreg(name receiver) {
