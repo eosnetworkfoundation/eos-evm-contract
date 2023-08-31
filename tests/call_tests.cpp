@@ -499,8 +499,13 @@ BOOST_FIXTURE_TEST_CASE(deploy_contract_function, call_evm_tester) try {
 BOOST_FIXTURE_TEST_CASE(assetnonce_test, call_evm_tester) try {
   auto alice_addr = make_reserved_address("alice"_n.to_uint64_t());
 
-  BOOST_REQUIRE_EXCEPTION(assertnonce("alice"_n, 0),
-                          eosio_assert_message_exception, eosio_assert_message_is("caller account has not been opened"));
+  // nonce for not opened account is zero.
+  assertnonce("alice"_n, 0);
+  BOOST_REQUIRE_EXCEPTION(assertnonce("alice"_n, 1),
+                          eosio_assert_message_exception, eosio_assert_message_is("wrong nonce"));
+
+  // Advance block so we do not generate same transaction.
+  produce_block();
 
   open("alice"_n);
   transfer_token("alice"_n, evm_account_name, make_asset(1000000), "alice");

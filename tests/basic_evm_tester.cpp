@@ -344,9 +344,9 @@ transaction_trace_ptr basic_evm_tester::bridgeunreg(name receiver) {
       mvo()("receiver", receiver));
 }
 
-transaction_trace_ptr basic_evm_tester::assertnonce(name receiver, uint64_t nonce) {
-   return basic_evm_tester::push_action(evm_account_name, "assertnonce"_n, receiver, 
-      mvo()("receiver", receiver)("nonce", nonce));
+transaction_trace_ptr basic_evm_tester::assertnonce(name account, uint64_t next_nonce) {
+   return basic_evm_tester::push_action(evm_account_name, "assertnonce"_n, account, 
+      mvo()("account", account)("next_nonce", next_nonce));
 }
 
 transaction_trace_ptr basic_evm_tester::pushtx(const silkworm::Transaction& trx, name miner)

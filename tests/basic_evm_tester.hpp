@@ -222,7 +222,7 @@ public:
    transaction_trace_ptr bridgereg(name receiver, asset min_fee, vector<account_name> extra_signers={evm_account_name});
    transaction_trace_ptr bridgeunreg(name receiver);
    transaction_trace_ptr exec(const exec_input& input, const std::optional<exec_callback>& callback);
-   transaction_trace_ptr assertnonce(name receiver, uint64_t nonce);
+   transaction_trace_ptr assertnonce(name account, uint64_t next_nonce);
    transaction_trace_ptr pushtx(const silkworm::Transaction& trx, name miner = evm_account_name);
    void call(name from, const evmc::bytes& to, const evmc::bytes& value, evmc::bytes& data, uint64_t gas_limit, name actor);
    void admincall(const evmc::bytes& from, const evmc::bytes& to, const evmc::bytes& value, evmc::bytes& data, uint64_t gas_limit, name actor);

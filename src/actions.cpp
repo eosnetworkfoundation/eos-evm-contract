@@ -736,11 +736,16 @@ void evm_contract::bridgeunreg(eosio::name receiver) {
 }
 
 
-void evm_contract::assertnonce(eosio::name receiver, uint64_t nonce) { 
+void evm_contract::assertnonce(eosio::name account, uint64_t next_nonce) { 
     nextnonces nextnonce_table(get_self(), get_self().value);
 
-    const nextnonce& next_nonce = nextnonce_table.get(receiver.value, "caller account has not been opened");
-    eosio::check(nonce == next_nonce.next_nonce, "wrong nonce");
+    auto next_nonce_iter = nextnonce_table.find(account.value);
+    if (next_nonce_iter == nextnonce_table.end()) {
+        eosio::check(0 == next_nonce, "wrong nonce");
+    }
+    else {
+        eosio::check(next_nonce_iter->next_nonce == next_nonce, "wrong nonce");
+    }
 }
 
 #ifdef WITH_TEST_ACTIONS
