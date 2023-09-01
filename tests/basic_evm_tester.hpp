@@ -111,6 +111,7 @@ struct exec_output {
 
 struct message_receiver {
     name     account;
+    name     handler;
     asset    min_fee;
     uint32_t flags;
 };
@@ -139,7 +140,7 @@ FC_REFLECT(evm_test::exec_input, (context)(from)(to)(data)(value))
 FC_REFLECT(evm_test::exec_callback, (contract)(action))
 FC_REFLECT(evm_test::exec_output, (status)(data)(context))
 
-FC_REFLECT(evm_test::message_receiver, (account)(min_fee)(flags));
+FC_REFLECT(evm_test::message_receiver, (account)(handler)(min_fee)(flags));
 FC_REFLECT(evm_test::bridge_message_v0, (receiver)(sender)(timestamp)(value)(data));
 
 namespace evm_test {
@@ -219,7 +220,7 @@ public:
    silkworm::Transaction
    generate_tx(const evmc::address& to, const intx::uint256& value, uint64_t gas_limit = 21000) const;
 
-   transaction_trace_ptr bridgereg(name receiver, asset min_fee, vector<account_name> extra_signers={evm_account_name});
+   transaction_trace_ptr bridgereg(name receiver, name handler, asset min_fee, vector<account_name> extra_signers={evm_account_name});
    transaction_trace_ptr bridgeunreg(name receiver);
    transaction_trace_ptr exec(const exec_input& input, const std::optional<exec_callback>& callback);
    transaction_trace_ptr assertnonce(name account, uint64_t next_nonce);

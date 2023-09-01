@@ -411,9 +411,9 @@ void evm_contract::process_filtered_messages(const std::vector<silkworm::Filtere
         eosio::check(value >= min_fee, "min_fee not covered");
 
         balances balance_table(get_self(), get_self().value);
-        const balance& receiver_account = balance_table.get(msg_v0.get_account_as_name().value, "receiver account is not open");
+        const balance& receiver_account = balance_table.get(receiver.value, "receiver account is not open");
 
-        action(std::vector<permission_level>{}, msg_v0.get_account_as_name(), "onbridgemsg"_n,
+        action(std::vector<permission_level>{}, it->handler, "onbridgemsg"_n,
             bridge_message{ bridge_message_v0 {
                 .receiver  = msg_v0.get_account_as_name(),
                 .sender    = to_bytes(rawmsg.sender),
@@ -699,7 +699,7 @@ void evm_contract::admincall(const bytes& from, const bytes& to, const bytes& va
     call_(s, to, v, data, gas_limit, nonce);
 }
 
-void evm_contract::bridgereg(eosio::name receiver, const eosio::asset& min_fee) {
+void evm_contract::bridgereg(eosio::name receiver, eosio::name handler, const eosio::asset& min_fee) {
     assert_unfrozen();
     require_auth(receiver);
     require_auth(get_self());  // to temporarily prevent registration of unauthorized accounts
@@ -709,6 +709,7 @@ void evm_contract::bridgereg(eosio::name receiver, const eosio::asset& min_fee) 
 
     auto update_row = [&](auto& row) {
         row.account = receiver;
+        row.handler = handler;
         row.min_fee = min_fee;
         row.flags   = message_receiver::FORCE_ATOMIC;
     };

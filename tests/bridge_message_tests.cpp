@@ -81,18 +81,18 @@ BOOST_FIXTURE_TEST_CASE(bridge_register_test, bridge_message_tester) try {
   create_accounts({"rec1"_n});
 
   // evm auth is needed
-  BOOST_REQUIRE_EXCEPTION(bridgereg("rec1"_n, make_asset(-1), {}),
+  BOOST_REQUIRE_EXCEPTION(bridgereg("rec1"_n, "rec1"_n, make_asset(-1), {}),
     missing_auth_exception, [](const missing_auth_exception& e) { return expect_assert_message(e, "missing authority of evm"); });
 
   // min fee only accepts EOS
-  BOOST_REQUIRE_EXCEPTION(bridgereg("rec1"_n, asset::from_string("1.0000 TST")),
+  BOOST_REQUIRE_EXCEPTION(bridgereg("rec1"_n, "rec1"_n, asset::from_string("1.0000 TST")),
     eosio_assert_message_exception, eosio_assert_message_is("unexpected symbol"));
 
   // min fee must be non-negative
-  BOOST_REQUIRE_EXCEPTION(bridgereg("rec1"_n, make_asset(-1)),
+  BOOST_REQUIRE_EXCEPTION(bridgereg("rec1"_n, "rec1"_n, make_asset(-1)),
     eosio_assert_message_exception, eosio_assert_message_is("min_fee cannot be negative"));
 
-  bridgereg("rec1"_n, make_asset(0));
+  bridgereg("rec1"_n, "rec1"_n, make_asset(0));
 
   auto row = fc::raw::unpack<message_receiver>(get_row_by_account( evm_account_name, evm_account_name, "msgreceiver"_n, "rec1"_n));
   BOOST_REQUIRE(row.account == "rec1"_n);
@@ -100,7 +100,7 @@ BOOST_FIXTURE_TEST_CASE(bridge_register_test, bridge_message_tester) try {
   BOOST_REQUIRE(row.flags == 0x1);
 
   // Register again changing min fee
-  bridgereg("rec1"_n, make_asset(1));
+  bridgereg("rec1"_n, "rec1"_n, make_asset(1));
 
   row = fc::raw::unpack<message_receiver>(get_row_by_account( evm_account_name, evm_account_name, "msgreceiver"_n, "rec1"_n));
   BOOST_REQUIRE(row.account == "rec1"_n);
@@ -127,7 +127,7 @@ BOOST_FIXTURE_TEST_CASE(basic_tests, bridge_message_tester) try {
   set_abi("rec1"_n, testing::contracts::evm_bridge_receiver_abi().data());
 
   // Register rec1 with 1000.0000 EOS as min_fee
-  bridgereg("rec1"_n, make_asset(1000'0000));
+  bridgereg("rec1"_n, "rec1"_n, make_asset(1000'0000));
 
   // Fund evm1 address with 1001 EOS
   evm_eoa evm1;
@@ -235,7 +235,7 @@ BOOST_FIXTURE_TEST_CASE(test_bridge_errors, bridge_message_tester) try {
   evm1.next_nonce--;
 
   // Register abcd
-  bridgereg("abcd"_n, make_asset(1));
+  bridgereg("abcd"_n, "abcd"_n, make_asset(1));
 
   // min fee not covered
   BOOST_REQUIRE_EXCEPTION(send_raw_message(evm1, emv_reserved_address, 0,
@@ -287,7 +287,7 @@ BOOST_FIXTURE_TEST_CASE(test_send_message_from_solidity, bridge_message_tester) 
   set_abi("rec1"_n, testing::contracts::evm_bridge_receiver_abi().data());
 
   // Register rec1 with 0 EOS as min_fee
-  bridgereg("rec1"_n, make_asset(0));
+  bridgereg("rec1"_n, "rec1"_n, make_asset(0));
 
   // Fund evm1 address with 100 EOS
   evm_eoa evm1;
@@ -323,6 +323,66 @@ BOOST_FIXTURE_TEST_CASE(test_send_message_from_solidity, bridge_message_tester) 
     BOOST_CHECK(out.value == to_bytes(0_ether));
     BOOST_CHECK(out.data == to_bytes(evmc::from_hex("00000000000000000000000000000000000000000000000000000000FFFFFF0"+std::to_string(i)).value()));
   }
+} FC_LOG_AND_RETHROW()
+
+BOOST_FIXTURE_TEST_CASE(handler_tests, bridge_message_tester) try {
+  auto emv_reserved_address = make_reserved_address(evm_account_name);
+
+  // Fund evm1 address with 1001 EOS
+  evm_eoa evm1;
+  const int64_t to_bridge = 1001'0000;
+  transfer_token("alice"_n, evm_account_name, make_asset(to_bridge), evm1.address_0x());
+
+  BOOST_REQUIRE_EXCEPTION(send_bridge_message(evm1, "receiver", 0, "0102030405060708090a"),
+    eosio_assert_message_exception, eosio_assert_message_is("receiver is not account"));
+  evm1.next_nonce--;
+
+  // Create receiver account
+  create_accounts({"receiver"_n});
+
+  // receiver not registered
+  BOOST_REQUIRE_EXCEPTION(send_bridge_message(evm1, "receiver", 0, "0102030405060708090a"),
+    eosio_assert_message_exception, eosio_assert_message_is("receiver not registered"));
+  evm1.next_nonce--;
+
+  // Create handler account
+  create_accounts({"handler"_n});
+  set_code("handler"_n, testing::contracts::evm_bridge_receiver_wasm());
+  set_abi("handler"_n, testing::contracts::evm_bridge_receiver_abi().data());
+  // Register handler with 1000.0000 EOS as min_fee
+  bridgereg("receiver"_n, "handler"_n, make_asset(1000'0000));
+
+
+  // Corner case: receiver account is not open
+  // We can only test in this way because bridgereg will open receiver.
+  close("receiver"_n);
+  
+  BOOST_REQUIRE_EXCEPTION(send_bridge_message(evm1, "receiver", 1000_ether, "0102030405060708090a"),
+    eosio_assert_message_exception, eosio_assert_message_is("receiver account is not open"));
+  evm1.next_nonce--;
+  open("receiver"_n);
+
+  // Check handler balance before sending the message
+  BOOST_REQUIRE(vault_balance("receiver"_n) == (balance_and_dust{make_asset(0), 0}));
+
+  // Emit message
+  auto res = send_bridge_message(evm1, "receiver", 1000_ether, "0102030405060708090a");
+
+  // Check handler balance after sending the message
+  BOOST_REQUIRE(vault_balance("receiver"_n) == (balance_and_dust{make_asset(1000'0000), 0}));
+
+  // Recover message form the return value of handler contract
+  // Make sure "handler" received a message sent to "receiver"
+  BOOST_CHECK(res->action_traces[1].receiver == "handler"_n);
+  auto msgout = fc::raw::unpack<bridge_message>(res->action_traces[1].return_value);
+  auto out = std::get<bridge_message_v0>(msgout);
+  
+  BOOST_CHECK(out.receiver == "receiver"_n);
+  BOOST_CHECK(out.sender == to_bytes(evm1.address));
+  BOOST_CHECK(out.timestamp.time_since_epoch() == control->pending_block_time().time_since_epoch());
+  BOOST_CHECK(out.value == to_bytes(1000_ether));
+  BOOST_CHECK(out.data == to_bytes(evmc::from_hex("0102030405060708090a").value()));
+
 } FC_LOG_AND_RETHROW()
 
 BOOST_AUTO_TEST_SUITE_END()

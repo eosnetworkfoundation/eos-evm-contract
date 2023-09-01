@@ -189,6 +189,7 @@ struct [[eosio::table]] [[eosio::contract("evm_contract")]] message_receiver {
     };
 
     name     account;
+    name     handler;
     asset    min_fee;
     uint32_t flags;
 
@@ -197,7 +198,7 @@ struct [[eosio::table]] [[eosio::contract("evm_contract")]] message_receiver {
         return (flags & f) != 0;
     }
 
-    EOSLIB_SERIALIZE(message_receiver, (account)(min_fee)(flags));
+    EOSLIB_SERIALIZE(message_receiver, (account)(handler)(min_fee)(flags));
 };
 
 typedef eosio::multi_index<"msgreceiver"_n, message_receiver> message_receiver_table;
