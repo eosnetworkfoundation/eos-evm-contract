@@ -253,7 +253,7 @@ BOOST_FIXTURE_TEST_CASE(test_bridge_errors, bridge_message_tester) try {
   // Close abcd balance
   close("abcd"_n);
 
-  // handler account is not open
+  // receiver account is not open
   BOOST_REQUIRE_EXCEPTION(send_raw_message(evm1, emv_reserved_address, 1e14,
                                                      evmc::from_hex(bridgeMsgV0_method_id).value() +
                                                      evmc::from_hex(int_str32(96)).value() +
@@ -333,15 +333,7 @@ BOOST_FIXTURE_TEST_CASE(handler_tests, bridge_message_tester) try {
   const int64_t to_bridge = 1001'0000;
   transfer_token("alice"_n, evm_account_name, make_asset(to_bridge), evm1.address_0x());
 
-  BOOST_REQUIRE_EXCEPTION(send_raw_message(evm1, emv_reserved_address, 0,
-                                                     evmc::from_hex(bridgeMsgV0_method_id).value() +
-                                                     evmc::from_hex(int_str32(96)).value() +
-                                                     evmc::from_hex(int_str32(1)).value() +
-                                                     evmc::from_hex(int_str32(160)).value() +
-                                                     evmc::from_hex(int_str32(8)).value() +
-                                                     evmc::from_hex(data_str32(str_to_hex("receiver"))).value() +
-                                                     evmc::from_hex(int_str32(4)).value() +
-                                                     evmc::from_hex(data_str32(str_to_hex("data"))).value()),
+  BOOST_REQUIRE_EXCEPTION(send_bridge_message(evm1, "receiver", 0, "0102030405060708090a"),
     eosio_assert_message_exception, eosio_assert_message_is("receiver is not account"));
   evm1.next_nonce--;
 
@@ -349,15 +341,7 @@ BOOST_FIXTURE_TEST_CASE(handler_tests, bridge_message_tester) try {
   create_accounts({"receiver"_n});
 
   // receiver not registered
-  BOOST_REQUIRE_EXCEPTION(send_raw_message(evm1, emv_reserved_address, 0,
-                                                     evmc::from_hex(bridgeMsgV0_method_id).value() +
-                                                     evmc::from_hex(int_str32(96)).value() +
-                                                     evmc::from_hex(int_str32(1)).value() +
-                                                     evmc::from_hex(int_str32(160)).value() +
-                                                     evmc::from_hex(int_str32(8)).value() +
-                                                     evmc::from_hex(data_str32(str_to_hex("receiver"))).value() +
-                                                     evmc::from_hex(int_str32(4)).value() +
-                                                     evmc::from_hex(data_str32(str_to_hex("data"))).value()),
+  BOOST_REQUIRE_EXCEPTION(send_bridge_message(evm1, "receiver", 0, "0102030405060708090a"),
     eosio_assert_message_exception, eosio_assert_message_is("receiver not registered"));
   evm1.next_nonce--;
 
@@ -373,15 +357,7 @@ BOOST_FIXTURE_TEST_CASE(handler_tests, bridge_message_tester) try {
   // We can only test in this way because bridgereg will open receiver.
   close("receiver"_n);
   
-  BOOST_REQUIRE_EXCEPTION(send_raw_message(evm1, emv_reserved_address, 1000_ether,
-                                                     evmc::from_hex(bridgeMsgV0_method_id).value() +
-                                                     evmc::from_hex(int_str32(96)).value() +
-                                                     evmc::from_hex(int_str32(1)).value() +
-                                                     evmc::from_hex(int_str32(160)).value() +
-                                                     evmc::from_hex(int_str32(8)).value() +
-                                                     evmc::from_hex(data_str32(str_to_hex("receiver"))).value() +
-                                                     evmc::from_hex(int_str32(4)).value() +
-                                                     evmc::from_hex(data_str32(str_to_hex("data"))).value()),
+  BOOST_REQUIRE_EXCEPTION(send_bridge_message(evm1, "receiver", 1000_ether, "0102030405060708090a"),
     eosio_assert_message_exception, eosio_assert_message_is("receiver account is not open"));
   evm1.next_nonce--;
   open("receiver"_n);
