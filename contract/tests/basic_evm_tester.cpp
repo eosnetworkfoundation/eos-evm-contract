@@ -350,9 +350,10 @@ transaction_trace_ptr basic_evm_tester::addevmbal(uint64_t id, const intx::uint2
       mvo()("id", id)("delta",d)("subtract",subtract));
 }
 
-transaction_trace_ptr basic_evm_tester::addopenbal(name account, const asset& delta, name actor) {
+transaction_trace_ptr basic_evm_tester::addopenbal(name account, const intx::uint256& delta, bool subtract, name actor) {
+   auto d = to_bytes(delta);
    return basic_evm_tester::push_action(evm_account_name, "addopenbal"_n, actor,
-      mvo()("account", account)("delta",delta));
+      mvo()("account", account)("delta",d)("subtract",subtract));
 }
 
 void basic_evm_tester::pushtx(const silkworm::Transaction& trx, name miner)

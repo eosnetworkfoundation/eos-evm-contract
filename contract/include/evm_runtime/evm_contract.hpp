@@ -89,7 +89,7 @@ public:
    [[eosio::action]] void setkvstore(uint64_t account_id, const bytes& key, const std::optional<bytes>& value);
    [[eosio::action]] void rmaccount(uint64_t id);
    [[eosio::action]] void addevmbal(uint64_t id, const bytes& delta, bool subtract);
-   [[eosio::action]] void addopenbal(name account, const asset& delta);
+   [[eosio::action]] void addopenbal(name account, const bytes& delta, bool subtract);
    [[eosio::action]] void freezeaccnt(uint64_t id, bool value);
 #endif
 

@@ -243,7 +243,7 @@ public:
    transaction_trace_ptr rmaccount(uint64_t id, name actor=evm_account_name);
    transaction_trace_ptr freezeaccnt(uint64_t id, bool value, name actor=evm_account_name);
    transaction_trace_ptr addevmbal(uint64_t id, const intx::uint256& delta, bool subtract, name actor=evm_account_name);
-   transaction_trace_ptr addopenbal(name account, const asset& delta, name actor=evm_account_name);
+   transaction_trace_ptr addopenbal(name account, const intx::uint256& delta, bool subtract, name actor=evm_account_name);
 
    void open(name owner);
    void close(name owner);

@@ -393,7 +393,7 @@ BOOST_FIXTURE_TEST_CASE(addevmbal_add_tests, admin_action_tester) try {
    BOOST_REQUIRE_THROW(check_balances(), std::runtime_error);
 
    // We need to substract 0.0001 from the open balance of `evm_account_name`
-   addopenbal(evm_account_name, make_asset(-1));
+   addopenbal(evm_account_name, minimum_natively_representable, true);
 
    check_balances();
 
@@ -402,24 +402,24 @@ BOOST_FIXTURE_TEST_CASE(addevmbal_add_tests, admin_action_tester) try {
 BOOST_FIXTURE_TEST_CASE(addopenbal_tests, admin_action_tester) try {
    open("alice"_n);
    transfer_token("alice"_n, evm_account_name, make_asset(100'0000), "alice");
-   
-   BOOST_REQUIRE_EXCEPTION(addopenbal("beto"_n, make_asset(100'0000), "alice"_n),
-      missing_auth_exception, eosio::testing::fc_exception_message_starts_with("missing authority"));
-
-   BOOST_REQUIRE_EXCEPTION(addopenbal("beto"_n, make_asset(100'0000)),
-         eosio_assert_message_exception, eosio_assert_message_is("account not found"));
-
-   BOOST_REQUIRE_EXCEPTION(addopenbal("alice"_n, make_asset(-100'0001)),
-         eosio_assert_message_exception, eosio_assert_message_is("negative final balance"));
-
-   BOOST_REQUIRE_EXCEPTION(addopenbal("alice"_n, make_asset(asset::max_amount-99'9999)),
-         eosio_assert_message_exception, eosio_assert_message_is("addition overflow"));
-
-   check_balances();
 
    intx::uint256 minimum_natively_representable = intx::exp(10_u256, intx::uint256(18 - 4));
 
-   addopenbal("alice"_n, make_asset(-1));
+   BOOST_REQUIRE_EXCEPTION(addopenbal("beto"_n, intx::uint256(100'0000)*minimum_natively_representable, false, "alice"_n),
+      missing_auth_exception, eosio::testing::fc_exception_message_starts_with("missing authority"));
+
+   BOOST_REQUIRE_EXCEPTION(addopenbal("beto"_n, intx::uint256(100'0000)*minimum_natively_representable, false),
+         eosio_assert_message_exception, eosio_assert_message_is("account not found"));
+
+   BOOST_REQUIRE_EXCEPTION(addopenbal("alice"_n, intx::uint256(100'0001)*minimum_natively_representable, true),
+         eosio_assert_message_exception, eosio_assert_message_is("decrementing more than available"));
+
+   BOOST_REQUIRE_EXCEPTION(addopenbal("alice"_n, std::numeric_limits<intx::uint256>::max()-intx::uint256(99'9999)*minimum_natively_representable, false),
+         eosio_assert_message_exception, eosio_assert_message_is("accumulation overflow"));
+
+   check_balances();
+
+   addopenbal("alice"_n, minimum_natively_representable, true);
    BOOST_REQUIRE(intx::uint256(vault_balance("alice"_n)) == intx::uint256(99'9999)*minimum_natively_representable);
 
    // This will fail since the eosio.token balance of `evm_account_name` is 0.0001 greater than the sum of all balances (evm + open balances)
@@ -430,7 +430,7 @@ BOOST_FIXTURE_TEST_CASE(addopenbal_tests, admin_action_tester) try {
 
    check_balances();
 
-   addopenbal("alice"_n, make_asset(1));
+   addopenbal("alice"_n, minimum_natively_representable, false);
    BOOST_REQUIRE(intx::uint256(vault_balance("alice"_n)) == intx::uint256(100'0000)*minimum_natively_representable);
 
    // This will fail since the eosio.token balance of `evm_account_name` is 0.0001 less than the sum of all balances (evm + open balances)
@@ -439,7 +439,7 @@ BOOST_FIXTURE_TEST_CASE(addopenbal_tests, admin_action_tester) try {
 
    // This combination is to adjust just the eosio.token EOS balance of the `evm_account_name`
    transfer_token("alice"_n, evm_account_name, make_asset(1), evm_account_name.to_string());
-   addopenbal(evm_account_name, make_asset(-1));
+   addopenbal(evm_account_name, minimum_natively_representable, true);
 
    check_balances();
 

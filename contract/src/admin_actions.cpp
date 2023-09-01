@@ -89,17 +89,20 @@ namespace evm_runtime {
     });
 }
 
-[[eosio::action]] void evm_contract::addopenbal(name account, const asset& delta) {
+[[eosio::action]] void evm_contract::addopenbal(name account, const bytes& delta, bool subtract) {
     eosio::require_auth(get_self());
     balances open_balances(get_self(), get_self().value);
     auto itr = open_balances.find(account.value);
     eosio::check(itr != open_balances.end(), "account not found");
 
-    auto res = itr->balance.balance + delta;
-    eosio::check(res.amount >= 0, "negative final balance");
+    auto d = to_uint256(delta);
 
     open_balances.modify(*itr, eosio::same_payer, [&](auto& row){
-        row.balance.balance = res;
+        if(subtract) {
+            row.balance-=d;
+        } else {
+            row.balance+=d;
+        }
     });
 }
 
