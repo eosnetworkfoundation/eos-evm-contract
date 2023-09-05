@@ -363,6 +363,11 @@ Set chain ID & native token configuration (in this example, gas price is 150 Gwe
 \"}}" -p evmevmevmevm
 ```
 
+Add eosio.code to active permission
+```
+./cleos set account permission evmevmevmevm active --add-code
+```
+
 after the init action we need a small amount of token (1 EOS) to be transferred into the contract account (with memo=contract account), for example:
 ```
 ./cleos transfer eosio evmevmevmevm "1.0000 EOS" "evmevmevmevm"
@@ -944,7 +949,17 @@ This determines the value of the "timestamp" field in EVM genesis.
 
 Set the "mixHash" field to be "0x + Antelope starting block id", e.g.  "0x000000026d392f1bfeddb000555bcb03ca6e31a54c0cf9edc23cede42bda17e6"
 
-Set the "nonce" field to be the hex encoding of the value of the Antelope name of the account on which the EVM contract is deployed. So if the `evmevmevmevm` account name is used, then set the nonce to "0x56e4adc95b92b720". If the `eosio.evm` account name is used, then set the nonce to "0x56e4adc95b92b720". This is re-purposed to be the block time (in mill-second) of the EVM chain.
+Set the "nonce" field to be the hex encoding of the value of the Antelope name of the account on which the EVM contract is deployed. So if the `evmevmevmevm` account name is used, then set the nonce to "0x56e4adc95b92b720". If the `eosio.evm` account name is used, then set the nonce to "0x5530ea015b900000".
+
+The function `convert_name_to_value` from https://github.com/eosnetworkfoundation/eos-evm/blob/main/tests/leap/antelope_name.py can be used to get the appropriate nonce value using Python:
+
+```shell
+>>> from antelope_name import convert_name_to_value
+>>> print(f'0x{convert_name_to_value("evmevmevmevm"):x}')
+0x56e4adc95b92b720
+>>> print(f'0x{convert_name_to_value("eosio.evm"):x}')
+0x5530ea015b900000
+```
 
 In the "alloc" part, setup the genesis EVM account balance (should be all zeros)
 
@@ -1008,7 +1023,7 @@ In the above command, eos-evm-rpc will listen on port 8881 for RPC requests.
 To verify the RPC response run below command:
 
 ```shell
-curl --location --request POST 'localhost:8881/' --header 'Content-Type: application/json' --data-raw '{"method":"eth_blockNumber","id":0}'
+curl --location --request POST 'localhost:8881/' --header 'Content-Type: application/json' --data-raw '{"method":"eth_blockNumber","id":0,"jsonrpc":"2.0"}'
 ```
 
 You'll recevie a response similar to the one below:
@@ -1022,7 +1037,7 @@ You'll recevie a response similar to the one below:
 Request:
 
 ```shell
-curl --location --request POST 'localhost:8881/' --header 'Content-Type: application/json' --data-raw '{"method":"eth_getBlockByNumber","params":["0x1",true],"id":0}'
+curl --location --request POST 'localhost:8881/' --header 'Content-Type: application/json' --data-raw '{"method":"eth_getBlockByNumber","params":["0x1",true],"id":0,"jsonrpc":"2.0"}'
 ```
 
 Response:
@@ -1036,7 +1051,7 @@ Response:
 Request:
 
 ```shell
-curl --location --request POST 'localhost:8881/' --header 'Content-Type: application/json' --data-raw '{"method":"eth_getBalance","params":["9edf022004846bc987799d552d1b8485b317b7ed","latest"],"id":0}'
+curl --location --request POST 'localhost:8881/' --header 'Content-Type: application/json' --data-raw '{"method":"eth_getBalance","params":["9edf022004846bc987799d552d1b8485b317b7ed","latest"],"id":0,"jsonrpc":"2.0"}'
 ```
 
 response:
@@ -1051,7 +1066,7 @@ Request:
 data - 0x2e64cec1 is the hash of a solidity function `retrieve() public view returns (uint256)`
 
 ```shell
-curl --location --request POST 'localhost:8881/' --header 'Content-Type: application/json' --data-raw '{"method":"eth_call","params":[{"from":" 2787b98fc4e731d0456b3941f0b3fe2e01439961","to":"3f4b0f92007341792aa61e065484e48e583ebeb9","data":"0x2e64cec1"},"latest"],"id":11}'
+curl --location --request POST 'localhost:8881/' --header 'Content-Type: application/json' --data-raw '{"method":"eth_call","params":[{"from":" 2787b98fc4e731d0456b3941f0b3fe2e01439961","to":"3f4b0f92007341792aa61e065484e48e583ebeb9","data":"0x2e64cec1"},"latest"],"id":11,"jsonrpc":"2.0"}'
 ```
 
 Response:
