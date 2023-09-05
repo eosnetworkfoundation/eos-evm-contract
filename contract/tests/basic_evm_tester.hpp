@@ -56,6 +56,11 @@ struct config_table_row
    uint32_t status;
 };
 
+struct config2_table_row
+{
+   uint64_t next_account_id;
+};
+
 struct balance_and_dust
 {
    asset balance;
@@ -114,6 +119,7 @@ struct exec_output {
 
 FC_REFLECT(evm_test::config_table_row,
            (version)(chainid)(genesis_time)(ingress_bridge_fee)(gas_price)(miner_cut)(status))
+FC_REFLECT(evm_test::config2_table_row,(next_account_id))
 FC_REFLECT(evm_test::balance_and_dust, (balance)(dust));
 FC_REFLECT(evm_test::account_object, (id)(address)(nonce)(balance))
 FC_REFLECT(evm_test::storage_slot, (id)(key)(value))
@@ -192,6 +198,7 @@ public:
    void prepare_self_balance(uint64_t fund_amount = 100'0000);
 
    config_table_row get_config() const;
+   config2_table_row get_config2() const;
 
    void setfeeparams(const fee_parameters& fee_params);
 
@@ -208,6 +215,8 @@ public:
    void open(name owner);
    void close(name owner);
    void withdraw(name owner, asset quantity);
+
+   void gc(uint32_t max);
 
    balance_and_dust vault_balance(name owner) const;
    std::optional<intx::uint256> evm_balance(const evmc::address& address) const;
@@ -241,6 +250,7 @@ public:
    bool scan_accounts(std::function<bool(account_object)> visitor) const;
    std::optional<account_object> scan_for_account_by_address(const evmc::address& address) const;
    std::optional<account_object> find_account_by_address(const evmc::address& address) const;
+   std::optional<account_object> find_account_by_id(uint64_t id) const;
    bool scan_account_storage(uint64_t account_id, std::function<bool(storage_slot)> visitor) const;
 };
 

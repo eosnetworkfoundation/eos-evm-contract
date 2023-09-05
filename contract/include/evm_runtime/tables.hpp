@@ -182,4 +182,11 @@ struct [[eosio::table]] [[eosio::contract("evm_contract")]] allowed_egress_accou
 
 typedef eosio::multi_index<"egresslist"_n, allowed_egress_account> egresslist;
 
+struct [[eosio::table]] [[eosio::contract("evm_contract")]] config2
+{
+    uint64_t next_account_id{0};
+
+    EOSLIB_SERIALIZE(config2, (next_account_id));
+};
+
 } //namespace evm_runtime
