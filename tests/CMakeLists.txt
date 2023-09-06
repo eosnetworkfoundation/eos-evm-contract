@@ -22,6 +22,7 @@ include_directories(
 )
 
 add_eosio_test_executable( unit_test
+    ${CMAKE_SOURCE_DIR}/account_id_tests.cpp
     ${CMAKE_SOURCE_DIR}/basic_evm_tester.cpp
     ${CMAKE_SOURCE_DIR}/evm_runtime_tests.cpp
     ${CMAKE_SOURCE_DIR}/init_tests.cpp

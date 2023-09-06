@@ -624,6 +624,7 @@ void evm_contract::withdraw(eosio::name owner, eosio::asset quantity, const eosi
 
 bool evm_contract::gc(uint32_t max) {
     assert_unfrozen();
+    require_auth(get_self());
 
     evm_runtime::state state{get_self(), eosio::same_payer};
     return state.gc(max);

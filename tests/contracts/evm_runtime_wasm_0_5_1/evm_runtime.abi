@@ -1,0 +1,394 @@
+{
+  "version": "eosio::abi/1.2",
+  "types": [],
+  "structs": [{
+      "name": "account",
+      "base": "",
+      "fields": [{
+          "name": "id",
+          "type": "uint64"
+        },{
+          "name": "eth_address",
+          "type": "bytes"
+        },{
+          "name": "nonce",
+          "type": "uint64"
+        },{
+          "name": "balance",
+          "type": "bytes"
+        },{
+          "name": "code_id",
+          "type": "uint64?"
+        }
+      ]
+    },{
+      "name": "account_code",
+      "base": "",
+      "fields": [{
+          "name": "id",
+          "type": "uint64"
+        },{
+          "name": "ref_count",
+          "type": "uint32"
+        },{
+          "name": "code",
+          "type": "bytes"
+        },{
+          "name": "code_hash",
+          "type": "bytes"
+        }
+      ]
+    },{
+      "name": "addegress",
+      "base": "",
+      "fields": [{
+          "name": "accounts",
+          "type": "name[]"
+        }
+      ]
+    },{
+      "name": "allowed_egress_account",
+      "base": "",
+      "fields": [{
+          "name": "account",
+          "type": "name"
+        }
+      ]
+    },{
+      "name": "balance",
+      "base": "",
+      "fields": [{
+          "name": "owner",
+          "type": "name"
+        },{
+          "name": "balance",
+          "type": "balance_with_dust"
+        }
+      ]
+    },{
+      "name": "balance_with_dust",
+      "base": "",
+      "fields": [{
+          "name": "balance",
+          "type": "asset"
+        },{
+          "name": "dust",
+          "type": "uint64"
+        }
+      ]
+    },{
+      "name": "close",
+      "base": "",
+      "fields": [{
+          "name": "owner",
+          "type": "name"
+        }
+      ]
+    },{
+      "name": "config",
+      "base": "",
+      "fields": [{
+          "name": "version",
+          "type": "varuint32"
+        },{
+          "name": "chainid",
+          "type": "uint64"
+        },{
+          "name": "genesis_time",
+          "type": "time_point_sec"
+        },{
+          "name": "ingress_bridge_fee",
+          "type": "asset"
+        },{
+          "name": "gas_price",
+          "type": "uint64"
+        },{
+          "name": "miner_cut",
+          "type": "uint32"
+        },{
+          "name": "status",
+          "type": "uint32"
+        }
+      ]
+    },{
+      "name": "exec",
+      "base": "",
+      "fields": [{
+          "name": "input",
+          "type": "exec_input"
+        },{
+          "name": "callback",
+          "type": "exec_callback?"
+        }
+      ]
+    },{
+      "name": "exec_callback",
+      "base": "",
+      "fields": [{
+          "name": "contract",
+          "type": "name"
+        },{
+          "name": "action",
+          "type": "name"
+        }
+      ]
+    },{
+      "name": "exec_input",
+      "base": "",
+      "fields": [{
+          "name": "context",
+          "type": "bytes?"
+        },{
+          "name": "from",
+          "type": "bytes?"
+        },{
+          "name": "to",
+          "type": "bytes"
+        },{
+          "name": "data",
+          "type": "bytes"
+        },{
+          "name": "value",
+          "type": "bytes?"
+        }
+      ]
+    },{
+      "name": "fee_parameters",
+      "base": "",
+      "fields": [{
+          "name": "gas_price",
+          "type": "uint64?"
+        },{
+          "name": "miner_cut",
+          "type": "uint32?"
+        },{
+          "name": "ingress_bridge_fee",
+          "type": "asset?"
+        }
+      ]
+    },{
+      "name": "freeze",
+      "base": "",
+      "fields": [{
+          "name": "value",
+          "type": "bool"
+        }
+      ]
+    },{
+      "name": "gc",
+      "base": "",
+      "fields": [{
+          "name": "max",
+          "type": "uint32"
+        }
+      ]
+    },{
+      "name": "gcstore",
+      "base": "",
+      "fields": [{
+          "name": "id",
+          "type": "uint64"
+        },{
+          "name": "storage_id",
+          "type": "uint64"
+        }
+      ]
+    },{
+      "name": "init",
+      "base": "",
+      "fields": [{
+          "name": "chainid",
+          "type": "uint64"
+        },{
+          "name": "fee_params",
+          "type": "fee_parameters"
+        }
+      ]
+    },{
+      "name": "nextnonce",
+      "base": "",
+      "fields": [{
+          "name": "owner",
+          "type": "name"
+        },{
+          "name": "next_nonce",
+          "type": "uint64"
+        }
+      ]
+    },{
+      "name": "open",
+      "base": "",
+      "fields": [{
+          "name": "owner",
+          "type": "name"
+        }
+      ]
+    },{
+      "name": "pushtx",
+      "base": "",
+      "fields": [{
+          "name": "miner",
+          "type": "name"
+        },{
+          "name": "rlptx",
+          "type": "bytes"
+        }
+      ]
+    },{
+      "name": "removeegress",
+      "base": "",
+      "fields": [{
+          "name": "accounts",
+          "type": "name[]"
+        }
+      ]
+    },{
+      "name": "setfeeparams",
+      "base": "",
+      "fields": [{
+          "name": "fee_params",
+          "type": "fee_parameters"
+        }
+      ]
+    },{
+      "name": "storage",
+      "base": "",
+      "fields": [{
+          "name": "id",
+          "type": "uint64"
+        },{
+          "name": "key",
+          "type": "bytes"
+        },{
+          "name": "value",
+          "type": "bytes"
+        }
+      ]
+    },{
+      "name": "withdraw",
+      "base": "",
+      "fields": [{
+          "name": "owner",
+          "type": "name"
+        },{
+          "name": "quantity",
+          "type": "asset"
+        },{
+          "name": "to",
+          "type": "name$"
+        }
+      ]
+    }
+  ],
+  "actions": [{
+      "name": "addegress",
+      "type": "addegress",
+      "ricardian_contract": ""
+    },{
+      "name": "close",
+      "type": "close",
+      "ricardian_contract": ""
+    },{
+      "name": "exec",
+      "type": "exec",
+      "ricardian_contract": ""
+    },{
+      "name": "freeze",
+      "type": "freeze",
+      "ricardian_contract": ""
+    },{
+      "name": "gc",
+      "type": "gc",
+      "ricardian_contract": ""
+    },{
+      "name": "init",
+      "type": "init",
+      "ricardian_contract": ""
+    },{
+      "name": "open",
+      "type": "open",
+      "ricardian_contract": ""
+    },{
+      "name": "pushtx",
+      "type": "pushtx",
+      "ricardian_contract": ""
+    },{
+      "name": "removeegress",
+      "type": "removeegress",
+      "ricardian_contract": ""
+    },{
+      "name": "setfeeparams",
+      "type": "setfeeparams",
+      "ricardian_contract": ""
+    },{
+      "name": "withdraw",
+      "type": "withdraw",
+      "ricardian_contract": ""
+    }
+  ],
+  "tables": [{
+      "name": "account",
+      "index_type": "i64",
+      "key_names": [],
+      "key_types": [],
+      "type": "account"
+    },{
+      "name": "accountcode",
+      "index_type": "i64",
+      "key_names": [],
+      "key_types": [],
+      "type": "account_code"
+    },{
+      "name": "balances",
+      "index_type": "i64",
+      "key_names": [],
+      "key_types": [],
+      "type": "balance"
+    },{
+      "name": "config",
+      "index_type": "i64",
+      "key_names": [],
+      "key_types": [],
+      "type": "config"
+    },{
+      "name": "egresslist",
+      "index_type": "i64",
+      "key_names": [],
+      "key_types": [],
+      "type": "allowed_egress_account"
+    },{
+      "name": "gcstore",
+      "index_type": "i64",
+      "key_names": [],
+      "key_types": [],
+      "type": "gcstore"
+    },{
+      "name": "inevm",
+      "index_type": "i64",
+      "key_names": [],
+      "key_types": [],
+      "type": "balance_with_dust"
+    },{
+      "name": "nextnonces",
+      "index_type": "i64",
+      "key_names": [],
+      "key_types": [],
+      "type": "nextnonce"
+    },{
+      "name": "storage",
+      "index_type": "i64",
+      "key_names": [],
+      "key_types": [],
+      "type": "storage"
+    }
+  ],
+  "ricardian_clauses": [],
+  "error_messages": [],
+  "abi_extensions": [],
+  "variants": [],
+  "action_results": [{
+      "name": "gc",
+      "result_type": "bool"
+    }
+  ]
+}

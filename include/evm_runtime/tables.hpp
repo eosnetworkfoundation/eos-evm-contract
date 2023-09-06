@@ -203,4 +203,11 @@ struct [[eosio::table]] [[eosio::contract("evm_contract")]] message_receiver {
 
 typedef eosio::multi_index<"msgreceiver"_n, message_receiver> message_receiver_table;
 
+struct [[eosio::table]] [[eosio::contract("evm_contract")]] config2
+{
+    uint64_t next_account_id{0};
+
+    EOSLIB_SERIALIZE(config2, (next_account_id));
+};
+
 } //namespace evm_runtime

@@ -251,6 +251,14 @@ config_table_row basic_evm_tester::get_config() const
    return fc::raw::unpack<config_table_row>(d);
 }
 
+config2_table_row basic_evm_tester::get_config2() const
+{
+   static constexpr eosio::chain::name config2_singleton_name = "config2"_n;
+   const vector<char> d =
+      get_row_by_account(evm_account_name, evm_account_name, config2_singleton_name, config2_singleton_name);
+   return fc::raw::unpack<config2_table_row>(d);
+}
+
 void basic_evm_tester::setfeeparams(const fee_parameters& fee_params)
 {
    mvo fee_params_vo;
@@ -406,6 +414,10 @@ balance_and_dust basic_evm_tester::inevm() const {
    return fc::raw::unpack<balance_and_dust>(get_row_by_account(evm_account_name, evm_account_name, "inevm"_n, "inevm"_n));
 }
 
+void basic_evm_tester::gc(uint32_t max) {
+   push_action(evm_account_name, "gc"_n, evm_account_name, mvo()("max", max));
+}
+
 balance_and_dust basic_evm_tester::vault_balance(name owner) const
 {
    const vector<char> d = get_row_by_account(evm_account_name, evm_account_name, "balances"_n, owner);
@@ -528,6 +540,20 @@ std::optional<account_object> basic_evm_tester::find_account_by_address(const ev
    }
 
    return result;
+}
+
+std::optional<account_object> basic_evm_tester::find_account_by_id(uint64_t id) const
+{
+   static constexpr eosio::chain::name account_table_name = "account"_n;
+   const vector<char> d =
+      get_row_by_account(evm_account_name, evm_account_name, account_table_name, name{id});
+   if(d.empty()) return {};
+
+   partial_account_table_row row;
+   fc::datastream<const char*> ds(d.data(), d.size());
+   fc::raw::unpack(ds, row);
+
+   return convert_to_account_object(row);
 }
 
 bool basic_evm_tester::scan_account_storage(uint64_t account_id, std::function<bool(storage_slot)> visitor) const
