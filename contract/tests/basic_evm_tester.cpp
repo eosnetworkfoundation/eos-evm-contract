@@ -61,7 +61,6 @@ namespace fc { namespace raw {
     template<>
     inline void unpack( datastream<const char*>& ds, evm_test::partial_account_table_row& tmp)
     { try  {
-      dlog("enrtro en partial_account_table_row unpack");
       fc::raw::unpack(ds, tmp.id);
       fc::raw::unpack(ds, tmp.eth_address);
       fc::raw::unpack(ds, tmp.nonce);
@@ -594,8 +593,6 @@ bool basic_evm_tester::scan_account_code(std::function<bool(account_code)> visit
    return true;
 }
 
-//TODO: remove when merging
-//---begin
 balance_and_dust basic_evm_tester::inevm() const {
    return fc::raw::unpack<balance_and_dust>(get_row_by_account(evm_account_name, evm_account_name, "inevm"_n, "inevm"_n));
 }
@@ -639,6 +636,5 @@ void basic_evm_tester::check_balances() {
       throw std::runtime_error("evm_eos_balance != total_in_accounts+total_in_evm_accounts");
    }
 }
-//---end
 
 } // namespace evm_test

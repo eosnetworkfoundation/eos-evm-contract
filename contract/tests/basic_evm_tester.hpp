@@ -289,13 +289,10 @@ public:
    bool scan_gcstore(std::function<bool(gcstore)> visitor) const;
    bool scan_account_code(std::function<bool(account_code)> visitor) const;
 
-   //TODO: remove before merge
-   //---begin
    balance_and_dust inevm() const;
    asset get_eos_balance( const account_name& act );
    void scan_balances(std::function<bool(evm_test::vault_balance_row)> visitor) const;
    void check_balances();
-   //---end
 
 };
 
