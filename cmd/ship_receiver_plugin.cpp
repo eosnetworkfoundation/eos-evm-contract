@@ -156,26 +156,20 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
            return std::nullopt;
          }
 
-         auto current_block = start_native_block(block);
+         native_block_t current_block = start_native_block(block);
 
          if (block.traces) {
             uint32_t num;
             eosio::varuint32_from_bin(num, *block.traces);
-            //SILK_DEBUG << "Block #" << block.this_block->block_num << " with " << num << " transactions";
+            SILK_DEBUG << "Block #" << block.this_block->block_num << " with " << num << " transactions";
             for (std::size_t i = 0; i < num; i++) {
                auto tt = eosio::from_bin<eosio::ship_protocol::transaction_trace>(*block.traces);
                const auto& trace = std::get<eosio::ship_protocol::transaction_trace_v0>(tt);
-               const auto& actions = trace.action_traces;
-               bool found = false;
-               for (std::size_t j=0; j < actions.size(); j++) {
-                  std::visit([&](auto& act){
-                     if (act.act.name == pushtx && core_account == act.receiver) {
-                        append_to_block(current_block, trace, j);
-                        found = true;
-                     }
-                  }, actions[j]);
-                  if (found) break;
+               if (trace.status != eosio::ship_protocol::transaction_status::executed) {
+                  SILK_DEBUG << "Block #" << block.this_block->block_num << " ignore transaction with status " << (int)trace.status;
+                  continue;
                }
+               append_to_block(current_block, trace);
             }
          }
 
@@ -198,27 +192,42 @@ class ship_receiver_plugin_impl : std::enable_shared_from_this<ship_receiver_plu
          return block;
       }
 
-      template <typename Trace>
-      inline void append_to_block(native_block_t& block, Trace& trace, std::size_t idx) {
+      inline void append_to_block(native_block_t& block, const eosio::ship_protocol::transaction_trace_v0& trace) {
          channels::native_trx native_trx = {trace.id, trace.cpu_usage_us, trace.elapsed};
          const auto& actions = trace.action_traces;
          //SILK_DEBUG << "Appending transaction ";
-         for (std::size_t j=idx; j < actions.size(); j++) {
-            std::visit([&](auto& act){
+         std::map<uint64_t, eosio::ship_protocol::action_trace> ordered_action_traces;
+         for (std::size_t j = 0; j < actions.size(); ++j) {
+            std::visit([&](auto& act) {
                if (act.act.name == pushtx && core_account == act.receiver) {
-                   channels::native_action action = {
-                       act.action_ordinal,
-                       act.receiver,
-                       act.act.account,
-                       act.act.name,
-                       std::vector<char>(act.act.data.pos, act.act.data.end)
-                   };
-                   native_trx.actions.emplace_back(std::move(action));
+                  if (!act.receipt.has_value()) {
+                     SILK_ERROR << "action_trace does not have receipt";
+                     throw std::runtime_error("action_trace does not have receipt");
+                  }
+                  uint64_t global_sequence = 0;
+                  std::visit([&](auto &receipt) { 
+                     global_sequence = receipt.global_sequence;
+                  }, act.receipt.value());
+                  ordered_action_traces[global_sequence] = std::move(actions[j]);
+                  SILK_DEBUG << "add action sequence " << global_sequence;
                }
             }, actions[j]);
-            //SILK_DEBUG << "Appending action " << native_trx.actions.back().name.to_string();
          }
-         block.transactions.emplace_back(std::move(native_trx));
+         if (ordered_action_traces.size()) {
+            for (const auto &pair: ordered_action_traces) {
+               std::visit([&](const auto& act) {
+                  channels::native_action action = {
+                     act.action_ordinal,
+                     act.receiver,
+                     act.act.account,
+                     act.act.name,
+                     std::vector<char>(act.act.data.pos, act.act.data.end)
+                  };
+                  native_trx.actions.emplace_back(std::move(action));
+               }, pair.second);
+            }
+            block.transactions.emplace_back(std::move(native_trx));
+         }
       }
 
      
