@@ -1,30 +1,24 @@
-[submodule "interfaces"]
-	path = interfaces
-	url = https://github.com/ledgerwatch/interfaces
-[submodule "silkrpc/croaring"]
-	path = silkrpc/croaring
-	url = https://github.com/lemire/CRoaringUnityBuild
 [submodule "silkworm"]
 	path = silkworm
-	url = git@github.com:eosnetworkfoundation/silkworm
-[submodule "contract/external/ethash"]
-	path = contract/external/ethash
-	url = git@github.com:eosnetworkfoundation/ethash
-[submodule "contract/external/intx"]
-	path = contract/external/intx
-	url = https://github.com/chfast/intx
-[submodule "contract/external/nlohmann_json"]
-	path = contract/external/nlohmann_json
-	url = https://github.com/nlohmann/json
-[submodule "contract/external/GSL"]
-	path = contract/external/GSL
+	url = https://github.com/eosnetworkfoundation/silkworm
+[submodule "external/expected"]
+	path = external/expected
+	url = https://github.com/TartanLlama/expected
+[submodule "external/GSL"]
+	path = external/GSL
 	url = https://github.com/microsoft/GSL
-[submodule "external/appbase"]
-	path = external/appbase
-	url = https://github.com/AntelopeIO/appbase
-[submodule "external/abieos"]
-	path = external/abieos
-	url = https://github.com/AntelopeIO/abieos
-[submodule "contract/tests/external/abseil"]
-	path = contract/tests/external/abseil
+[submodule "tests/external/abseil"]
+	path = tests/external/abseil
 	url = https://github.com/abseil/abseil-cpp
+[submodule "tests/external/ethash"]
+	path = tests/external/ethash
+	url = https://github.com/eosnetworkfoundation/ethash
+[submodule "tests/external/intx"]
+	path = tests/external/intx
+	url = https://github.com/chfast/intx
+[submodule "tests/external/evmone"]
+	path = tests/external/evmone
+	url = https://github.com/eosnetworkfoundation/evmone
+[submodule "tests/external/secp256k1"]
+	path = tests/external/secp256k1
+	url = https://github.com/bitcoin-core/secp256k1.git
