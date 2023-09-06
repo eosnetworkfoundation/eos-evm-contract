@@ -24,6 +24,9 @@ using namespace eosio;
 using namespace eosio::chain;
 using mvo = fc::mutable_variant_object;
 
+#include "utils.hpp"
+namespace evm_test { struct vault_balance_row; }
+
 using intx::operator""_u256;
 
 namespace intx {
@@ -74,10 +77,20 @@ struct balance_and_dust
 
 struct account_object
 {
+   enum class flag : uint32_t {
+      frozen = 0x1
+   };
+
    uint64_t id;
    evmc::address address;
    uint64_t nonce;
    intx::uint256 balance;
+   std::optional<uint64_t> code_id;
+   std::optional<uint32_t> flags;
+
+   inline bool has_flag(flag f)const {
+      return (flags.has_value() && flags.value() & static_cast<uint32_t>(f) != 0);
+   }
 };
 
 struct storage_slot
@@ -129,6 +142,18 @@ struct bridge_message_v0 {
    bytes      data;
 };
 
+struct gcstore {
+    uint64_t id;
+    uint64_t storage_id;
+};
+
+struct account_code {
+    uint64_t    id;
+    uint32_t    ref_count;
+    bytes       code;
+    bytes       code_hash;
+};
+
 using bridge_message = std::variant<bridge_message_v0>;
 
 } // namespace evm_test
@@ -148,6 +173,8 @@ FC_REFLECT(evm_test::exec_output, (status)(data)(context))
 
 FC_REFLECT(evm_test::message_receiver, (account)(handler)(min_fee)(flags));
 FC_REFLECT(evm_test::bridge_message_v0, (receiver)(sender)(timestamp)(value)(data));
+FC_REFLECT(evm_test::gcstore, (id)(storage_id));
+FC_REFLECT(evm_test::account_code, (id)(ref_count)(code)(code_hash));
 
 namespace evm_test {
 class evm_eoa
@@ -239,6 +266,13 @@ public:
    void addegress(const std::vector<name>& accounts);
    void removeegress(const std::vector<name>& accounts);
 
+   transaction_trace_ptr rmgcstore(uint64_t id, name actor=evm_account_name);
+   transaction_trace_ptr setkvstore(uint64_t account_id, const bytes& key, const std::optional<bytes>& value, name actor=evm_account_name);
+   transaction_trace_ptr rmaccount(uint64_t id, name actor=evm_account_name);
+   transaction_trace_ptr freezeaccnt(uint64_t id, bool value, name actor=evm_account_name);
+   transaction_trace_ptr addevmbal(uint64_t id, const intx::uint256& delta, bool subtract, name actor=evm_account_name);
+   transaction_trace_ptr addopenbal(name account, const intx::uint256& delta, bool subtract, name actor=evm_account_name);
+
    void open(name owner);
    void close(name owner);
    void withdraw(name owner, asset quantity);
@@ -248,7 +282,7 @@ public:
    balance_and_dust vault_balance(name owner) const;
    std::optional<intx::uint256> evm_balance(const evmc::address& address) const;
    std::optional<intx::uint256> evm_balance(const evm_eoa& account) const;
-
+   gcstore get_gcstore(uint64_t id) const;
    asset get_eos_balance( const account_name& act );
 
    void check_balances();
@@ -283,7 +317,9 @@ public:
    std::optional<account_object> find_account_by_address(const evmc::address& address) const;
    std::optional<account_object> find_account_by_id(uint64_t id) const;
    bool scan_account_storage(uint64_t account_id, std::function<bool(storage_slot)> visitor) const;
-   void scan_balances(std::function<bool(vault_balance_row)> visitor) const;
+   bool scan_gcstore(std::function<bool(gcstore)> visitor) const;
+   bool scan_account_code(std::function<bool(account_code)> visitor) const;
+   void scan_balances(std::function<bool(evm_test::vault_balance_row)> visitor) const;
 };
 
 inline constexpr intx::uint256 operator"" _wei(const char* s) { return intx::from_string<intx::uint256>(s); }

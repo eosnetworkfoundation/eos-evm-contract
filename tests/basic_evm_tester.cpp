@@ -44,6 +44,8 @@ struct partial_account_table_row
    bytes eth_address;
    uint64_t nonce;
    bytes balance;
+   std::optional<uint64_t> code_id;
+   uint32_t flags;
 };
 
 struct storage_table_row
@@ -55,8 +57,23 @@ struct storage_table_row
 
 } // namespace evm_test
 
+namespace fc { namespace raw {
+    template<>
+    inline void unpack( datastream<const char*>& ds, evm_test::partial_account_table_row& tmp)
+    { try  {
+      fc::raw::unpack(ds, tmp.id);
+      fc::raw::unpack(ds, tmp.eth_address);
+      fc::raw::unpack(ds, tmp.nonce);
+      fc::raw::unpack(ds, tmp.balance);
+      fc::raw::unpack(ds, tmp.code_id);
+      tmp.flags=0;
+      if(ds.remaining()) { fc::raw::unpack(ds, tmp.flags); }
+    } FC_RETHROW_EXCEPTIONS(warn, "error unpacking partial_account_table_row") }
+}}
+
+
 FC_REFLECT(evm_test::vault_balance_row, (owner)(balance)(dust))
-FC_REFLECT(evm_test::partial_account_table_row, (id)(eth_address)(nonce)(balance))
+FC_REFLECT(evm_test::partial_account_table_row, (id)(eth_address)(nonce)(balance)(code_id)(flags))
 FC_REFLECT(evm_test::storage_table_row, (id)(key)(value))
 
 namespace evm_test {
@@ -259,6 +276,13 @@ config2_table_row basic_evm_tester::get_config2() const
    return fc::raw::unpack<config2_table_row>(d);
 }
 
+gcstore basic_evm_tester::get_gcstore(uint64_t id) const
+{
+   const vector<char> d = get_row_by_account(evm_account_name, evm_account_name, "gcstore"_n, name{id});
+   FC_ASSERT(d.size(), "not found");
+   return fc::raw::unpack<gcstore>(d);
+}
+
 void basic_evm_tester::setfeeparams(const fee_parameters& fee_params)
 {
    mvo fee_params_vo;
@@ -371,6 +395,38 @@ transaction_trace_ptr basic_evm_tester::pushtx(const silkworm::Transaction& trx,
    return push_action(evm_account_name, "pushtx"_n, miner, mvo()("miner", miner)("rlptx", rlp_bytes));
 }
 
+transaction_trace_ptr basic_evm_tester::rmgcstore(uint64_t id, name actor) {
+   return basic_evm_tester::push_action(evm_account_name, "rmgcstore"_n, actor,
+      mvo()("id", id));
+}
+
+transaction_trace_ptr basic_evm_tester::setkvstore(uint64_t account_id, const bytes& key, const std::optional<bytes>& value, name actor) {
+   return basic_evm_tester::push_action(evm_account_name, "setkvstore"_n, actor,
+      mvo()("account_id", account_id)("key", key)("value", value));
+}
+
+transaction_trace_ptr basic_evm_tester::rmaccount(uint64_t id, name actor) {
+   return basic_evm_tester::push_action(evm_account_name, "rmaccount"_n, actor,
+      mvo()("id", id));
+}
+
+transaction_trace_ptr basic_evm_tester::freezeaccnt(uint64_t id, bool value, name actor) {
+   return basic_evm_tester::push_action(evm_account_name, "freezeaccnt"_n, actor,
+      mvo()("id", id)("value",value));
+}
+
+transaction_trace_ptr basic_evm_tester::addevmbal(uint64_t id, const intx::uint256& delta, bool subtract, name actor) {
+   auto d = to_bytes(delta);
+   return basic_evm_tester::push_action(evm_account_name, "addevmbal"_n, actor,
+      mvo()("id", id)("delta",d)("subtract",subtract));
+}
+
+transaction_trace_ptr basic_evm_tester::addopenbal(name account, const intx::uint256& delta, bool subtract, name actor) {
+   auto d = to_bytes(delta);
+   return basic_evm_tester::push_action(evm_account_name, "addopenbal"_n, actor,
+      mvo()("account", account)("delta",d)("subtract",subtract));
+}
+
 evmc::address basic_evm_tester::deploy_contract(evm_eoa& eoa, evmc::bytes bytecode)
 {
    uint64_t nonce = eoa.next_nonce;
@@ -461,6 +517,8 @@ std::optional<account_object> convert_to_account_object(const partial_account_ta
       .address = std::move(address),
       .nonce = row.nonce,
       .balance = intx::be::unsafe::load<intx::uint256>(reinterpret_cast<const uint8_t*>(row.balance.data())),
+      .code_id = row.code_id,
+      .flags = row.flags
    };
 }
 
@@ -586,6 +644,28 @@ void basic_evm_tester::scan_balances(std::function<bool(vault_balance_row)> visi
    );
 }
 
+bool basic_evm_tester::scan_gcstore(std::function<bool(gcstore)> visitor) const
+{
+   static constexpr eosio::chain::name gcstore_table_name = "gcstore"_n;
+
+   scan_table<gcstore>(
+      gcstore_table_name, evm_account_name, [&visitor](gcstore&& row) { return visitor(row); }
+   );
+
+   return true;
+}
+
+bool basic_evm_tester::scan_account_code(std::function<bool(account_code)> visitor) const
+{
+   static constexpr eosio::chain::name account_code_table_name = "accountcode"_n;
+
+   scan_table<account_code>(
+      account_code_table_name, evm_account_name, [&visitor](account_code&& row) { return visitor(row); }
+   );
+
+   return true;
+}
+
 asset basic_evm_tester::get_eos_balance( const account_name& act ) {
    vector<char> data = get_row_by_account( "eosio.token"_n, act, "accounts"_n, name(native_symbol.to_symbol_code().value) );
    return data.empty() ? asset(0, native_symbol) : fc::raw::unpack<asset>(data);
@@ -593,13 +673,16 @@ asset basic_evm_tester::get_eos_balance( const account_name& act ) {
 
 void basic_evm_tester::check_balances() {
    intx::uint256 total_in_evm_accounts;
-   scan_accounts([&](account_object&& account) -> bool {
+   scan_accounts([&](evm_test::account_object&& account) -> bool {
       total_in_evm_accounts += account.balance;
       return false;
    });
 
    auto in_evm = intx::uint256(inevm());
-   BOOST_REQUIRE(total_in_evm_accounts == in_evm);
+   if(total_in_evm_accounts != in_evm) {
+      dlog("inevm: ${inevm}, total_in_evm_accounts: ${total_in_evm_accounts}",("total_in_evm_accounts",intx::to_string(total_in_evm_accounts))("inevm",intx::to_string(in_evm)));
+      throw std::runtime_error("total_in_evm_accounts != in_evm");
+   }
 
    intx::uint256 total_in_accounts;
    scan_balances([&](vault_balance_row&& row) -> bool {
@@ -608,7 +691,10 @@ void basic_evm_tester::check_balances() {
    });
 
    auto evm_eos_balance = intx::uint256(balance_and_dust{.balance=get_eos_balance(evm_account_name), .dust=0});
-   BOOST_REQUIRE(evm_eos_balance == total_in_accounts+total_in_evm_accounts);
+   if(evm_eos_balance != total_in_accounts+total_in_evm_accounts) {
+      dlog("evm_eos_balance: ${evm_eos_balance}, total_in_accounts+total_in_evm_accounts: ${tt}",("tt",intx::to_string(total_in_accounts+total_in_evm_accounts))("evm_eos_balance",intx::to_string(evm_eos_balance)));
+      throw std::runtime_error("evm_eos_balance != total_in_accounts+total_in_evm_accounts");
+   }
 }
 
 } // namespace evm_test

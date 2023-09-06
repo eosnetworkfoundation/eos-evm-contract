@@ -43,4 +43,4 @@ bytes to_bytes(const evmc::bytes32& val);
 bytes to_bytes(const evmc::address& addr);
 bytes to_bytes(const key256_t& k);
 evmc::address to_address(const bytes& addr);
-    
+

@@ -34,6 +34,7 @@ add_eosio_test_executable( unit_test
     ${CMAKE_SOURCE_DIR}/call_tests.cpp
     ${CMAKE_SOURCE_DIR}/chainid_tests.cpp
     ${CMAKE_SOURCE_DIR}/bridge_message_tests.cpp
+    ${CMAKE_SOURCE_DIR}/admin_actions_tests.cpp
     ${CMAKE_SOURCE_DIR}/main.cpp
     ${CMAKE_SOURCE_DIR}/silkworm/core/silkworm/rlp/encode.cpp
     ${CMAKE_SOURCE_DIR}/silkworm/core/silkworm/rlp/decode.cpp

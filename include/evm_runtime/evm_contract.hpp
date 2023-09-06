@@ -93,6 +93,15 @@ public:
 
    [[eosio::action]] void assertnonce(eosio::name account, uint64_t next_nonce);
 
+#ifdef WITH_ADMIN_ACTIONS
+   [[eosio::action]] void rmgcstore(uint64_t id);
+   [[eosio::action]] void setkvstore(uint64_t account_id, const bytes& key, const std::optional<bytes>& value);
+   [[eosio::action]] void rmaccount(uint64_t id);
+   [[eosio::action]] void addevmbal(uint64_t id, const bytes& delta, bool subtract);
+   [[eosio::action]] void addopenbal(name account, const bytes& delta, bool subtract);
+   [[eosio::action]] void freezeaccnt(uint64_t id, bool value);
+#endif
+
 #ifdef WITH_TEST_ACTIONS
    [[eosio::action]] void testtx(const std::optional<bytes>& orlptx, const evm_runtime::test::block_info& bi);
    [[eosio::action]] void
