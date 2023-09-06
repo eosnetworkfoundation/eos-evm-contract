@@ -16,18 +16,18 @@ using namespace silkworm;
     Block block;
     block.header = bi.get_block_header();
 
-    evm_runtime::test::engine engine;
+    evm_runtime::test::engine engine{evm_runtime::test::kTestNetwork};
     evm_runtime::state state{get_self(), get_self()};
     silkworm::ExecutionProcessor ep{block, engine, state, evm_runtime::test::kTestNetwork};
 
     if(orlptx) {
         Transaction tx;
         ByteView bv{(const uint8_t*)orlptx->data(), orlptx->size()};
-        eosio::check(rlp::decode(bv,tx) == DecodingResult::kOk && bv.empty(), "unable to decode transaction");
+        eosio::check(rlp::decode(bv,tx) && bv.empty(), "unable to decode transaction");
 
         execute_tx(eosio::name{}, block, tx, ep, false);
     }
-    engine.finalize(ep.state(), ep.evm().block(), ep.evm().revision());
+    engine.finalize(ep.state(), ep.evm().block());
     ep.state().write_to_db(ep.evm().block().header.number);
 }
 
@@ -195,8 +195,8 @@ using namespace silkworm;
             Account tmp;
             ByteView bv{(const uint8_t *)data.data(), data.size()};
             auto dec_res = Account::from_encoded_storage(bv);
-            eosio::check(dec_res.second == DecodingResult::kOk, "unable to decode account");
-            res = dec_res.first;
+            eosio::check(!!dec_res, "unable to decode account");
+            res = *dec_res;
         }
         return res;
     };
