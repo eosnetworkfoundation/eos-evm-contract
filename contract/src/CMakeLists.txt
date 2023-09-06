@@ -13,10 +13,16 @@ list(APPEND SOURCES
 )
 if (WITH_TEST_ACTIONS)
     add_compile_definitions(WITH_TEST_ACTIONS)
+    list(APPEND SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/test_actions.cpp)
 endif()
 
 if (WITH_LOGTIME)
     add_compile_definitions(WITH_LOGTIME)
+endif()
+
+if (WITH_ADMIN_ACTIONS)
+    add_compile_definitions(WITH_ADMIN_ACTIONS)
+    list(APPEND SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/admin_actions.cpp)
 endif()
 
 add_compile_definitions(ANTELOPE)
@@ -84,5 +90,5 @@ target_compile_options(evm_runtime PUBLIC --no-missing-ricardian-clause)
 if (WITH_LARGE_STACK)
     target_link_options(evm_runtime PUBLIC --stack-size=50000000)
 else()
-    target_link_options(evm_runtime PUBLIC --stack-size=46080)
+    target_link_options(evm_runtime PUBLIC --stack-size=45360)
 endif()

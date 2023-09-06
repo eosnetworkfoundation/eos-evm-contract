@@ -27,12 +27,13 @@ struct state : State {
     name _self;
     name _ram_payer;
     bool _read_only;
+    bool _allow_frozen;
     mutable std::map<evmc::address, uint64_t> addr2id;
     mutable std::map<bytes32, bytes> addr2code;
     mutable db_stats stats;
     std::optional<config2> _config2;
 
-    explicit state(name self, name ram_payer, bool read_only=false) : _self(self), _ram_payer(ram_payer), _read_only{read_only}{}
+    explicit state(name self, name ram_payer, bool read_only=false, bool allow_frozen=true) : _self(self), _ram_payer(ram_payer), _read_only{read_only}, _allow_frozen{allow_frozen}{}
     virtual ~state() override;
 
     uint64_t get_next_account_id();
