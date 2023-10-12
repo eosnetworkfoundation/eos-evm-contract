@@ -261,8 +261,8 @@ public:
    signed_block_ptr produce_block( fc::microseconds skip_time = fc::milliseconds(config::block_interval_ms) )override {
       auto sb = _produce_block(skip_time, false);
       auto bsf = validating_node->create_block_state_future( sb->calculate_id(), sb );
-      struct controller::block_report br;
-      validating_node->push_block( br, bsf.get(), forked_branch_callback{}, trx_meta_cache_lookup{} );
+      //struct controller::block_report br; // FIXME,
+      validating_node->push_block(/* br,*/ bsf.get(), forked_branch_callback{}, trx_meta_cache_lookup{} );
 
       return sb;
    }
@@ -273,16 +273,16 @@ public:
 
    void validate_push_block(const signed_block_ptr& sb) {
       auto bsf = validating_node->create_block_state_future( sb->calculate_id(), sb );
-      struct controller::block_report br;
-      validating_node->push_block( br, bsf.get(), forked_branch_callback{}, trx_meta_cache_lookup{} );
+      //struct controller::block_report br; // FIXME
+      validating_node->push_block(/* br, */ bsf.get(), forked_branch_callback{}, trx_meta_cache_lookup{} );
    }
 
    signed_block_ptr produce_empty_block( fc::microseconds skip_time = fc::milliseconds(config::block_interval_ms) )override {
       unapplied_transactions.add_aborted( control->abort_block() );
       auto sb = _produce_block(skip_time, true);
       auto bsf = validating_node->create_block_state_future( sb->calculate_id(), sb );
-      struct controller::block_report br;
-      validating_node->push_block( br, bsf.get(), forked_branch_callback{}, trx_meta_cache_lookup{} );
+      //struct controller::block_report br; // FIXME
+      validating_node->push_block(/* br, */bsf.get(), forked_branch_callback{}, trx_meta_cache_lookup{} );
 
       return sb;
    }
