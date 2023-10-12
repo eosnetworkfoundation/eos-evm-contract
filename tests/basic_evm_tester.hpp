@@ -89,7 +89,7 @@ struct account_object
    std::optional<uint32_t> flags;
 
    inline bool has_flag(flag f)const {
-      return (flags.has_value() && flags.value() & static_cast<uint32_t>(f) != 0);
+      return (flags.has_value() && (flags.value() & static_cast<uint32_t>(f)) != 0);
    }
 };
 
@@ -201,10 +201,125 @@ private:
 };
 
 struct vault_balance_row;
-class basic_evm_tester : public testing::validating_tester
+class evm_validating_tester : public testing::base_tester {
+public:
+   virtual ~evm_validating_tester() {
+      if( !validating_node ) {
+         elog( "~evm_validating_tester() called with empty validating_node; likely in the middle of failure" );
+         return;
+      }
+      try {
+         if( num_blocks_to_producer_before_shutdown > 0 )
+            produce_blocks( num_blocks_to_producer_before_shutdown );
+         if (!skip_validate && std::uncaught_exceptions() == 0)
+            BOOST_CHECK_EQUAL( validate(), true );
+      } catch( const fc::exception& e ) {
+         wdump((e.to_detail_string()));
+      }
+   }
+   controller::config vcfg;
+
+   evm_validating_tester(const flat_set<account_name>& trusted_producers = flat_set<account_name>(), deep_mind_handler* dmlog = nullptr, testing::setup_policy p = testing::setup_policy::full) {
+      auto def_conf = default_config(tempdir, 4096 /* genesis_max_inline_action_size max inline action size*/);
+
+      vcfg = def_conf.first;
+      config_validator(vcfg);
+      vcfg.trusted_producers = trusted_producers;
+
+      validating_node = create_validating_node(vcfg, def_conf.second, true, dmlog);
+
+      init(def_conf.first, def_conf.second);
+      execute_setup_policy(p);
+   }
+
+   static void config_validator(controller::config& vcfg) {
+      FC_ASSERT( vcfg.blocks_dir.filename().generic_string() != "."
+                  && vcfg.state_dir.filename().generic_string() != ".", "invalid path names in controller::config" );
+
+      vcfg.blocks_dir = vcfg.blocks_dir.parent_path() / std::string("v_").append( vcfg.blocks_dir.filename().generic_string() );
+      vcfg.state_dir  = vcfg.state_dir.parent_path() / std::string("v_").append( vcfg.state_dir.filename().generic_string() );
+
+      vcfg.contracts_console = false;
+   }
+
+   static unique_ptr<controller> create_validating_node(controller::config vcfg, const genesis_state& genesis, bool use_genesis, deep_mind_handler* dmlog = nullptr) {
+      unique_ptr<controller> validating_node = std::make_unique<controller>(vcfg, testing::make_protocol_feature_set(), genesis.compute_chain_id());
+      validating_node->add_indices();
+      if(dmlog)
+      {
+         validating_node->enable_deep_mind(dmlog);
+      }
+      if (use_genesis) {
+         validating_node->startup( [](){}, []() { return false; }, genesis );
+      }
+      else {
+         validating_node->startup( [](){}, []() { return false; } );
+      }
+      return validating_node;
+   }
+
+   signed_block_ptr produce_block( fc::microseconds skip_time = fc::milliseconds(config::block_interval_ms) )override {
+      auto sb = _produce_block(skip_time, false);
+      auto bsf = validating_node->create_block_state_future( sb->calculate_id(), sb );
+      controller::block_report br;
+      validating_node->push_block( br, bsf.get(), forked_branch_callback{}, trx_meta_cache_lookup{} );
+
+      return sb;
+   }
+
+   signed_block_ptr produce_block_no_validation( fc::microseconds skip_time = fc::milliseconds(config::block_interval_ms) ) {
+      return _produce_block(skip_time, false);
+   }
+
+   void validate_push_block(const signed_block_ptr& sb) {
+      auto bsf = validating_node->create_block_state_future( sb->calculate_id(), sb );
+      controller::block_report br;
+      validating_node->push_block( br, bsf.get(), forked_branch_callback{}, trx_meta_cache_lookup{} );
+   }
+
+   signed_block_ptr produce_empty_block( fc::microseconds skip_time = fc::milliseconds(config::block_interval_ms) )override {
+      unapplied_transactions.add_aborted( control->abort_block() );
+      auto sb = _produce_block(skip_time, true);
+      auto bsf = validating_node->create_block_state_future( sb->calculate_id(), sb );
+      controller::block_report br;
+      validating_node->push_block( br, bsf.get(), forked_branch_callback{}, trx_meta_cache_lookup{} );
+
+      return sb;
+   }
+
+   signed_block_ptr finish_block()override {
+      return _finish_block();
+   }
+
+   bool validate() {
+
+
+      auto hbh = control->head_block_state()->header;
+      auto vn_hbh = validating_node->head_block_state()->header;
+      bool ok = control->head_block_id() == validating_node->head_block_id() &&
+            hbh.previous == vn_hbh.previous &&
+            hbh.timestamp == vn_hbh.timestamp &&
+            hbh.transaction_mroot == vn_hbh.transaction_mroot &&
+            hbh.action_mroot == vn_hbh.action_mroot &&
+            hbh.producer == vn_hbh.producer;
+
+      validating_node.reset();
+      validating_node = std::make_unique<controller>(vcfg, testing::make_protocol_feature_set(), control->get_chain_id());
+      validating_node->add_indices();
+      validating_node->startup( [](){}, []() { return false; } );
+
+      return ok;
+   }
+
+   unique_ptr<controller>   validating_node;
+   uint32_t                 num_blocks_to_producer_before_shutdown = 0;
+   bool                     skip_validate = false;
+};
+
+class basic_evm_tester : public evm_validating_tester
 {
 public:
-   using testing::validating_tester::push_action;
+   using evm_validating_tester::push_action;
 
    static constexpr name token_account_name = "eosio.token"_n;
    static constexpr name faucet_account_name = "faucet"_n;
@@ -243,6 +358,11 @@ public:
              const uint32_t miner_cut = suggested_miner_cut,
              const std::optional<asset> ingress_bridge_fee = std::nullopt,
              const bool also_prepare_self_balance = true);
+
+   template <typename... T>
+   void start_block(T... t) {
+      evm_validating_tester::_start_block(t...);
+   }
 
    void prepare_self_balance(uint64_t fund_amount = 100'0000);
 
@@ -355,14 +475,14 @@ inline constexpr intx::uint256 operator"" _ether(const char* s)
 }
 
 template <typename Tester>
-class speculative_block_starter
+class speculative_block_starter 
 {
 public:
    // Assumes user will not abort or finish blocks using the tester passed into the constructor for the lifetime of this
    // object.
    explicit speculative_block_starter(Tester& tester, uint32_t time_gap_sec = 0) : t(tester)
    {
-      t.control->start_block(t.control->head_block_time() + fc::milliseconds(500 + 1000 * time_gap_sec), 0);
+      t.start_block(t.control->head_block_time() + fc::milliseconds(500 + 1000 * time_gap_sec));
    }
 
    speculative_block_starter(speculative_block_starter&& other) : t(other.t) { other.canceled = true; }
