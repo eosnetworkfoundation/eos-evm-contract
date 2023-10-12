@@ -242,8 +242,8 @@ public:
       vcfg.contracts_console = false;
    }
 
-   static unique_ptr<controller> create_validating_node(controller::config vcfg, const genesis_state& genesis, bool use_genesis, deep_mind_handler* dmlog = nullptr) {
-      unique_ptr<controller> validating_node = std::make_unique<controller>(vcfg, testing::make_protocol_feature_set(), genesis.compute_chain_id());
+   static std::unique_ptr<controller> create_validating_node(controller::config vcfg, const genesis_state& genesis, bool use_genesis, deep_mind_handler* dmlog = nullptr) {
+      std::unique_ptr<controller> validating_node = std::make_unique<controller>(vcfg, testing::make_protocol_feature_set(), genesis.compute_chain_id());
       validating_node->add_indices();
       if(dmlog)
       {
@@ -311,7 +311,7 @@ public:
       return ok;
    }
 
-   unique_ptr<controller>   validating_node;
+   std::unique_ptr<controller>   validating_node;
    uint32_t                 num_blocks_to_producer_before_shutdown = 0;
    bool                     skip_validate = false;
 };
