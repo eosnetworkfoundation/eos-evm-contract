@@ -49,14 +49,13 @@ jobs:
           token: ${{ steps.auth.outputs.token }}
 
       - name: Download CDT
-        uses: AntelopeIO/asset-artifact-download-action@v2
+        uses: AntelopeIO/asset-artifact-download-action@v3
         with:
           owner: AntelopeIO
           repo: cdt
           target: 'v3.1.0'
           prereleases: false
           file: 'cdt_.*amd64.deb'
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install CDT
         run: sudo apt-get install -y ./cdt*.deb
@@ -74,15 +73,14 @@ jobs:
           if-no-files-found: error
 
       - name: Download Leap - dev binary
-        uses: AntelopeIO/asset-artifact-download-action@v2
+        uses: AntelopeIO/asset-artifact-download-action@v3
         with:
           owner: AntelopeIO
           repo: leap
           target: 'v4.0.3'
           prereleases: false
-          file: 'leap-dev.*(x86_64|amd64).deb'
+          file: 'leap-dev.*ubuntu20.*(x86_64|amd64).deb'
           container-package: experimental-binaries
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install Leap
         run: sudo apt-get install -y ./leap*.deb
