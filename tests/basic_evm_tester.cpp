@@ -34,7 +34,7 @@ balance_and_dust::operator intx::uint256() const
 struct vault_balance_row
 {
    name owner;
-   asset balance;
+   asset balance{};
    uint64_t dust = 0;
 };
 

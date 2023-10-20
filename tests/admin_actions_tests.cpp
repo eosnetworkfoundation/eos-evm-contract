@@ -144,7 +144,9 @@ BOOST_FIXTURE_TEST_CASE(setkvstore_tests, admin_action_tester) try {
    const int64_t to_bridge = 1000000;
    transfer_token("alice"_n, evm_account_name, make_asset(to_bridge), evm1.address_0x());
 
-   auto [contract_addr, contract_account_id] = deploy_simple_contract(evm1);
+   evmc::address contract_addr;
+   uint64_t contract_account_id;
+   std::tie(contract_addr, contract_account_id) = deploy_simple_contract(evm1);
 
    // Call method "setval" on simple contract (sha3('setval(uint256)') = 0x559c9c4a)
    auto txn = generate_tx(contract_addr, 0, 500'000);
