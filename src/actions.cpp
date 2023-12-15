@@ -588,10 +588,12 @@ void evm_contract::handle_evm_transfer(eosio::asset quantity, const std::string&
 
 void evm_contract::transfer(eosio::name from, eosio::name to, eosio::asset quantity, std::string memo) {
     assert_unfrozen();
-    eosio::check(get_code() == token_account && quantity.symbol == token_symbol, "received unexpected token");
-
+    
+    // Allow transfer non-EOS tokens out.
     if(to != get_self() || from == get_self())
         return;
+
+    eosio::check(get_code() == token_account && quantity.symbol == token_symbol, "received unexpected token");
 
     if(memo.size() == 42 && memo[0] == '0' && memo[1] == 'x')
         handle_evm_transfer(quantity, memo);
