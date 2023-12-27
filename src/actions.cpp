@@ -8,8 +8,7 @@
 #include <evm_runtime/intrinsics.hpp>
 #include <evm_runtime/eosio.token.hpp>
 #include <evm_runtime/bridge.hpp>
-
-#include <eosevm/block_mapping.hpp>
+#include <eosevm/version.hpp>
 
 #include <silkworm/core/protocol/trust_rule_set.hpp>
 // included here so NDEBUG is defined to disable assert macro
@@ -193,7 +192,7 @@ void check_result( ValidationResult r, const Transaction& txn, const char* desc 
 
 Receipt evm_contract::execute_tx( eosio::name miner, Block& block, Transaction& tx, silkworm::ExecutionProcessor& ep, bool enforce_chain_id) {
     //when being called as an inline action, clutch in allowance for reserved addresses & signatures by setting from_self=true
-    const bool from_self = get_sender() == get_self();
+    const bool from_self = is_from_self || get_sender() == get_self();
 
     balances balance_table(get_self(), get_self().value);
 
@@ -388,7 +387,6 @@ void evm_contract::process_filtered_messages(const std::vector<silkworm::Filtere
         eosio::check(msg.has_value(), "unable to decode bridge message");
 
         auto& msg_v0 = std::get<bridge::message_v0>(msg.value());
-        eosio::print("FIL MESSAGE: ", uint64_t(msg_v0.force_atomic), "\n");
 
         const auto& receiver = msg_v0.get_account_as_name();
         eosio::check(eosio::is_account(receiver), "receiver is not account");
@@ -443,7 +441,10 @@ void evm_contract::pushtx( eosio::name miner, const bytes& rlptx ) {
     eosio::check((get_sender() != get_self()) || (miner == get_self()),
                  "unexpected error: EVM contract generated inline pushtx without setting itself as the miner");
 
-    const auto& current_config = _config.get();
+    auto current_config = _config.get();
+    auto current_time = eosio::current_time_point();
+    auto [current_version, update_required] = current_config.get_version(current_time);
+
     std::optional<std::pair<const std::string, const ChainConfig*>> found_chain_config = lookup_known_chain(current_config.chainid);
     check( found_chain_config.has_value(), "failed to find expected chain config" );
 
@@ -451,7 +452,7 @@ void evm_contract::pushtx( eosio::name miner, const bytes& rlptx ) {
 
     Block block;
     eosevm::prepare_block_header(block.header, bm, get_self().value, 
-        bm.timestamp_to_evm_block_num(eosio::current_time_point().time_since_epoch().count()));
+        bm.timestamp_to_evm_block_num(current_time.time_since_epoch().count()));
 
     silkworm::protocol::TrustRuleSet engine{*found_chain_config->second};
 
@@ -479,6 +480,14 @@ void evm_contract::pushtx( eosio::name miner, const bytes& rlptx ) {
 
     engine.finalize(ep.state(), ep.evm().block());
     ep.state().write_to_db(ep.evm().block().header.number);
+    if( current_version >= 1 ) {
+        auto event = evmtx_type{evmtx_v0{current_version, rlptx}};
+        action(std::vector<permission_level>{}, get_self(), "evmtx"_n, event).send();
+    }
+    if( update_required ) {
+        _config.set(current_config, get_self());
+    }
+
     LOGTIME("EVM END");
 }
 
@@ -557,7 +566,9 @@ void evm_contract::handle_evm_transfer(eosio::asset quantity, const std::string&
         b.balance.balance += quantity;
     });
 
-    const auto& current_config = _config.get();
+    auto current_config = _config.get();
+    auto current_time = eosio::current_time_point();
+    auto [current_version, update_required] = current_config.get_version(current_time);
 
     //subtract off the ingress bridge fee from the quantity that will be bridged
     quantity -= current_config.ingress_bridge_fee;
@@ -580,10 +591,7 @@ void evm_contract::handle_evm_transfer(eosio::asset quantity, const std::string&
     txn.r = 0u;  // r == 0 is pseudo signature that resolves to reserved address range
     txn.s = get_self().value;
 
-    Bytes rlp;
-    rlp::encode(rlp, txn);
-    pushtx_action pushtx_act(get_self(), {{get_self(), "active"_n}});
-    pushtx_act.send(get_self(), rlp);
+    push_tx(txn, current_version);
 }
 
 void evm_contract::transfer(eosio::name from, eosio::name to, eosio::asset quantity, std::string memo) {
@@ -626,7 +634,9 @@ bool evm_contract::gc(uint32_t max) {
 }
 
 void evm_contract::call_(intx::uint256 s, const bytes& to, intx::uint256 value, const bytes& data, uint64_t gas_limit, uint64_t nonce) {
-    const auto& current_config = _config.get();
+    auto current_config = _config.get();
+    auto current_time = eosio::current_time_point();
+    auto [current_version, update_required] = current_config.get_version(current_time);
 
     Transaction txn;
     txn.type = TransactionType::kLegacy;
@@ -645,10 +655,20 @@ void evm_contract::call_(intx::uint256 s, const bytes& to, intx::uint256 value, 
         txn.to = to_evmc_address(bv_to);
     }
 
+    push_tx(txn, current_version);
+}
+
+void evm_contract::push_tx(const silkworm::Transaction& txn, uint64_t current_version) {
     Bytes rlp;
     rlp::encode(rlp, txn);
-    pushtx_action pushtx_act(get_self(), {{get_self(), "active"_n}});
-    pushtx_act.send(get_self(), rlp);
+    if( current_version >= 1 ) {
+        is_from_self = true;
+        auto rlptx = bytes{rlp.begin(), rlp.end()};
+        pushtx(get_self(), rlptx);
+    } else {
+        pushtx_action pushtx_act(get_self(), {{get_self(), "active"_n}});
+        pushtx_act.send(get_self(), rlp);
+    }
 }
 
 void evm_contract::call(eosio::name from, const bytes& to, const bytes& value, const bytes& data, uint64_t gas_limit) {
@@ -743,6 +763,14 @@ void evm_contract::assertnonce(eosio::name account, uint64_t next_nonce) {
     else {
         eosio::check(next_nonce_iter->next_nonce == next_nonce, "wrong nonce");
     }
+}
+
+void evm_contract::setversion(uint64_t version) {
+    require_auth(get_self());
+    auto config = _config.get();
+    eosio::check(version <= MAX_EOSEVM_SUPPORTED_VERSION, "Unsupported version");
+    config.set_version(version, eosio::current_block_time());
+    _config.set(config, get_self());
 }
 
 } //evm_runtime

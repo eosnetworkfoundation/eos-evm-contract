@@ -2,11 +2,15 @@
 #include <eosio/asset.hpp>
 #include <eosio/binary_extension.hpp>
 #include <eosio/singleton.hpp>
+#include <eosio/ignore.hpp>
 
 #include <evm_runtime/types.hpp>
 
 #include <silkworm/core/types/block.hpp>
 #include <silkworm/core/execution/processor.hpp>
+
+#include <eosevm/block_mapping.hpp>
+
 #ifdef WITH_TEST_ACTIONS
 #include <evm_runtime/test/block_info.hpp>
 #endif
@@ -93,6 +97,13 @@ public:
 
    [[eosio::action]] void assertnonce(eosio::name account, uint64_t next_nonce);
 
+   [[eosio::action]] void setversion(uint64_t version);
+
+   // Events
+   [[eosio::action]] void evmtx(eosio::ignore<evm_runtime::evmtx_type> event){
+      eosio::check(get_sender() == get_self(), "forbidden to call");
+   };
+
 #ifdef WITH_ADMIN_ACTIONS
    [[eosio::action]] void rmgcstore(uint64_t id);
    [[eosio::action]] void setkvstore(uint64_t account_id, const bytes& key, const std::optional<bytes>& value);
@@ -116,6 +127,29 @@ public:
    [[eosio::action]] void testbaldust(const name test);
 #endif
 
+   struct evm_version_type {
+      struct pending {
+         uint64_t version;
+         block_timestamp time;
+
+         bool is_active(time_point_sec genesis_time, block_timestamp current_time)const {
+            eosevm::block_mapping bm(genesis_time.sec_since_epoch());
+            auto current_block_num = bm.timestamp_to_evm_block_num(current_time.to_time_point().time_since_epoch().count());
+            auto pending_block_num = bm.timestamp_to_evm_block_num(time.to_time_point().time_since_epoch().count());
+            return current_block_num > pending_block_num;
+         }
+      };
+
+      void promote_pending() {
+         eosio::check(pending_version.has_value(), "no pending version");
+         cached_version = pending_version.value().version;
+         pending_version.reset();
+      }
+
+      std::optional<pending> pending_version;
+      uint64_t               cached_version=0;
+   };
+
    struct [[eosio::table]] [[eosio::contract("evm_contract")]] config
    {
       unsigned_int version; // placeholder for future variant index
@@ -126,7 +160,31 @@ public:
       uint32_t miner_cut = 0;
       uint32_t status = 0; // <- bit mask values from status_flags
 
-      EOSLIB_SERIALIZE(config, (version)(chainid)(genesis_time)(ingress_bridge_fee)(gas_price)(miner_cut)(status));
+      binary_extension<evm_version_type> evm_version;
+
+      std::pair<uint64_t, bool> get_version(block_timestamp current_time) {
+         bool update_required = false;
+         uint64_t current_version = 0;
+         if(evm_version.has_value()) {
+            const auto& pending_version = evm_version.value().pending_version;
+            if(pending_version.has_value()) {
+               if( pending_version->is_active(genesis_time, current_time) ) {
+                  update_required = true;
+                  evm_version->promote_pending();
+               }
+            }
+            current_version = evm_version->cached_version;
+         }
+         return std::make_pair(current_version, update_required);
+      }
+
+      void set_version(uint64_t new_version, block_timestamp current_time) {
+         auto [current_version, _] = get_version(current_time);
+         eosio::check(new_version > current_version, "new version must be greater than the active one");
+         evm_version.emplace(evm_version_type{evm_version_type::pending{new_version, current_time},current_version});
+      }
+
+      EOSLIB_SERIALIZE(config, (version)(chainid)(genesis_time)(ingress_bridge_fee)(gas_price)(miner_cut)(status)(evm_version));
    };
 
 private:
@@ -164,6 +222,9 @@ private:
    // to allow sending through a Bytes (basic_string<uint8_t>) w/o copying over to a std::vector<char>
    void pushtx_bytes(eosio::name miner, const std::basic_string<uint8_t>& rlptx);
    using pushtx_action = eosio::action_wrapper<"pushtx"_n, &evm_contract::pushtx_bytes>;
+
+   bool is_from_self = false;
+   void push_tx(const silkworm::Transaction& txn, uint64_t current_version);
 };
 
 

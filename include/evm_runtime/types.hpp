@@ -8,6 +8,7 @@
 #include <ethash/hash_types.hpp>
 
 #define TOKEN_ACCOUNT_NAME "eosio.token"
+#define MAX_EOSEVM_SUPPORTED_VERSION 1
 
 namespace evm_runtime {
    using intx::operator""_u256;
@@ -74,6 +75,15 @@ namespace evm_runtime {
    };
 
    using bridge_message = std::variant<bridge_message_v0>;
+
+   struct evmtx_v0 {
+      uint64_t  eos_evm_version;
+      bytes     rlptx;
+
+      EOSLIB_SERIALIZE(evmtx_v0, (eos_evm_version)(rlptx));
+   };
+
+   using evmtx_type = std::variant<evmtx_v0>;
 
 } //namespace evm_runtime
 
