@@ -8,7 +8,6 @@
 #include <evm_runtime/intrinsics.hpp>
 #include <evm_runtime/eosio.token.hpp>
 #include <evm_runtime/bridge.hpp>
-#include <eosevm/version.hpp>
 
 #include <silkworm/core/protocol/trust_rule_set.hpp>
 // included here so NDEBUG is defined to disable assert macro
