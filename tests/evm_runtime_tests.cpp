@@ -408,7 +408,7 @@ struct evm_runtime_tester : eosio_system_tester, silkworm::State {
    size_t total_failed{0};
    size_t total_skipped{0};
 
-   evm_runtime_tester() {
+   evm_runtime_tester(const fc::temp_directory& tmpdir) : eosio_system_tester(tmpdir) {
       std::string verbose_arg = "--verbose";
       std::string slowtests_arg = "--slow-tests";
       auto argc = boost::unit_test::framework::master_test_suite().argc;
@@ -1101,12 +1101,14 @@ struct evm_runtime_tester : eosio_system_tester, silkworm::State {
 };
 
 BOOST_AUTO_TEST_SUITE(evm_runtime_tests)
-BOOST_FIXTURE_TEST_CASE( GeneralStateTests, evm_runtime_tester ) try {
+BOOST_AUTO_TEST_CASE( GeneralStateTests ) try {
+   fc::temp_directory tmpdir;
+   evm_runtime_tester t(tmpdir);
 
    StopWatch sw;
    sw.start();
 
-   load_excluded();
+   t.load_excluded();
 
    const fs::path root_dir{contracts::eth_test_folder()};
 
@@ -1120,44 +1122,47 @@ BOOST_FIXTURE_TEST_CASE( GeneralStateTests, evm_runtime_tester ) try {
       const RunnerFunc runner{entry.second};
 
       for (auto i = fs::recursive_directory_iterator(root_dir / dir); i != fs::recursive_directory_iterator{}; ++i) {
-         if (exclude_test(*i, root_dir, slow_tests)) {
-               ++total_skipped;
+         if (t.exclude_test(*i, root_dir, t.slow_tests)) {
+               ++t.total_skipped;
                i.disable_recursion_pending();
          } else if (fs::is_regular_file(i->path())) {
                const fs::path path{*i};
-               run_test_file(path, runner);
+               t.run_test_file(path, runner);
          }
       }
    }
 
    const auto [_, duration] = sw.lap();
-   std::cout << total_passed  << " tests passed" << ", "
-             << total_failed  << " failed" << ", "
-             << total_skipped << " skipped"
+   std::cout << t.total_passed  << " tests passed" << ", "
+             << t.total_failed  << " failed" << ", "
+             << t.total_skipped << " skipped"
              << " in " << StopWatch::format(duration) << std::endl;
 
-   BOOST_REQUIRE_EQUAL(total_failed, 0);
+   BOOST_REQUIRE_EQUAL(t.total_failed, 0u);
 
 } FC_LOG_AND_RETHROW()
 
-BOOST_FIXTURE_TEST_CASE( balance_and_dust_tests, evm_runtime_tester ) try {
-   BOOST_REQUIRE_EQUAL(testbaldust("basic"_n),      success());
+BOOST_AUTO_TEST_CASE( balance_and_dust_tests ) try {
+   fc::temp_directory tmpdir;
+   evm_runtime_tester t(tmpdir);
 
-   BOOST_REQUIRE_EQUAL(testbaldust("underflow1"_n), error("assertion failure with message: decrementing more than available"));
-   BOOST_REQUIRE_EQUAL(testbaldust("underflow2"_n), error("assertion failure with message: decrementing more than available"));
-   BOOST_REQUIRE_EQUAL(testbaldust("underflow3"_n), error("assertion failure with message: decrementing more than available"));
-   BOOST_REQUIRE_EQUAL(testbaldust("underflow4"_n), error("assertion failure with message: decrementing more than available"));
-   BOOST_REQUIRE_EQUAL(testbaldust("underflow5"_n), error("assertion failure with message: decrementing more than available"));
+   BOOST_REQUIRE_EQUAL(t.testbaldust("basic"_n),      t.success());
 
-   BOOST_REQUIRE_EQUAL(testbaldust("overflow1"_n),  error("assertion failure with message: accumulation overflow"));
-   BOOST_REQUIRE_EQUAL(testbaldust("overflow2"_n),  error("assertion failure with message: accumulation overflow"));
-   BOOST_REQUIRE_EQUAL(testbaldust("overflow3"_n),  success());
-   BOOST_REQUIRE_EQUAL(testbaldust("overflow4"_n),  error("assertion failure with message: accumulation overflow"));
-   BOOST_REQUIRE_EQUAL(testbaldust("overflow5"_n),  error("assertion failure with message: accumulation overflow"));
-   BOOST_REQUIRE_EQUAL(testbaldust("overflowa"_n),  error("assertion failure with message: accumulation overflow"));
-   BOOST_REQUIRE_EQUAL(testbaldust("overflowb"_n),  error("assertion failure with message: accumulation overflow"));
-   BOOST_REQUIRE_EQUAL(testbaldust("overflowc"_n),  error("assertion failure with message: accumulation overflow"));
-   BOOST_REQUIRE_EQUAL(testbaldust("overflowd"_n),  error("assertion failure with message: accumulation overflow"));
+   BOOST_REQUIRE_EQUAL(t.testbaldust("underflow1"_n), t.error("assertion failure with message: decrementing more than available"));
+   BOOST_REQUIRE_EQUAL(t.testbaldust("underflow2"_n), t.error("assertion failure with message: decrementing more than available"));
+   BOOST_REQUIRE_EQUAL(t.testbaldust("underflow3"_n), t.error("assertion failure with message: decrementing more than available"));
+   BOOST_REQUIRE_EQUAL(t.testbaldust("underflow4"_n), t.error("assertion failure with message: decrementing more than available"));
+   BOOST_REQUIRE_EQUAL(t.testbaldust("underflow5"_n), t.error("assertion failure with message: decrementing more than available"));
+
+   BOOST_REQUIRE_EQUAL(t.testbaldust("overflow1"_n),  t.error("assertion failure with message: accumulation overflow"));
+   BOOST_REQUIRE_EQUAL(t.testbaldust("overflow2"_n),  t.error("assertion failure with message: accumulation overflow"));
+   BOOST_REQUIRE_EQUAL(t.testbaldust("overflow3"_n),  t.success());
+   BOOST_REQUIRE_EQUAL(t.testbaldust("overflow4"_n),  t.error("assertion failure with message: accumulation overflow"));
+   BOOST_REQUIRE_EQUAL(t.testbaldust("overflow5"_n),  t.error("assertion failure with message: accumulation overflow"));
+   BOOST_REQUIRE_EQUAL(t.testbaldust("overflowa"_n),  t.error("assertion failure with message: accumulation overflow"));
+   BOOST_REQUIRE_EQUAL(t.testbaldust("overflowb"_n),  t.error("assertion failure with message: accumulation overflow"));
+   BOOST_REQUIRE_EQUAL(t.testbaldust("overflowc"_n),  t.error("assertion failure with message: accumulation overflow"));
+   BOOST_REQUIRE_EQUAL(t.testbaldust("overflowd"_n),  t.error("assertion failure with message: accumulation overflow"));
 } FC_LOG_AND_RETHROW()
 
 BOOST_AUTO_TEST_SUITE_END()
