@@ -7,6 +7,10 @@ using namespace evm_test;
 using eosio::testing::eosio_assert_message_is;
 
 struct version_tester : basic_evm_tester {
+
+  static constexpr char* increment_ = "0xd09de08a"; // sha3(increment())[:4]
+  static constexpr char* retrieve_  = "0x0a79309b"; // sha3(retrieve(address))[:4]
+
   version_tester() {
     create_accounts({"alice"_n});
     transfer_token(faucet_account_name, "alice"_n, make_asset(10000'0000));
@@ -60,7 +64,7 @@ struct version_tester : basic_evm_tester {
     input.to = bytes{std::begin(contract_addr.bytes), std::end(contract_addr.bytes)};
 
     silkworm::Bytes data;
-    data += evmc::from_hex("0a79309b").value();   // sha3(retrieve(address))[:4]
+    data += evmc::from_hex(retrieve_).value();
     data += silkworm::to_bytes32(account);
     input.data = bytes{data.begin(), data.end()};
 
@@ -146,39 +150,39 @@ BOOST_FIXTURE_TEST_CASE(traces_in_different_eosevm_version, version_tester) try 
     // Test traces of `handle_evm_transfer` (EVM VERSION=0)
     auto trace = transfer_token("alice"_n, evm_account_name, make_asset(to_bridge), evm1.address_0x());
     BOOST_REQUIRE(trace->action_traces.size() == 4);
-    BOOST_REQUIRE(trace->action_traces[0].act.account == "eosio.token"_n);
+    BOOST_REQUIRE(trace->action_traces[0].act.account == token_account_name);
     BOOST_REQUIRE(trace->action_traces[0].act.name == "transfer"_n);
-    BOOST_REQUIRE(trace->action_traces[1].act.account == "eosio.token"_n);
+    BOOST_REQUIRE(trace->action_traces[1].act.account == token_account_name);
     BOOST_REQUIRE(trace->action_traces[1].act.name == "transfer"_n);
-    BOOST_REQUIRE(trace->action_traces[2].act.account == "eosio.token"_n);
+    BOOST_REQUIRE(trace->action_traces[2].act.account == token_account_name);
     BOOST_REQUIRE(trace->action_traces[2].act.name == "transfer"_n);
-    BOOST_REQUIRE(trace->action_traces[3].act.account == "evm"_n);
+    BOOST_REQUIRE(trace->action_traces[3].act.account == evm_account_name);
     BOOST_REQUIRE(trace->action_traces[3].act.name == "pushtx"_n);
 
     // Test traces of `pushtx` (EVM VERSION=0)
     auto [trace2, contract_address] = deploy_test_contract(evm1);
     BOOST_REQUIRE(trace2->action_traces.size() == 1);
-    BOOST_REQUIRE(trace2->action_traces[0].act.account == "evm"_n);
+    BOOST_REQUIRE(trace2->action_traces[0].act.account == evm_account_name);
     BOOST_REQUIRE(trace2->action_traces[0].act.name == "pushtx"_n);
 
     auto to = evmc::bytes{std::begin(contract_address.bytes), std::end(contract_address.bytes)};
-    auto data = evmc::from_hex("0xd09de08a");
+    auto data = evmc::from_hex(increment_);
 
     // Test traces of `call` (EVM VERSION=0)
     trace = call("alice"_n, to, silkworm::Bytes(evmc::bytes32{}), *data, 1000000, "alice"_n);
     BOOST_REQUIRE(trace->action_traces.size() == 2);
-    BOOST_REQUIRE(trace->action_traces[0].act.account == "evm"_n);
+    BOOST_REQUIRE(trace->action_traces[0].act.account == evm_account_name);
     BOOST_REQUIRE(trace->action_traces[0].act.name == "call"_n);
-    BOOST_REQUIRE(trace->action_traces[1].act.account == "evm"_n);
+    BOOST_REQUIRE(trace->action_traces[1].act.account == evm_account_name);
     BOOST_REQUIRE(trace->action_traces[1].act.name == "pushtx"_n);
 
     // Test traces of `admincall` (EVM VERSION=0)
     auto from = evmc::bytes{std::begin(alice_addr.bytes), std::end(alice_addr.bytes)};
     trace = admincall(from, to, silkworm::Bytes(evmc::bytes32{}), *data, 1000000, evm_account_name);
     BOOST_REQUIRE(trace->action_traces.size() == 2);
-    BOOST_REQUIRE(trace->action_traces[0].act.account == "evm"_n);
+    BOOST_REQUIRE(trace->action_traces[0].act.account == evm_account_name);
     BOOST_REQUIRE(trace->action_traces[0].act.name == "admincall"_n);
-    BOOST_REQUIRE(trace->action_traces[1].act.account == "evm"_n);
+    BOOST_REQUIRE(trace->action_traces[1].act.account == evm_account_name);
     BOOST_REQUIRE(trace->action_traces[1].act.name == "pushtx"_n);
 
     /////////////////////////////////////
@@ -207,13 +211,13 @@ BOOST_FIXTURE_TEST_CASE(traces_in_different_eosevm_version, version_tester) try 
     // Test traces of `handle_evm_transfer` (EVM VERSION=1)
     trace = transfer_token("alice"_n, evm_account_name, make_asset(to_bridge), evm1.address_0x());
     BOOST_REQUIRE(trace->action_traces.size() == 4);
-    BOOST_REQUIRE(trace->action_traces[0].act.account == "eosio.token"_n);
+    BOOST_REQUIRE(trace->action_traces[0].act.account == token_account_name);
     BOOST_REQUIRE(trace->action_traces[0].act.name == "transfer"_n);
-    BOOST_REQUIRE(trace->action_traces[1].act.account == "eosio.token"_n);
+    BOOST_REQUIRE(trace->action_traces[1].act.account == token_account_name);
     BOOST_REQUIRE(trace->action_traces[1].act.name == "transfer"_n);
-    BOOST_REQUIRE(trace->action_traces[2].act.account == "eosio.token"_n);
+    BOOST_REQUIRE(trace->action_traces[2].act.account == token_account_name);
     BOOST_REQUIRE(trace->action_traces[2].act.name == "transfer"_n);
-    BOOST_REQUIRE(trace->action_traces[3].act.account == "evm"_n);
+    BOOST_REQUIRE(trace->action_traces[3].act.account == evm_account_name);
     BOOST_REQUIRE(trace->action_traces[3].act.name == "evmtx"_n);
 
     auto tx = get_tx_from_trace(trace->action_traces[3].act.data);
@@ -234,20 +238,21 @@ BOOST_FIXTURE_TEST_CASE(traces_in_different_eosevm_version, version_tester) try 
     trace = pushtx(txin);
 
     BOOST_REQUIRE(trace->action_traces.size() == 2);
-    BOOST_REQUIRE(trace->action_traces[0].act.account == "evm"_n);
+    BOOST_REQUIRE(trace->action_traces[0].act.account == evm_account_name);
     BOOST_REQUIRE(trace->action_traces[0].act.name == "pushtx"_n);
-    BOOST_REQUIRE(trace->action_traces[1].act.account == "evm"_n);
+    BOOST_REQUIRE(trace->action_traces[1].act.account == evm_account_name);
     BOOST_REQUIRE(trace->action_traces[1].act.name == "evmtx"_n);
 
     auto txout = get_tx_from_trace(trace->action_traces[1].act.data);
     BOOST_REQUIRE(txout == txin);
+    BOOST_REQUIRE(retrieve(contract_address, evm1.address) == intx::uint256(1));
 
     // Test traces of `call` (EVM VERSION=1)
     trace = call("alice"_n, to, silkworm::Bytes(evmc::bytes32{}), *data, 1000000, "alice"_n);
     BOOST_REQUIRE(trace->action_traces.size() == 2);
-    BOOST_REQUIRE(trace->action_traces[0].act.account == "evm"_n);
+    BOOST_REQUIRE(trace->action_traces[0].act.account == evm_account_name);
     BOOST_REQUIRE(trace->action_traces[0].act.name == "call"_n);
-    BOOST_REQUIRE(trace->action_traces[1].act.account == "evm"_n);
+    BOOST_REQUIRE(trace->action_traces[1].act.account == evm_account_name);
     BOOST_REQUIRE(trace->action_traces[1].act.name == "evmtx"_n);
 
     tx = get_tx_from_trace(trace->action_traces[1].act.data);
@@ -261,9 +266,9 @@ BOOST_FIXTURE_TEST_CASE(traces_in_different_eosevm_version, version_tester) try 
     // Test traces of `admincall` (EVM VERSION=1)
     trace = admincall(from, to, silkworm::Bytes(evmc::bytes32{}), *data, 1000000, evm_account_name);
     BOOST_REQUIRE(trace->action_traces.size() == 2);
-    BOOST_REQUIRE(trace->action_traces[0].act.account == "evm"_n);
+    BOOST_REQUIRE(trace->action_traces[0].act.account == evm_account_name);
     BOOST_REQUIRE(trace->action_traces[0].act.name == "admincall"_n);
-    BOOST_REQUIRE(trace->action_traces[1].act.account == "evm"_n);
+    BOOST_REQUIRE(trace->action_traces[1].act.account == evm_account_name);
     BOOST_REQUIRE(trace->action_traces[1].act.name == "evmtx"_n);
 
     tx = get_tx_from_trace(trace->action_traces[1].act.data);
@@ -276,6 +281,142 @@ BOOST_FIXTURE_TEST_CASE(traces_in_different_eosevm_version, version_tester) try 
 
     // Check 4 times call to `increment` from alice_addr
     BOOST_REQUIRE(retrieve(contract_address, alice_addr) == intx::uint256(4));
+
+} FC_LOG_AND_RETHROW()
+
+BOOST_FIXTURE_TEST_CASE(exec_does_not_update_version, version_tester) try {
+    auto config = get_config();
+
+    evm_eoa evm1;
+    const int64_t to_bridge = 1000000;
+
+    // Fund evm1 address
+    transfer_token("alice"_n, evm_account_name, make_asset(to_bridge), evm1.address_0x());
+
+    // Deploy contract
+    auto [_, contract_address] = deploy_test_contract(evm1);
+
+    // Call `increment` from evm1 address
+    silkworm::Transaction txin {
+      .type = silkworm::Transaction::Type::kLegacy,
+      .max_priority_fee_per_gas = config.gas_price,
+      .max_fee_per_gas = config.gas_price,
+      .gas_limit = 10'000'000,
+      .to = contract_address,
+      .data = *evmc::from_hex(increment_)
+    };
+
+    evm1.sign(txin);
+    pushtx(txin);
+
+    setversion(1, evm_account_name);
+    auto activation_time = control->pending_block_time();
+    produce_blocks(10);
+
+    // Use `exec` action
+    BOOST_REQUIRE(retrieve(contract_address, evm1.address) == intx::uint256(1));
+
+    // Validate config still at 0
+    config = get_config();
+    BOOST_CHECK_EQUAL(config.evm_version.has_value(), true);
+    BOOST_CHECK_EQUAL(config.evm_version.value().cached_version, 0);
+    BOOST_CHECK_EQUAL(config.evm_version.value().pending_version.has_value(), true);
+    BOOST_REQUIRE(config.evm_version.value().pending_version.value().time == activation_time);
+    BOOST_REQUIRE(config.evm_version.value().pending_version.value().version == 1);
+
+} FC_LOG_AND_RETHROW()
+
+BOOST_FIXTURE_TEST_CASE(call_promote_pending, version_tester) try {
+    auto config = get_config();
+
+    evm_eoa evm1;
+    const int64_t to_bridge = 1000000;
+
+    // Open alice internal balance
+    open("alice"_n);
+    transfer_token("alice"_n, evm_account_name, make_asset(to_bridge), "alice");
+    auto alice_addr = make_reserved_address("alice"_n.to_uint64_t());
+
+    // Fund evm1 address
+    transfer_token("alice"_n, evm_account_name, make_asset(to_bridge), evm1.address_0x());
+
+    // Deploy contract
+    auto [_, contract_address] = deploy_test_contract(evm1);
+
+    // Call `increment` from evm1 address
+    silkworm::Transaction txin {
+      .type = silkworm::Transaction::Type::kLegacy,
+      .max_priority_fee_per_gas = config.gas_price,
+      .max_fee_per_gas = config.gas_price,
+      .gas_limit = 10'000'000,
+      .to = contract_address,
+      .data = *evmc::from_hex(increment_)
+    };
+
+    evm1.sign(txin);
+    pushtx(txin);
+
+    setversion(1, evm_account_name);
+    produce_blocks(2);
+
+    // Call increment as allice using `call` action
+    auto to = evmc::bytes{std::begin(contract_address.bytes), std::end(contract_address.bytes)};
+    auto data = evmc::from_hex(increment_);
+    call("alice"_n, to, silkworm::Bytes(evmc::bytes32{}), *data, 1000000, "alice"_n);
+
+    // Validate config is now 1
+    config = get_config();
+    BOOST_CHECK_EQUAL(config.evm_version.has_value(), true);
+    BOOST_CHECK_EQUAL(config.evm_version.value().cached_version, 1);
+    BOOST_CHECK_EQUAL(config.evm_version.value().pending_version.has_value(), false);
+
+} FC_LOG_AND_RETHROW()
+
+
+BOOST_FIXTURE_TEST_CASE(admincall_promote_pending, version_tester) try {
+    auto config = get_config();
+
+    evm_eoa evm1;
+    const int64_t to_bridge = 1000000;
+
+    // Open alice internal balance
+    open("alice"_n);
+    transfer_token("alice"_n, evm_account_name, make_asset(to_bridge), "alice");
+    auto alice_addr = make_reserved_address("alice"_n.to_uint64_t());
+
+    // Fund evm1 address
+    transfer_token("alice"_n, evm_account_name, make_asset(to_bridge), evm1.address_0x());
+
+    // Deploy contract
+    auto [_, contract_address] = deploy_test_contract(evm1);
+
+    // Call `increment` from evm1 address
+    silkworm::Transaction txin {
+      .type = silkworm::Transaction::Type::kLegacy,
+      .max_priority_fee_per_gas = config.gas_price,
+      .max_fee_per_gas = config.gas_price,
+      .gas_limit = 10'000'000,
+      .to = contract_address,
+      .data = *evmc::from_hex(increment_)
+    };
+
+    evm1.sign(txin);
+    pushtx(txin);
+
+    setversion(1, evm_account_name);
+    produce_blocks(2);
+
+    // Call increment as allice using `call` action
+    auto to = evmc::bytes{std::begin(contract_address.bytes), std::end(contract_address.bytes)};
+    auto data = evmc::from_hex(increment_);
+    auto from = evmc::bytes{std::begin(alice_addr.bytes), std::end(alice_addr.bytes)};
+    admincall(from, to, silkworm::Bytes(evmc::bytes32{}), *data, 1000000, evm_account_name);
+
+    // Validate config is now 1
+    config = get_config();
+    BOOST_CHECK_EQUAL(config.evm_version.has_value(), true);
+    BOOST_CHECK_EQUAL(config.evm_version.value().cached_version, 1);
+    BOOST_CHECK_EQUAL(config.evm_version.value().pending_version.has_value(), false);
 
 } FC_LOG_AND_RETHROW()
 
