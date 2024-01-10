@@ -461,6 +461,15 @@ public:
    bool scan_gcstore(std::function<bool(gcstore)> visitor) const;
    bool scan_account_code(std::function<bool(account_code)> visitor) const;
    void scan_balances(std::function<bool(evm_test::vault_balance_row)> visitor) const;
+
+   bytes get_dummy_transaction() {
+      silkworm::Bytes rlp;
+      silkworm::rlp::encode(rlp, silkworm::Transaction{});
+      bytes rlp_bytes;
+      rlp_bytes.resize(rlp.size());
+      memcpy(rlp_bytes.data(), rlp.data(), rlp.size());
+      return rlp_bytes;
+   }
 };
 
 inline constexpr intx::uint256 operator"" _wei(const char* s) { return intx::from_string<intx::uint256>(s); }

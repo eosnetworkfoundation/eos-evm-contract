@@ -6,7 +6,7 @@ BOOST_AUTO_TEST_SUITE(evm_init_tests)
 BOOST_FIXTURE_TEST_CASE(check_init, basic_evm_tester) try {
    //all of these should fail since the contract hasn't been init'd yet
 
-   BOOST_REQUIRE_EXCEPTION(push_action("evm"_n, "pushtx"_n, "evm"_n, mvo()("miner", "evm"_n)("rlptx", bytes())),
+   BOOST_REQUIRE_EXCEPTION(push_action("evm"_n, "pushtx"_n, "evm"_n, mvo()("miner", "evm"_n)("rlptx", get_dummy_transaction())),
                            eosio_assert_message_exception,
                            [](const eosio_assert_message_exception& e) {return testing::expect_assert_message(e, "assertion failure with message: contract not initialized");});
 
@@ -82,7 +82,7 @@ BOOST_FIXTURE_TEST_CASE(check_freeze, basic_evm_tester) try {
 
    push_action("evm"_n, "freeze"_n, "evm"_n, mvo()("value", true));
 
-   BOOST_REQUIRE_EXCEPTION(push_action("evm"_n, "pushtx"_n, "evm"_n, mvo()("miner", "evm"_n)("rlptx", bytes())),
+   BOOST_REQUIRE_EXCEPTION(push_action("evm"_n, "pushtx"_n, "evm"_n, mvo()("miner", "evm"_n)("rlptx", get_dummy_transaction())),
                            eosio_assert_message_exception,
                            [](const eosio_assert_message_exception& e) {return testing::expect_assert_message(e, "assertion failure with message: contract is frozen");});
 
