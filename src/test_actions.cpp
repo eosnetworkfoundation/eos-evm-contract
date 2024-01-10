@@ -25,7 +25,7 @@ using namespace silkworm;
         ByteView bv{(const uint8_t*)orlptx->data(), orlptx->size()};
         eosio::check(rlp::decode(bv,tx) && bv.empty(), "unable to decode transaction");
 
-        execute_tx(eosio::name{}, block, tx, ep, false);
+        execute_tx(eosio::name{}, block, tx, ep, false, false);
     }
     engine.finalize(ep.state(), ep.evm().block());
     ep.state().write_to_db(ep.evm().block().header.number);
