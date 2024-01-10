@@ -58,7 +58,7 @@ using evmtx_type = std::variant<evmtx_v0>;
 struct evm_version_type {
    struct pending {
       uint64_t version;
-      block_timestamp_type time;
+      fc::time_point time;
    };
 
    std::optional<pending> pending_version;

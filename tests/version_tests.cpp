@@ -115,7 +115,7 @@ BOOST_FIXTURE_TEST_CASE(set_version, version_tester) try {
 
     // Produce blocks until the next EVM block (pending version activation)
     const auto& pending_version = config.evm_version.value().pending_version.value();
-    auto b0 = bm.timestamp_to_evm_block_num(pending_version.time.to_time_point().time_since_epoch().count());
+    auto b0 = bm.timestamp_to_evm_block_num(pending_version.time.time_since_epoch().count());
     while(bm.timestamp_to_evm_block_num(control->pending_block_time().time_since_epoch().count()) <= b0) {
       produce_block();
     }

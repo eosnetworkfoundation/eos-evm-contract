@@ -130,12 +130,12 @@ public:
    struct evm_version_type {
       struct pending {
          uint64_t version;
-         block_timestamp time;
+         time_point time;
 
          bool is_active(time_point_sec genesis_time, block_timestamp current_time)const {
             eosevm::block_mapping bm(genesis_time.sec_since_epoch());
             auto current_block_num = bm.timestamp_to_evm_block_num(current_time.to_time_point().time_since_epoch().count());
-            auto pending_block_num = bm.timestamp_to_evm_block_num(time.to_time_point().time_since_epoch().count());
+            auto pending_block_num = bm.timestamp_to_evm_block_num(time.time_since_epoch().count());
             return current_block_num > pending_block_num;
          }
       };
@@ -181,7 +181,7 @@ public:
       void set_version(uint64_t new_version, block_timestamp current_time) {
          auto [current_version, _] = get_version(current_time);
          eosio::check(new_version > current_version, "new version must be greater than the active one");
-         evm_version.emplace(evm_version_type{evm_version_type::pending{new_version, current_time},current_version});
+         evm_version.emplace(evm_version_type{evm_version_type::pending{new_version, current_time.to_time_point()},current_version});
       }
 
       EOSLIB_SERIALIZE(config, (version)(chainid)(genesis_time)(ingress_bridge_fee)(gas_price)(miner_cut)(status)(evm_version));
