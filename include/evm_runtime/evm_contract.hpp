@@ -178,7 +178,8 @@ public:
       }
 
       void set_version(uint64_t new_version, block_timestamp current_time) {
-         auto [current_version, _] = get_version(current_time);
+         eosio::check(new_version <= MAX_EOSEVM_SUPPORTED_VERSION, "Unsupported version");
+         auto [current_version, update_required] = get_version(current_time);
          eosio::check(new_version > current_version, "new version must be greater than the active one");
          if( update_required ) {
             eosio::check(evm_version.has_value(), "no evm_version");
@@ -210,7 +211,7 @@ private:
       check((_config.get().status & static_cast<uint32_t>(status_flags::frozen)) == 0, "contract is frozen");
    }
 
-   silkworm::Receipt execute_tx(eosio::name miner, silkworm::Block& block, silkworm::Transaction& tx, silkworm::ExecutionProcessor& ep, bool enforce_chain_id);
+   silkworm::Receipt execute_tx(eosio::name miner, silkworm::Block& block, silkworm::Transaction& tx, silkworm::ExecutionProcessor& ep, bool enforce_chain_id, bool is_from_self);
    void process_filtered_messages(const std::vector<silkworm::FilteredMessage>& filtered_messages);
 
    uint64_t get_and_increment_nonce(const name owner);
@@ -226,8 +227,8 @@ private:
    void pushtx_bytes(eosio::name miner, const std::basic_string<uint8_t>& rlptx);
    using pushtx_action = eosio::action_wrapper<"pushtx"_n, &evm_contract::pushtx_bytes>;
 
-   bool is_from_self = false;
-   void push_tx(const silkworm::Transaction& txn, uint64_t current_version);
+   void pushtx( eosio::name miner, const bytes& rlptx, silkworm::Transaction& txn, bool is_from_self );
+   void versioned_tx_dispatch(silkworm::Transaction& txn, uint64_t current_version);
 };
 
 

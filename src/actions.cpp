@@ -189,7 +189,7 @@ void check_result( ValidationResult r, const Transaction& txn, const char* desc 
     eosio::check( false, std::move(err_msg));
 }
 
-Receipt evm_contract::execute_tx( eosio::name miner, Block& block, Transaction& tx, silkworm::ExecutionProcessor& ep, bool enforce_chain_id) {
+Receipt evm_contract::execute_tx( eosio::name miner, Block& block, Transaction& tx, silkworm::ExecutionProcessor& ep, bool enforce_chain_id, bool is_from_self) {
     //when being called as an inline action, clutch in allowance for reserved addresses & signatures by setting from_self=true
     const bool from_self = is_from_self || get_sender() == get_self();
 
@@ -432,9 +432,8 @@ void evm_contract::process_filtered_messages(const std::vector<silkworm::Filtere
 
 }
 
-void evm_contract::pushtx( eosio::name miner, const bytes& rlptx ) {
-    LOGTIME("EVM START");
-
+void evm_contract::pushtx( eosio::name miner, const bytes& rlptx, silkworm::Transaction& tx, bool is_from_self ) {
+    LOGTIME("EVM START1");
     assert_unfrozen();
 
     eosio::check((get_sender() != get_self()) || (miner == get_self()),
@@ -458,11 +457,6 @@ void evm_contract::pushtx( eosio::name miner, const bytes& rlptx ) {
     evm_runtime::state state{get_self(), get_self(), false, false};
     silkworm::ExecutionProcessor ep{block, engine, state, *found_chain_config->second};
 
-    Transaction tx;
-    ByteView bv{(const uint8_t*)rlptx.data(), rlptx.size()};
-    eosio::check(rlp::decode(bv,tx) && bv.empty(), "unable to decode transaction");
-    LOGTIME("EVM TX DECODE");
-
     check(tx.max_priority_fee_per_gas == tx.max_fee_per_gas, "max_priority_fee_per_gas must be equal to max_fee_per_gas");
     check(tx.max_fee_per_gas >= current_config.gas_price, "gas price is too low");
 
@@ -473,7 +467,7 @@ void evm_contract::pushtx( eosio::name miner, const bytes& rlptx ) {
         return message.recipient == me && message.input_size > 0;
     });
 
-    auto receipt = execute_tx(miner, block, tx, ep, true);
+    auto receipt = execute_tx(miner, block, tx, ep, true, is_from_self);
 
     process_filtered_messages(ep.state().filtered_messages());
 
@@ -489,6 +483,16 @@ void evm_contract::pushtx( eosio::name miner, const bytes& rlptx ) {
         _config.set(current_config, get_self());
     }
     LOGTIME("EVM END");
+}
+
+void evm_contract::pushtx( eosio::name miner, const bytes& rlptx ) {
+    LOGTIME("EVM START0");
+
+    Transaction tx;
+    ByteView bv{(const uint8_t*)rlptx.data(), rlptx.size()};
+    eosio::check(rlp::decode(bv,tx) && bv.empty(), "unable to decode transaction");
+
+    pushtx(miner, rlptx, tx, false);
 }
 
 void evm_contract::open(eosio::name owner) {
@@ -591,7 +595,7 @@ void evm_contract::handle_evm_transfer(eosio::asset quantity, const std::string&
     txn.r = 0u;  // r == 0 is pseudo signature that resolves to reserved address range
     txn.s = get_self().value;
 
-    push_tx(txn, current_version);
+    versioned_tx_dispatch(txn, current_version);
 }
 
 void evm_contract::transfer(eosio::name from, eosio::name to, eosio::asset quantity, std::string memo) {
@@ -657,16 +661,15 @@ void evm_contract::call_(intx::uint256 s, const bytes& to, intx::uint256 value, 
         txn.to = to_evmc_address(bv_to);
     }
 
-    push_tx(txn, current_version);
+    versioned_tx_dispatch(txn, current_version);
 }
 
-void evm_contract::push_tx(const silkworm::Transaction& txn, uint64_t current_version) {
+void evm_contract::versioned_tx_dispatch(silkworm::Transaction& txn, uint64_t current_version) {
     Bytes rlp;
     rlp::encode(rlp, txn);
     if( current_version >= 1 ) {
-        is_from_self = true;
         auto rlptx = bytes{rlp.begin(), rlp.end()};
-        pushtx(get_self(), rlptx);
+        pushtx(get_self(), rlptx, txn, true);
     } else {
         pushtx_action pushtx_act(get_self(), {{get_self(), "active"_n}});
         pushtx_act.send(get_self(), rlp);
@@ -770,7 +773,6 @@ void evm_contract::assertnonce(eosio::name account, uint64_t next_nonce) {
 void evm_contract::setversion(uint64_t version) {
     require_auth(get_self());
     auto config = _config.get();
-    eosio::check(version <= MAX_EOSEVM_SUPPORTED_VERSION, "Unsupported version");
     config.set_version(version, eosio::current_block_time());
     _config.set(config, get_self());
 }
