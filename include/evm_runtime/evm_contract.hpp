@@ -162,18 +162,17 @@ public:
 
       binary_extension<evm_version_type> evm_version;
 
-      std::pair<uint64_t, bool> get_version(block_timestamp current_time) {
+      std::pair<uint64_t, bool> get_version(block_timestamp current_time)const {
          bool update_required = false;
          uint64_t current_version = 0;
          if(evm_version.has_value()) {
             const auto& pending_version = evm_version.value().pending_version;
-            if(pending_version.has_value()) {
-               if( pending_version->is_active(genesis_time, current_time) ) {
-                  update_required = true;
-                  evm_version->promote_pending();
-               }
+            if(pending_version.has_value() && pending_version->is_active(genesis_time, current_time)) {
+               update_required = true;
+               current_version = evm_version->pending_version->version;
+            } else {
+               current_version = evm_version->cached_version;
             }
-            current_version = evm_version->cached_version;
          }
          return std::make_pair(current_version, update_required);
       }
@@ -181,6 +180,10 @@ public:
       void set_version(uint64_t new_version, block_timestamp current_time) {
          auto [current_version, _] = get_version(current_time);
          eosio::check(new_version > current_version, "new version must be greater than the active one");
+         if( update_required ) {
+            eosio::check(evm_version.has_value(), "no evm_version");
+            evm_version->promote_pending();
+         }
          evm_version.emplace(evm_version_type{evm_version_type::pending{new_version, current_time.to_time_point()},current_version});
       }
 

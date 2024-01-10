@@ -484,9 +484,10 @@ void evm_contract::pushtx( eosio::name miner, const bytes& rlptx ) {
         action(std::vector<permission_level>{}, get_self(), "evmtx"_n, event).send();
     }
     if( update_required ) {
+        eosio::check(current_config.evm_version.has_value(), "no evm_version");
+        current_config.evm_version->promote_pending();
         _config.set(current_config, get_self());
     }
-
     LOGTIME("EVM END");
 }
 
