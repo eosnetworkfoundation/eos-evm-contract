@@ -4,7 +4,7 @@
 #include <evm_runtime/state.hpp>
 #include <evm_runtime/test/engine.hpp>
 #include <evm_runtime/test/config.hpp>
-
+#include <evm_runtime/runtime_config.hpp>
 namespace evm_runtime {
 using namespace silkworm;
 
@@ -25,7 +25,13 @@ using namespace silkworm;
         ByteView bv{(const uint8_t*)orlptx->data(), orlptx->size()};
         eosio::check(rlp::decode(bv,tx) && bv.empty(), "unable to decode transaction");
 
-        execute_tx(eosio::name{}, block, tx, ep, false, false);
+        runtime_config rc {
+            .allow_special_signature = false,
+            .abort_on_failure = false,
+            .enforce_chain_id = false,
+            .allow_non_self_miner = true
+        };
+        execute_tx(rc, eosio::name{}, block, tx, ep);
     }
     engine.finalize(ep.state(), ep.evm().block());
     ep.state().write_to_db(ep.evm().block().header.number);

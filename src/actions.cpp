@@ -8,7 +8,6 @@
 #include <evm_runtime/intrinsics.hpp>
 #include <evm_runtime/eosio.token.hpp>
 #include <evm_runtime/bridge.hpp>
-
 #include <silkworm/core/protocol/trust_rule_set.hpp>
 // included here so NDEBUG is defined to disable assert macro
 #include <silkworm/core/execution/processor.hpp>
@@ -30,39 +29,11 @@ namespace silkworm {
         return {};
     }
 }
-
 namespace evm_runtime {
 
-static constexpr uint32_t hundred_percent = 100'000;
 static constexpr char err_msg_invalid_addr[] = "invalid address";
 
 using namespace silkworm;
-
-void set_fee_parameters(evm_contract::config& current_config,
-                        const evm_contract::fee_parameters& fee_params,
-                        bool allow_any_to_be_unspecified)
-{
-   if (fee_params.gas_price.has_value()) {
-      current_config.gas_price = *fee_params.gas_price;
-   } else {
-      check(allow_any_to_be_unspecified, "All required fee parameters not specified: missing gas_price");
-   }
-
-   if (fee_params.miner_cut.has_value()) {
-      check(*fee_params.miner_cut <= hundred_percent, "miner_cut cannot exceed 100,000 (100%)");
-
-      current_config.miner_cut = *fee_params.miner_cut;
-   } else {
-      check(allow_any_to_be_unspecified, "All required fee parameters not specified: missing miner_cut");
-   }
-
-   if (fee_params.ingress_bridge_fee.has_value()) {
-      check(fee_params.ingress_bridge_fee->symbol == token_symbol, "unexpected bridge symbol");
-      check(fee_params.ingress_bridge_fee->amount >= 0, "ingress bridge fee cannot be negative");
-
-      current_config.ingress_bridge_fee = *fee_params.ingress_bridge_fee;
-   }
-}
 
 void evm_contract::init(const uint64_t chainid, const fee_parameters& fee_params)
 {
@@ -74,22 +45,19 @@ void evm_contract::init(const uint64_t chainid, const fee_parameters& fee_params
    // Convert current time to EVM compatible block timestamp used as genesis time by rounding down to nearest second.
    time_point_sec genesis_time = eosio::current_time_point();
 
-   config new_config = {
-      .version = 0,
-      .chainid = chainid,
-      .genesis_time = genesis_time,
-   };
+   _config.set_version(0);
+   _config.set_chainid(chainid);
+   _config.set_genesis_time(genesis_time);
 
-   // Other fee parameters in new_config are still left at their (undesired) default values.
-   // Correct those values now using the fee_params passed in as an argument to the init function.
+   // Other fee parameters in new_config are still left at their (undesired)
+   // default values. Correct those values now using the fee_params passed in as
+   // an argument to the init function.
 
-   set_fee_parameters(new_config, fee_params, false); // enforce that all fee parameters are specified
-
-   _config.set(new_config, get_self());
+   _config.set_fee_parameters(fee_params, false);  // enforce that all fee parameters are specified
 
    inevm_singleton(get_self(), get_self().value).get_or_create(get_self());
 
-   open(get_self());
+   open_internal_balance(get_self());
 }
 
 void evm_contract::setfeeparams(const fee_parameters& fee_params)
@@ -97,9 +65,9 @@ void evm_contract::setfeeparams(const fee_parameters& fee_params)
    assert_inited();
    require_auth(get_self());
 
-   config current_config = _config.get();
-   set_fee_parameters(current_config, fee_params, true); // do not enforce that all fee parameters are specified
-   _config.set(current_config, get_self());
+   _config.set_fee_parameters(
+      fee_params,
+      true);  // do not enforce that all fee parameters are specified
 }
 
 void evm_contract::addegress(const std::vector<name>& accounts) {
@@ -130,13 +98,13 @@ void evm_contract::freeze(bool value) {
     eosio::require_auth(get_self());
 
     assert_inited();
-    config config2 = _config.get();
+    auto status = _config.get_status();
     if (value) {
-        config2.status |= static_cast<uint32_t>(status_flags::frozen);
+        status |= static_cast<uint32_t>(status_flags::frozen);
     } else {
-        config2.status &= ~static_cast<uint32_t>(status_flags::frozen);
+        status &= ~static_cast<uint32_t>(status_flags::frozen);
     }
-    _config.set(config2, get_self());
+    _config.set_status(status);
 }
 
 void check_result( ValidationResult r, const Transaction& txn, const char* desc ) {
@@ -189,10 +157,7 @@ void check_result( ValidationResult r, const Transaction& txn, const char* desc 
     eosio::check( false, std::move(err_msg));
 }
 
-Receipt evm_contract::execute_tx( eosio::name miner, Block& block, Transaction& tx, silkworm::ExecutionProcessor& ep, bool enforce_chain_id, bool is_from_self) {
-    //when being called as an inline action, clutch in allowance for reserved addresses & signatures by setting from_self=true
-    const bool from_self = is_from_self || get_sender() == get_self();
-
+Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Block& block, Transaction& tx, silkworm::ExecutionProcessor& ep) {
     balances balance_table(get_self(), get_self().value);
 
     if (miner == get_self()) {
@@ -226,7 +191,7 @@ Receipt evm_contract::execute_tx( eosio::name miner, Block& block, Transaction& 
     // 2 For special signature, we will reject calls not from self 
     // and process the special balance if the tx is from reserved address.
     if (is_special_signature) {
-        check(from_self, "bridge signature used outside of bridge transaction");
+        check(rc.allow_special_signature, "bridge signature used outside of bridge transaction");
         if (is_reserved_address(*tx.from)) {
             const name ingress_account(*extract_reserved_address(*tx.from));
 
@@ -245,9 +210,9 @@ Receipt evm_contract::execute_tx( eosio::name miner, Block& block, Transaction& 
         }
     }
 
-    // A tx from self with regular signature can potentially from external source. 
+    // A tx from self with regular signature can potentially from external source.
     // Therefore, only tx with special signature can waive the chain_id check.
-    if(enforce_chain_id && !is_special_signature) {
+    if (rc.enforce_chain_id) {
         check(tx.chain_id.has_value(), "tx without chain-id");
     }
 
@@ -266,12 +231,12 @@ Receipt evm_contract::execute_tx( eosio::name miner, Block& block, Transaction& 
         uint64_t tx_gas_used = receipt.cumulative_gas_used; // Only transaction in the "block" so cumulative_gas_used is the tx gas_used.
         intx::uint512 gas_fee = intx::uint256(tx_gas_used) * tx.max_fee_per_gas;
         check(gas_fee < std::numeric_limits<intx::uint256>::max(), "too much gas");
-        gas_fee *= _config.get().miner_cut;
+        gas_fee *= _config.get_miner_cut();
         gas_fee /= hundred_percent;
         gas_fee_miner_portion.emplace(static_cast<intx::uint256>(gas_fee));
     }
 
-    if(from_self)
+    if (rc.abort_on_failure)
         eosio::check(receipt.success, "tx executed inline by contract must succeed");
 
     if(!ep.state().reserved_objects().empty()) {
@@ -339,11 +304,10 @@ void evm_contract::exec(const exec_input& input, const std::optional<exec_callba
 
     assert_unfrozen();
 
-    const auto& current_config = _config.get();
-    std::optional<std::pair<const std::string, const ChainConfig*>> found_chain_config = lookup_known_chain(current_config.chainid);
+    std::optional<std::pair<const std::string, const ChainConfig*>> found_chain_config = lookup_known_chain(_config.get_chainid());
     check( found_chain_config.has_value(), "failed to find expected chain config" );
 
-    eosevm::block_mapping bm(current_config.genesis_time.sec_since_epoch());
+    eosevm::block_mapping bm(_config.get_genesis_time().sec_since_epoch());
 
     Block block;
     eosevm::prepare_block_header(block.header, bm, get_self().value,
@@ -432,25 +396,23 @@ void evm_contract::process_filtered_messages(const std::vector<silkworm::Filtere
 
 }
 
-void evm_contract::pushtx( eosio::name miner, const bytes& rlptx, silkworm::Transaction& tx, bool is_from_self ) {
+void evm_contract::process_tx(const runtime_config& rc, eosio::name miner, transaction& txn) {
     LOGTIME("EVM START1");
-    assert_unfrozen();
 
-    eosio::check((get_sender() != get_self()) || (miner == get_self()),
+    auto tx = txn.get_tx();
+    eosio::check(rc.allow_non_self_miner || miner == get_self(),
                  "unexpected error: EVM contract generated inline pushtx without setting itself as the miner");
 
-    auto current_config = _config.get();
-    auto current_time = eosio::current_time_point();
-    auto [current_version, update_required] = current_config.get_version(current_time);
+    auto current_version = _config.get_evm_version();
 
-    std::optional<std::pair<const std::string, const ChainConfig*>> found_chain_config = lookup_known_chain(current_config.chainid);
+    std::optional<std::pair<const std::string, const ChainConfig*>> found_chain_config = lookup_known_chain(_config.get_chainid());
     check( found_chain_config.has_value(), "failed to find expected chain config" );
 
-    eosevm::block_mapping bm(current_config.genesis_time.sec_since_epoch());
+    eosevm::block_mapping bm(_config.get_genesis_time().sec_since_epoch());
 
     Block block;
-    eosevm::prepare_block_header(block.header, bm, get_self().value, 
-        bm.timestamp_to_evm_block_num(current_time.time_since_epoch().count()));
+    eosevm::prepare_block_header(block.header, bm, get_self().value,
+        bm.timestamp_to_evm_block_num(eosio::current_time_point().time_since_epoch().count()));
 
     silkworm::protocol::TrustRuleSet engine{*found_chain_config->second};
 
@@ -458,7 +420,7 @@ void evm_contract::pushtx( eosio::name miner, const bytes& rlptx, silkworm::Tran
     silkworm::ExecutionProcessor ep{block, engine, state, *found_chain_config->second};
 
     check(tx.max_priority_fee_per_gas == tx.max_fee_per_gas, "max_priority_fee_per_gas must be equal to max_fee_per_gas");
-    check(tx.max_fee_per_gas >= current_config.gas_price, "gas price is too low");
+    check(tx.max_fee_per_gas >= _config.get_gas_price(), "gas price is too low");
 
     // Filter EVM messages (with data) that are sent to the reserved address
     // corresponding to the EOS account holding the contract (self)
@@ -467,38 +429,58 @@ void evm_contract::pushtx( eosio::name miner, const bytes& rlptx, silkworm::Tran
         return message.recipient == me && message.input_size > 0;
     });
 
-    auto receipt = execute_tx(miner, block, tx, ep, true, is_from_self);
+    auto receipt = execute_tx(rc, miner, block, tx, ep);
 
     process_filtered_messages(ep.state().filtered_messages());
 
     engine.finalize(ep.state(), ep.evm().block());
     ep.state().write_to_db(ep.evm().block().header.number);
-    if( current_version >= 1 ) {
-        auto event = evmtx_type{evmtx_v0{current_version, rlptx}};
-        action(std::vector<permission_level>{}, get_self(), "evmtx"_n, event).send();
-    }
-    if( update_required ) {
-        eosio::check(current_config.evm_version.has_value(), "no evm_version");
-        current_config.evm_version->promote_pending();
-        _config.set(current_config, get_self());
+    if (current_version >= 1) {
+        auto event = evmtx_type{evmtx_v0{current_version, txn.get_rlptx()}};
+        action(std::vector<permission_level>{}, get_self(), "evmtx"_n, event)
+            .send();
     }
     LOGTIME("EVM END");
 }
 
-void evm_contract::pushtx( eosio::name miner, const bytes& rlptx ) {
+void evm_contract::pushtx(eosio::name miner, bytes& rlptx) {
     LOGTIME("EVM START0");
+    assert_unfrozen();
 
-    Transaction tx;
-    ByteView bv{(const uint8_t*)rlptx.data(), rlptx.size()};
-    eosio::check(rlp::decode(bv,tx) && bv.empty(), "unable to decode transaction");
+    // Use default runtime configuration parameters.
+    runtime_config rc;
 
-    pushtx(miner, rlptx, tx, false);
+    // Check if the transaction is initiated by the contract itself.
+    // When the contract calls this as an inline action, it implies a special
+    // context where certain rules are relaxed or altered.
+    // 1. Allowance for special signatures: This permits the use of special
+    // signatures that are otherwise restricted.
+    // 2. Enforce immediate EOS transaction failure on error: In case of failure
+    // in the EVM transaction execution, the EOS transaction is set to abort
+    // immediately.
+    // 3. Disable chainId enforcement: This is applicable because the RLP
+    // transaction sent by the contract is a legacy pre-EIP155 transaction that is
+    // not replay-protected (lacks a chain ID).
+    // 4. Restrict miner to self: Ensures that if the transaction originates from
+    // the contract then the miner must also be the contract itself.
+    if (get_sender() == get_self()) {
+        rc.allow_special_signature = true;
+        rc.abort_on_failure = true;
+        rc.enforce_chain_id = false;
+        rc.allow_non_self_miner = false;
+    }
+
+    transaction tx(rlptx);
+    process_tx(rc, miner, tx);
 }
 
 void evm_contract::open(eosio::name owner) {
     assert_unfrozen();
     require_auth(owner);
+    open_internal_balance(owner);
+}
 
+void evm_contract::open_internal_balance(eosio::name owner) {
     balances balance_table(get_self(), get_self().value);
     if(balance_table.find(owner.value) == balance_table.end())
         balance_table.emplace(owner, [&](balance& a) {
@@ -544,7 +526,6 @@ uint64_t evm_contract::get_and_increment_nonce(const name owner) {
 
 checksum256 evm_contract::get_code_hash(name account) const {
     char buff[64];
-
     eosio::check(internal_use_do_not_use::get_code_hash(account.value, 0, buff, sizeof(buff)) <= sizeof(buff), "get_code_hash() too big");
     using start_of_code_hash_return = std::tuple<unsigned_int, uint64_t, checksum256>;
     const auto& [v, s, code_hash] = unpack<start_of_code_hash_return>(buff, sizeof(buff));
@@ -570,12 +551,8 @@ void evm_contract::handle_evm_transfer(eosio::asset quantity, const std::string&
         b.balance.balance += quantity;
     });
 
-    auto current_config = _config.get();
-    auto current_time = eosio::current_time_point();
-    auto [current_version, update_required] = current_config.get_version(current_time);
-
     //subtract off the ingress bridge fee from the quantity that will be bridged
-    quantity -= current_config.ingress_bridge_fee;
+    quantity -= _config.get_ingress_bridge_fee();
     eosio::check(quantity.amount > 0, "must bridge more than ingress bridge fee");
 
     const std::optional<Bytes> address_bytes = from_hex(memo);
@@ -587,15 +564,22 @@ void evm_contract::handle_evm_transfer(eosio::asset quantity, const std::string&
     Transaction txn;
     txn.type = TransactionType::kLegacy;
     txn.nonce = get_and_increment_nonce(get_self());
-    txn.max_priority_fee_per_gas = current_config.gas_price;
-    txn.max_fee_per_gas = current_config.gas_price;
+    txn.max_priority_fee_per_gas = _config.get_gas_price();
+    txn.max_fee_per_gas = _config.get_gas_price();
     txn.gas_limit = 21000;
     txn.to = to_evmc_address(*address_bytes);
     txn.value = value;
     txn.r = 0u;  // r == 0 is pseudo signature that resolves to reserved address range
     txn.s = get_self().value;
 
-    versioned_tx_dispatch(txn, current_version);
+    runtime_config rc;
+    rc.allow_special_signature = true;
+    rc.abort_on_failure = true;
+    rc.enforce_chain_id = false;
+    rc.allow_non_self_miner = false;
+
+    transaction tx{txn};
+    dispatch_tx(rc, tx);
 }
 
 void evm_contract::transfer(eosio::name from, eosio::name to, eosio::asset quantity, std::string memo) {
@@ -640,15 +624,12 @@ bool evm_contract::gc(uint32_t max) {
 }
 
 void evm_contract::call_(intx::uint256 s, const bytes& to, intx::uint256 value, const bytes& data, uint64_t gas_limit, uint64_t nonce) {
-    auto current_config = _config.get();
-    auto current_time = eosio::current_time_point();
-    auto [current_version, update_required] = current_config.get_version(current_time);
 
     Transaction txn;
     txn.type = TransactionType::kLegacy;
     txn.nonce = nonce;
-    txn.max_priority_fee_per_gas = current_config.gas_price;
-    txn.max_fee_per_gas = current_config.gas_price;
+    txn.max_priority_fee_per_gas = _config.get_gas_price();
+    txn.max_fee_per_gas = _config.get_gas_price();
     txn.gas_limit = gas_limit;
     txn.value = value;
     txn.data = Bytes{(const uint8_t*)data.data(), data.size()};
@@ -661,18 +642,23 @@ void evm_contract::call_(intx::uint256 s, const bytes& to, intx::uint256 value, 
         txn.to = to_evmc_address(bv_to);
     }
 
-    versioned_tx_dispatch(txn, current_version);
+    runtime_config rc;
+    rc.allow_special_signature = true;
+    rc.abort_on_failure = true;
+    rc.enforce_chain_id = false;
+    rc.allow_non_self_miner = false;
+
+    transaction tx{txn};
+    dispatch_tx(rc, tx);
 }
 
-void evm_contract::versioned_tx_dispatch(silkworm::Transaction& txn, uint64_t current_version) {
-    Bytes rlp;
-    rlp::encode(rlp, txn);
-    if( current_version >= 1 ) {
-        auto rlptx = bytes{rlp.begin(), rlp.end()};
-        pushtx(get_self(), rlptx, txn, true);
+void evm_contract::dispatch_tx(const runtime_config& rc, transaction& tx) {
+    if (_config.get_evm_version() >= 1) {
+        process_tx(rc, get_self(), tx);
     } else {
+        eosio::check(rc.allow_special_signature && rc.abort_on_failure && !rc.enforce_chain_id && !rc.allow_non_self_miner, "invalid runtime config");
         pushtx_action pushtx_act(get_self(), {{get_self(), "active"_n}});
-        pushtx_act.send(get_self(), rlp);
+        pushtx_act.send(get_self(), tx.get_rlptx());
     }
 }
 
@@ -772,9 +758,7 @@ void evm_contract::assertnonce(eosio::name account, uint64_t next_nonce) {
 
 void evm_contract::setversion(uint64_t version) {
     require_auth(get_self());
-    auto config = _config.get();
-    config.set_version(version, eosio::current_block_time());
-    _config.set(config, get_self());
+    _config.set_evm_version(version);
 }
 
 } //evm_runtime

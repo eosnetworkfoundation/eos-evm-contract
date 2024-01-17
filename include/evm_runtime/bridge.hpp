@@ -1,9 +1,13 @@
 #pragma once
 
 #include <evm_runtime/types.hpp>
+#include <silkworm/core/common/base.hpp>
 
 namespace evm_runtime { namespace bridge {
 
+using namespace std;
+using namespace eosio;
+using namespace silkworm;
 struct message_v0 {
     static constexpr uint32_t id = 0xf781185b; //sha3('bridgeMsgV0(string,bool,bytes)')[:4]
 
