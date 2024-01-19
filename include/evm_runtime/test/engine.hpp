@@ -19,7 +19,7 @@ class engine : public  silkworm::protocol::IRuleSet {
 
     void finalize(IntraBlockState& state, const Block& block) override {
         intx::uint256 block_reward;
-        const evmc_revision revision{config.revision(block.header.number, block.header.timestamp)};
+        const evmc_revision revision{config.revision(block.header)};
         if (revision >= EVMC_CONSTANTINOPLE) {
             block_reward = silkworm::protocol::kBlockRewardConstantinople;
         } else if (revision >= EVMC_BYZANTIUM) {
