@@ -14,10 +14,10 @@ using silkworm::ByteView;
 struct transaction {
 
   transaction() = delete;
-  explicit transaction(bytes& rlptx) : rlptx_(std::move(rlptx)) {}
-  explicit transaction(silkworm::Transaction& tx) : tx_(std::move(tx)) {}
+  explicit transaction(bytes rlptx) : rlptx_(std::move(rlptx)) {}
+  explicit transaction(silkworm::Transaction tx) : tx_(std::move(tx)) {}
 
-  const bytes& get_rlptx() {
+  const bytes& get_rlptx()const {
     if(!rlptx_) {
       eosio::check(tx_.has_value(), "no tx");
       Bytes rlp;
@@ -27,7 +27,7 @@ struct transaction {
     return rlptx_.value();
   }
 
-  const silkworm::Transaction& get_tx() {
+  silkworm::Transaction& get_tx()const {
     if(!tx_) {
       eosio::check(rlptx_.has_value(), "no rlptx");
       ByteView bv{(const uint8_t*)rlptx_->data(), rlptx_->size()};
@@ -39,8 +39,8 @@ struct transaction {
   }
 
 private:
-  std::optional<bytes>  rlptx_;
-  std::optional<silkworm::Transaction> tx_;
+  mutable std::optional<bytes>  rlptx_;
+  mutable std::optional<silkworm::Transaction> tx_;
 };
 
 } //namespace evm_runtime
