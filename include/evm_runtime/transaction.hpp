@@ -27,7 +27,7 @@ struct transaction {
     return rlptx_.value();
   }
 
-  silkworm::Transaction& get_tx()const {
+  const silkworm::Transaction& get_tx()const {
     if(!tx_) {
       eosio::check(rlptx_.has_value(), "no rlptx");
       ByteView bv{(const uint8_t*)rlptx_->data(), rlptx_->size()};
@@ -36,6 +36,13 @@ struct transaction {
       tx_.emplace(tmp);
     }
     return tx_.value();
+  }
+
+  void recover_sender()const {
+    eosio::check(tx_.has_value(), "no tx");
+    auto& tx = tx_.value();
+    tx.from.reset();
+    tx.recover_sender();
   }
 
 private:

@@ -136,7 +136,7 @@ private:
       check((_config.get_status() & static_cast<uint32_t>(status_flags::frozen)) == 0, "contract is frozen");
    }
 
-   silkworm::Receipt execute_tx(const runtime_config& rc, eosio::name miner, silkworm::Block& block, silkworm::Transaction& tx, silkworm::ExecutionProcessor& ep);
+   silkworm::Receipt execute_tx(const runtime_config& rc, eosio::name miner, silkworm::Block& block, const transaction& tx, silkworm::ExecutionProcessor& ep);
    void process_filtered_messages(const std::vector<silkworm::FilteredMessage>& filtered_messages);
 
    uint64_t get_and_increment_nonce(const name owner);

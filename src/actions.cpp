@@ -157,7 +157,8 @@ void check_result( ValidationResult r, const Transaction& txn, const char* desc 
     eosio::check( false, std::move(err_msg));
 }
 
-Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Block& block, Transaction& tx, silkworm::ExecutionProcessor& ep) {
+Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Block& block, const transaction& txn, silkworm::ExecutionProcessor& ep) {
+    const auto& tx = txn.get_tx();
     balances balance_table(get_self(), get_self().value);
 
     if (miner == get_self()) {
@@ -181,8 +182,7 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
 
     bool is_special_signature = silkworm::is_special_signature(tx.r, tx.s);
 
-    tx.from.reset();
-    tx.recover_sender();
+    txn.recover_sender();
     eosio::check(tx.from.has_value(), "unable to recover sender");
     LOGTIME("EVM RECOVER SENDER");
 
