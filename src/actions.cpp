@@ -311,7 +311,7 @@ void evm_contract::exec(const exec_input& input, const std::optional<exec_callba
 
     Block block;
     eosevm::prepare_block_header(block.header, bm, get_self().value,
-        bm.timestamp_to_evm_block_num(eosio::current_time_point().time_since_epoch().count()));
+        bm.timestamp_to_evm_block_num(eosio::current_time_point().time_since_epoch().count()), _config.get_evm_version());
 
     evm_runtime::state state{get_self(), get_self(), true};
     IntraBlockState ibstate{state};
@@ -396,14 +396,14 @@ void evm_contract::process_filtered_messages(const std::vector<silkworm::Filtere
 
 }
 
-void evm_contract::process_tx(const runtime_config& rc, eosio::name miner, transaction& txn) {
+void evm_contract::process_tx(const runtime_config& rc, eosio::name miner, const transaction& txn) {
     LOGTIME("EVM START1");
 
-    auto tx = txn.get_tx();
+    auto& tx = txn.get_tx();
     eosio::check(rc.allow_non_self_miner || miner == get_self(),
                  "unexpected error: EVM contract generated inline pushtx without setting itself as the miner");
 
-    auto current_version = _config.get_evm_version();
+    auto current_version = _config.get_evm_version_and_maybe_promote();
 
     std::optional<std::pair<const std::string, const ChainConfig*>> found_chain_config = lookup_known_chain(_config.get_chainid());
     check( found_chain_config.has_value(), "failed to find expected chain config" );
@@ -412,7 +412,7 @@ void evm_contract::process_tx(const runtime_config& rc, eosio::name miner, trans
 
     Block block;
     eosevm::prepare_block_header(block.header, bm, get_self().value,
-        bm.timestamp_to_evm_block_num(eosio::current_time_point().time_since_epoch().count()));
+        bm.timestamp_to_evm_block_num(eosio::current_time_point().time_since_epoch().count()), current_version);
 
     silkworm::protocol::TrustRuleSet engine{*found_chain_config->second};
 
@@ -443,7 +443,7 @@ void evm_contract::process_tx(const runtime_config& rc, eosio::name miner, trans
     LOGTIME("EVM END");
 }
 
-void evm_contract::pushtx(eosio::name miner, bytes& rlptx) {
+void evm_contract::pushtx(eosio::name miner, bytes rlptx) {
     LOGTIME("EVM START0");
     assert_unfrozen();
 
@@ -470,8 +470,7 @@ void evm_contract::pushtx(eosio::name miner, bytes& rlptx) {
         rc.allow_non_self_miner = false;
     }
 
-    transaction tx(rlptx);
-    process_tx(rc, miner, tx);
+    process_tx(rc, miner, transaction{std::move(rlptx)});
 }
 
 void evm_contract::open(eosio::name owner) {
@@ -578,8 +577,7 @@ void evm_contract::handle_evm_transfer(eosio::asset quantity, const std::string&
     rc.enforce_chain_id = false;
     rc.allow_non_self_miner = false;
 
-    transaction tx{txn};
-    dispatch_tx(rc, tx);
+    dispatch_tx(rc, transaction{std::move(txn)});
 }
 
 void evm_contract::transfer(eosio::name from, eosio::name to, eosio::asset quantity, std::string memo) {
@@ -623,7 +621,7 @@ bool evm_contract::gc(uint32_t max) {
     return state.gc(max);
 }
 
-void evm_contract::call_(intx::uint256 s, const bytes& to, intx::uint256 value, const bytes& data, uint64_t gas_limit, uint64_t nonce) {
+void evm_contract::call_(const runtime_config& rc, intx::uint256 s, const bytes& to, intx::uint256 value, const bytes& data, uint64_t gas_limit, uint64_t nonce) {
 
     Transaction txn;
     txn.type = TransactionType::kLegacy;
@@ -642,18 +640,11 @@ void evm_contract::call_(intx::uint256 s, const bytes& to, intx::uint256 value, 
         txn.to = to_evmc_address(bv_to);
     }
 
-    runtime_config rc;
-    rc.allow_special_signature = true;
-    rc.abort_on_failure = true;
-    rc.enforce_chain_id = false;
-    rc.allow_non_self_miner = false;
-
-    transaction tx{txn};
-    dispatch_tx(rc, tx);
+    dispatch_tx(rc, transaction{std::move(txn)});
 }
 
-void evm_contract::dispatch_tx(const runtime_config& rc, transaction& tx) {
-    if (_config.get_evm_version() >= 1) {
+void evm_contract::dispatch_tx(const runtime_config& rc, const transaction& tx) {
+    if (_config.get_evm_version_and_maybe_promote() >= 1) {
         process_tx(rc, get_self(), tx);
     } else {
         eosio::check(rc.allow_special_signature && rc.abort_on_failure && !rc.enforce_chain_id && !rc.allow_non_self_miner, "invalid runtime config");
@@ -670,7 +661,14 @@ void evm_contract::call(eosio::name from, const bytes& to, const bytes& value, c
     eosio::check(value.size() == sizeof(intx::uint256), "invalid value");
     intx::uint256 v = intx::be::unsafe::load<intx::uint256>((const uint8_t *)value.data());
 
-    call_(from.value, to, v, data, gas_limit, get_and_increment_nonce(from));
+    runtime_config rc {
+        .allow_special_signature = true,
+        .abort_on_failure = true,
+        .enforce_chain_id = false,
+        .allow_non_self_miner = false
+    };
+
+    call_(rc, from.value, to, v, data, gas_limit, get_and_increment_nonce(from));
 }
 
 void evm_contract::admincall(const bytes& from, const bytes& to, const bytes& value, const bytes& data, uint64_t gas_limit) {
@@ -702,8 +700,15 @@ void evm_contract::admincall(const bytes& from, const bytes& to, const bytes& va
         check(!!account, err_msg_invalid_addr);
         nonce = account->nonce;
     }
-    
-    call_(s, to, v, data, gas_limit, nonce);
+
+    runtime_config rc {
+        .allow_special_signature = true,
+        .abort_on_failure = true,
+        .enforce_chain_id = false,
+        .allow_non_self_miner = false
+    };
+
+    call_(rc, s, to, v, data, gas_limit, nonce);
 }
 
 void evm_contract::bridgereg(eosio::name receiver, eosio::name handler, const eosio::asset& min_fee) {

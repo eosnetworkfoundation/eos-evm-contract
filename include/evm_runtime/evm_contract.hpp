@@ -8,7 +8,6 @@
 #include <evm_runtime/transaction.hpp>
 #include <evm_runtime/runtime_config.hpp>
 #include <evm_runtime/config_wrapper.hpp>
-
 #include <silkworm/core/types/block.hpp>
 #include <silkworm/core/execution/processor.hpp>
 
@@ -63,7 +62,7 @@ public:
 
    [[eosio::action]] void exec(const exec_input& input, const std::optional<exec_callback>& callback);
 
-   [[eosio::action]] void pushtx(eosio::name miner, bytes& rlptx);
+   [[eosio::action]] void pushtx(eosio::name miner, bytes rlptx);
 
    [[eosio::action]] void open(eosio::name owner);
 
@@ -147,24 +146,13 @@ private:
    void handle_account_transfer(const eosio::asset& quantity, const std::string& memo);
    void handle_evm_transfer(eosio::asset quantity, const std::string& memo);
 
-   void call_(intx::uint256 s, const bytes& to, intx::uint256 value, const bytes& data, uint64_t gas_limit, uint64_t nonce);
+   void call_(const runtime_config& rc, intx::uint256 s, const bytes& to, intx::uint256 value, const bytes& data, uint64_t gas_limit, uint64_t nonce);
 
    using pushtx_action = eosio::action_wrapper<"pushtx"_n, &evm_contract::pushtx>;
 
-   void process_tx(const runtime_config& rc, eosio::name miner, transaction& tx);
-   void dispatch_tx(const runtime_config& rc, transaction& tx);
+   void process_tx(const runtime_config& rc, eosio::name miner, const transaction& tx);
+   void dispatch_tx(const runtime_config& rc, const transaction& tx);
 };
-
 
 } // namespace evm_runtime
 
-namespace std {
-template <typename DataStream>
-DataStream& operator<<(DataStream& ds, const std::basic_string<uint8_t>& bs)
-{
-   ds << (unsigned_int)bs.size();
-   if (bs.size())
-      ds.write((const char*)bs.data(), bs.size());
-   return ds;
-}
-} // namespace std
