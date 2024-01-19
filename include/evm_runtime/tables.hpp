@@ -244,14 +244,23 @@ struct evm_version_type {
         }
     };
 
-    std::pair<uint64_t, bool> get_version(time_point_sec genesis_time, time_point current_time)const {
+    uint64_t get_version(time_point_sec genesis_time, time_point current_time)const {
         uint64_t current_version = cached_version;
-        bool promote_required = false;
         if(pending_version.has_value() && pending_version->is_active(genesis_time, current_time)) {
             current_version = pending_version->version;
-            promote_required = true;
         }
-        return std::make_pair(current_version, promote_required);
+        return current_version;
+    }
+
+    std::pair<uint64_t, bool> get_version_and_maybe_promote(time_point_sec genesis_time, time_point current_time) {
+        uint64_t current_version = cached_version;
+        bool promoted = false;
+        if(pending_version.has_value() && pending_version->is_active(genesis_time, current_time)) {
+            current_version = pending_version->version;
+            promote_pending();
+            promoted = true;
+        }
+        return std::make_pair(current_version, promoted);
     }
 
     void promote_pending() {
@@ -277,21 +286,5 @@ struct [[eosio::table]] [[eosio::contract("evm_contract")]] config
 
     EOSLIB_SERIALIZE(config, (version)(chainid)(genesis_time)(ingress_bridge_fee)(gas_price)(miner_cut)(status)(evm_version));
 };
-
-struct fee_parameters
-{
-    std::optional<uint64_t> gas_price; ///< Minimum gas price (in 10^-18 EOS, aka wei) that is enforced on all
-                                        ///< transactions. Required during initialization.
-
-    std::optional<uint32_t> miner_cut; ///< Percentage cut (maximum allowed value of 100,000 which equals 100%) of the
-                                        ///< gas fee collected for a transaction that is sent to the indicated miner of
-                                        ///< that transaction. Required during initialization.
-
-    std::optional<asset> ingress_bridge_fee; ///< Fee (in EOS) deducted from ingress transfers of EOS across bridge.
-                                            ///< Symbol must be in EOS and quantity must be non-negative. If not
-                                            ///< provided during initialization, the default fee of 0 will be used.
-};
-
-
 
 } //namespace evm_runtime
