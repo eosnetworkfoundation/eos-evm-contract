@@ -7,7 +7,6 @@
 #include <evm_runtime/types.hpp>
 #include <evm_runtime/transaction.hpp>
 #include <evm_runtime/runtime_config.hpp>
-#include <evm_runtime/config_wrapper.hpp>
 #include <silkworm/core/types/block.hpp>
 #include <silkworm/core/execution/processor.hpp>
 
@@ -23,8 +22,7 @@ class [[eosio::contract]] evm_contract : public contract
 {
 public:
    using contract::contract;
-   evm_contract(eosio::name receiver, eosio::name code, const datastream<const char*>& ds) : contract(receiver, code, ds), _config(get_self()) {}
-
+   evm_contract(eosio::name receiver, eosio::name code, const datastream<const char*>& ds);
 
    /**
     * @brief Initialize EVM contract
@@ -117,24 +115,15 @@ public:
 
 private:
    void open_internal_balance(eosio::name owner);
-   config_wrapper _config;
+   std::shared_ptr<struct config_wrapper> _config;
 
    enum class status_flags : uint32_t
    {
       frozen = 0x1
    };
 
-   void assert_inited()
-   {
-      check(_config.exists(), "contract not initialized");
-      check(_config.get_version() == 0u, "unsupported configuration singleton");
-   }
-
-   void assert_unfrozen()
-   {
-      assert_inited();
-      check((_config.get_status() & static_cast<uint32_t>(status_flags::frozen)) == 0, "contract is frozen");
-   }
+   void assert_inited();
+   void assert_unfrozen();
 
    silkworm::Receipt execute_tx(const runtime_config& rc, eosio::name miner, silkworm::Block& block, const transaction& tx, silkworm::ExecutionProcessor& ep);
    void process_filtered_messages(const std::vector<silkworm::FilteredMessage>& filtered_messages);

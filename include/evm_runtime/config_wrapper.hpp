@@ -3,14 +3,10 @@
 #include <eosio/asset.hpp>
 #include <eosio/time.hpp>
 #include <eosio/singleton.hpp>
-
+#include <evm_runtime/tables.hpp>
 namespace evm_runtime {
 
-using eosio::check;
-
 struct fee_parameters;
-struct config;
-
 struct config_wrapper {
 
     config_wrapper(eosio::name self);
@@ -41,9 +37,7 @@ struct config_wrapper {
     void set_status(uint32_t status);
 
     uint64_t get_evm_version()const;
-
     uint64_t get_evm_version_and_maybe_promote();
-
     void set_evm_version(uint64_t new_version);
 
     void set_fee_parameters(const fee_parameters& fee_params,
@@ -58,7 +52,7 @@ private:
 
     bool _dirty  = false;
     bool _exists = false;
-    config* _cached_config;
+    config _cached_config;
 
     eosio::name _self;
     eosio::singleton<"config"_n, config> _config;
