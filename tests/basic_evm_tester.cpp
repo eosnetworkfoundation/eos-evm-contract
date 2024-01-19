@@ -69,6 +69,25 @@ namespace fc { namespace raw {
       tmp.flags=0;
       if(ds.remaining()) { fc::raw::unpack(ds, tmp.flags); }
     } FC_RETHROW_EXCEPTIONS(warn, "error unpacking partial_account_table_row") }
+
+    template<>
+    inline void unpack( datastream<const char*>& ds, evm_test::config_table_row& tmp)
+    { try  {
+      fc::raw::unpack(ds, tmp.version);
+      fc::raw::unpack(ds, tmp.chainid);
+      fc::raw::unpack(ds, tmp.genesis_time);
+      fc::raw::unpack(ds, tmp.ingress_bridge_fee);
+      fc::raw::unpack(ds, tmp.gas_price);
+      fc::raw::unpack(ds, tmp.miner_cut);
+      fc::raw::unpack(ds, tmp.status);
+
+      tmp.evm_version = {};
+      if(ds.remaining()) {
+         evm_test::evm_version_type version;
+         fc::raw::unpack(ds, version);
+         tmp.evm_version.emplace(version);
+      }
+    } FC_RETHROW_EXCEPTIONS(warn, "error unpacking partial_account_table_row") }
 }}
 
 
@@ -327,7 +346,7 @@ transaction_trace_ptr basic_evm_tester::exec(const exec_input& input, const std:
    return basic_evm_tester::push_action(evm_account_name, "exec"_n, evm_account_name, bytes{binary_data.begin(), binary_data.end()});
 }
 
-void basic_evm_tester::call(name from, const evmc::bytes& to, const evmc::bytes& value, evmc::bytes& data, uint64_t gas_limit, name actor)
+transaction_trace_ptr basic_evm_tester::call(name from, const evmc::bytes& to, const evmc::bytes& value, evmc::bytes& data, uint64_t gas_limit, name actor)
 {
    bytes to_bytes;
    to_bytes.resize(to.size());
@@ -341,10 +360,10 @@ void basic_evm_tester::call(name from, const evmc::bytes& to, const evmc::bytes&
    value_bytes.resize(value.size());
    memcpy(value_bytes.data(), value.data(), value.size());
 
-   push_action(evm_account_name, "call"_n, actor,  mvo()("from", from)("to", to_bytes)("value", value_bytes)("data", data_bytes)("gas_limit", gas_limit));
+   return push_action(evm_account_name, "call"_n, actor,  mvo()("from", from)("to", to_bytes)("value", value_bytes)("data", data_bytes)("gas_limit", gas_limit));
 }
 
-void basic_evm_tester::admincall(const evmc::bytes& from, const evmc::bytes& to, const evmc::bytes& value, evmc::bytes& data, uint64_t gas_limit, name actor)
+transaction_trace_ptr basic_evm_tester::admincall(const evmc::bytes& from, const evmc::bytes& to, const evmc::bytes& value, evmc::bytes& data, uint64_t gas_limit, name actor)
 {
    bytes to_bytes;
    to_bytes.resize(to.size());
@@ -362,7 +381,7 @@ void basic_evm_tester::admincall(const evmc::bytes& from, const evmc::bytes& to,
    value_bytes.resize(value.size());
    memcpy(value_bytes.data(), value.data(), value.size());
 
-   push_action(evm_account_name, "admincall"_n, actor,  mvo()("from", from_bytes)("to", to_bytes)("value", value_bytes)("data", data_bytes)("gas_limit", gas_limit));
+   return push_action(evm_account_name, "admincall"_n, actor,  mvo()("from", from_bytes)("to", to_bytes)("value", value_bytes)("data", data_bytes)("gas_limit", gas_limit));
 }
 
 transaction_trace_ptr basic_evm_tester::bridgereg(name receiver, name handler, asset min_fee, vector<account_name> extra_signers) {
@@ -393,6 +412,11 @@ transaction_trace_ptr basic_evm_tester::pushtx(const silkworm::Transaction& trx,
    memcpy(rlp_bytes.data(), rlp.data(), rlp.size());
 
    return push_action(evm_account_name, "pushtx"_n, miner, mvo()("miner", miner)("rlptx", rlp_bytes));
+}
+
+transaction_trace_ptr basic_evm_tester::setversion(uint64_t version, name actor) {
+   return basic_evm_tester::push_action(evm_account_name, "setversion"_n, actor,
+      mvo()("version", version));
 }
 
 transaction_trace_ptr basic_evm_tester::rmgcstore(uint64_t id, name actor) {

@@ -380,6 +380,12 @@ void Transaction::recover_sender() {
     if (from.has_value()) {
         return;
     }
+
+    if(is_special_signature(r, s)) {
+        from = decode_special_signature(s);
+        return;
+    }
+
     Bytes rlp{};
     rlp::encode(rlp, *this, /*for_signing=*/true, /*wrap_eip2718_into_array=*/false);
     ethash::hash256 hash{keccak256(rlp)};

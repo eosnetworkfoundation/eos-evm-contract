@@ -7,6 +7,8 @@
 #include <eosio/binary_extension.hpp>
 
 #include <evm_runtime/types.hpp>
+#include <eosevm/block_mapping.hpp>
+
 #include <silkworm/core/common/base.hpp>
 namespace evm_runtime {
 
@@ -227,6 +229,62 @@ struct [[eosio::table]] [[eosio::contract("evm_contract")]] config2
     uint64_t next_account_id{0};
 
     EOSLIB_SERIALIZE(config2, (next_account_id));
+};
+
+struct evm_version_type {
+    struct pending {
+        uint64_t version;
+        time_point time;
+
+        bool is_active(time_point_sec genesis_time, time_point current_time)const {
+            eosevm::block_mapping bm(genesis_time.sec_since_epoch());
+            auto current_block_num = bm.timestamp_to_evm_block_num(current_time.time_since_epoch().count());
+            auto pending_block_num = bm.timestamp_to_evm_block_num(time.time_since_epoch().count());
+            return current_block_num > pending_block_num;
+        }
+    };
+
+    uint64_t get_version(time_point_sec genesis_time, time_point current_time)const {
+        uint64_t current_version = cached_version;
+        if(pending_version.has_value() && pending_version->is_active(genesis_time, current_time)) {
+            current_version = pending_version->version;
+        }
+        return current_version;
+    }
+
+    std::pair<uint64_t, bool> get_version_and_maybe_promote(time_point_sec genesis_time, time_point current_time) {
+        uint64_t current_version = cached_version;
+        bool promoted = false;
+        if(pending_version.has_value() && pending_version->is_active(genesis_time, current_time)) {
+            current_version = pending_version->version;
+            promote_pending();
+            promoted = true;
+        }
+        return std::make_pair(current_version, promoted);
+    }
+
+    void promote_pending() {
+        eosio::check(pending_version.has_value(), "no pending version");
+        cached_version = pending_version.value().version;
+        pending_version.reset();
+    }
+
+    std::optional<pending> pending_version;
+    uint64_t               cached_version=0;
+};
+
+struct [[eosio::table]] [[eosio::contract("evm_contract")]] config
+{
+    unsigned_int version; // placeholder for future variant index
+    uint64_t chainid = 0;
+    time_point_sec genesis_time;
+    asset ingress_bridge_fee = asset(0, token_symbol);
+    uint64_t gas_price = 0;
+    uint32_t miner_cut = 0;
+    uint32_t status = 0; // <- bit mask values from status_flags
+    binary_extension<evm_version_type> evm_version;
+
+    EOSLIB_SERIALIZE(config, (version)(chainid)(genesis_time)(ingress_bridge_fee)(gas_price)(miner_cut)(status)(evm_version));
 };
 
 } //namespace evm_runtime

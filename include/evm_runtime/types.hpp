@@ -2,6 +2,7 @@
 
 #include <eosio/eosio.hpp>
 #include <eosio/name.hpp>
+#include <eosio/asset.hpp>
 #include <eosio/symbol.hpp>
 #include <intx/intx.hpp>
 #include <evmc/evmc.hpp>
@@ -11,6 +12,7 @@
 
 namespace evm_runtime {
    using intx::operator""_u256;
+   static constexpr uint32_t hundred_percent = 100'000;
 
    constexpr unsigned evm_precision = 18;
    constexpr eosio::name token_account(eosio::name(TOKEN_ACCOUNT_NAME));
@@ -75,6 +77,29 @@ namespace evm_runtime {
 
    using bridge_message = std::variant<bridge_message_v0>;
 
+   struct evmtx_v0 {
+      uint64_t  eos_evm_version;
+      bytes     rlptx;
+
+      EOSLIB_SERIALIZE(evmtx_v0, (eos_evm_version)(rlptx));
+   };
+
+   using evmtx_type = std::variant<evmtx_v0>;
+
+   struct fee_parameters
+   {
+      std::optional<uint64_t> gas_price; ///< Minimum gas price (in 10^-18 EOS, aka wei) that is enforced on all
+                                          ///< transactions. Required during initialization.
+
+      std::optional<uint32_t> miner_cut; ///< Percentage cut (maximum allowed value of 100,000 which equals 100%) of the
+                                          ///< gas fee collected for a transaction that is sent to the indicated miner of
+                                          ///< that transaction. Required during initialization.
+
+      std::optional<eosio::asset> ingress_bridge_fee; ///< Fee (in EOS) deducted from ingress transfers of EOS across bridge.
+                                             ///< Symbol must be in EOS and quantity must be non-negative. If not
+                                             ///< provided during initialization, the default fee of 0 will be used.
+   };
+
 } //namespace evm_runtime
 
 namespace eosio {
@@ -88,3 +113,14 @@ inline datastream<Stream>& operator>>(datastream<Stream>& ds, evm_runtime::uint2
 }
 
 } //namespace eosio
+
+namespace std {
+template <typename DataStream>
+DataStream& operator<<(DataStream& ds, const std::basic_string<uint8_t>& bs)
+{
+   ds << (eosio::unsigned_int)bs.size();
+   if (bs.size())
+      ds.write((const char*)bs.data(), bs.size());
+   return ds;
+}
+} // namespace std

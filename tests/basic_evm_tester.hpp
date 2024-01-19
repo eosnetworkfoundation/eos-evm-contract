@@ -48,6 +48,23 @@ void to_variant(const evmc::address& o, fc::variant& v);
 
 namespace evm_test {
 
+struct evmtx_v0 {
+   uint64_t  eos_evm_version;
+   bytes     rlptx;
+};
+
+using evmtx_type = std::variant<evmtx_v0>;
+
+struct evm_version_type {
+   struct pending {
+      uint64_t version;
+      fc::time_point time;
+   };
+
+   std::optional<pending> pending_version;
+   uint64_t               cached_version=0;
+};
+
 struct config_table_row
 {
    unsigned_int version;
@@ -57,6 +74,7 @@ struct config_table_row
    uint64_t gas_price;
    uint32_t miner_cut;
    uint32_t status;
+   std::optional<evm_version_type> evm_version;
 };
 
 struct config2_table_row
@@ -159,8 +177,9 @@ using bridge_message = std::variant<bridge_message_v0>;
 } // namespace evm_test
 
 
-FC_REFLECT(evm_test::config_table_row,
-           (version)(chainid)(genesis_time)(ingress_bridge_fee)(gas_price)(miner_cut)(status))
+FC_REFLECT(evm_test::config_table_row, (version)(chainid)(genesis_time)(ingress_bridge_fee)(gas_price)(miner_cut)(status)(evm_version))
+FC_REFLECT(evm_test::evm_version_type, (pending_version)(cached_version))
+FC_REFLECT(evm_test::evm_version_type::pending, (version)(time))
 FC_REFLECT(evm_test::config2_table_row,(next_account_id))
 FC_REFLECT(evm_test::balance_and_dust, (balance)(dust));
 FC_REFLECT(evm_test::account_object, (id)(address)(nonce)(balance))
@@ -175,6 +194,7 @@ FC_REFLECT(evm_test::message_receiver, (account)(handler)(min_fee)(flags));
 FC_REFLECT(evm_test::bridge_message_v0, (receiver)(sender)(timestamp)(value)(data));
 FC_REFLECT(evm_test::gcstore, (id)(storage_id));
 FC_REFLECT(evm_test::account_code, (id)(ref_count)(code)(code_hash));
+FC_REFLECT(evm_test::evmtx_v0, (eos_evm_version)(rlptx));
 
 namespace evm_test {
 class evm_eoa
@@ -379,8 +399,9 @@ public:
    transaction_trace_ptr exec(const exec_input& input, const std::optional<exec_callback>& callback);
    transaction_trace_ptr assertnonce(name account, uint64_t next_nonce);
    transaction_trace_ptr pushtx(const silkworm::Transaction& trx, name miner = evm_account_name);
-   void call(name from, const evmc::bytes& to, const evmc::bytes& value, evmc::bytes& data, uint64_t gas_limit, name actor);
-   void admincall(const evmc::bytes& from, const evmc::bytes& to, const evmc::bytes& value, evmc::bytes& data, uint64_t gas_limit, name actor);
+   transaction_trace_ptr setversion(uint64_t version, name actor);
+   transaction_trace_ptr call(name from, const evmc::bytes& to, const evmc::bytes& value, evmc::bytes& data, uint64_t gas_limit, name actor);
+   transaction_trace_ptr admincall(const evmc::bytes& from, const evmc::bytes& to, const evmc::bytes& value, evmc::bytes& data, uint64_t gas_limit, name actor);
    evmc::address deploy_contract(evm_eoa& eoa, evmc::bytes bytecode);
 
    void addegress(const std::vector<name>& accounts);
