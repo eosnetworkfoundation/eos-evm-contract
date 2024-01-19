@@ -40,13 +40,13 @@ using namespace silkworm;
 evm_contract::evm_contract(eosio::name receiver, eosio::name code, const datastream<const char*>& ds) : 
         contract(receiver, code, ds), _config(std::make_shared<config_wrapper>(get_self())) {}
 
-inline void evm_contract::assert_inited()
+void evm_contract::assert_inited()
 {
     check(_config->exists(), "contract not initialized");
     check(_config->get_version() == 0u, "unsupported configuration singleton");
 }
 
-inline void evm_contract::assert_unfrozen()
+void evm_contract::assert_unfrozen()
 {
     assert_inited();
     check((_config->get_status() & static_cast<uint32_t>(status_flags::frozen)) == 0, "contract is frozen");
