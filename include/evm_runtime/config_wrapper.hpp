@@ -43,6 +43,9 @@ struct config_wrapper {
     void set_fee_parameters(const fee_parameters& fee_params,
                             bool allow_any_to_be_unspecified);
 
+    void update_gas_params(double kb_price);
+    std::pair<const gas_parameter_type::gas_parameter_data_type &, bool> get_gas_param_maybe_update();
+
 private:
     bool is_dirty()const;
     void set_dirty();

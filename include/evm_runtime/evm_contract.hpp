@@ -85,8 +85,19 @@ public:
 
    [[eosio::action]] void setversion(uint64_t version);
 
+   [[eosio::action]] void updtgasparam(double kb_ram_price);
+
    // Events
    [[eosio::action]] void evmtx(eosio::ignore<evm_runtime::evmtx_type> event){
+      eosio::check(get_sender() == get_self(), "forbidden to call");
+   };
+
+   // Events
+   [[eosio::action]] void configchgdv1(eosio::ignore<uint64_t> gas_txnnewaccount, 
+                                       eosio::ignore<uint64_t> gas_newaccount,
+                                       eosio::ignore<uint64_t> gas_txcreate,
+                                       eosio::ignore<uint64_t> gas_codedeposit,
+                                       eosio::ignore<uint64_t> gas_sset) {
       eosio::check(get_sender() == get_self(), "forbidden to call");
    };
 

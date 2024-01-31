@@ -144,6 +144,58 @@ void config_wrapper::set_fee_parameters(const fee_parameters& fee_params,
     set_dirty();
 }
 
+void config_wrapper::update_gas_params(double kb_ram_price) {
+
+    // for simplicity, just ensure last (cached) evm_version >= 1, not touching promote logic
+    eosio::check(_cached_config.evm_version.has_value() && _cached_config.evm_version->cached_version >= 1,
+        "required evm_version at least 1");
+
+    if (!_cached_config.gas_parameter.has_value()) {
+        _cached_config.gas_parameter = gas_parameter_type();
+    }
+    gas_parameter_type &param = *(_cached_config.gas_parameter);
+
+    double gas_per_byte_f = 
+        (kb_ram_price * 1e18 / (1024.0)) / (_cached_config.gas_price * (100000 - _cached_config.miner_cut) / 100000);
+
+    // round up to multiple of 8 bytes
+    constexpr uint64_t account_bytes = 352;
+    constexpr uint64_t contract_fixed_bytes = 606;
+    constexpr uint64_t storage_slot_bytes = 352;
+
+    eosio::check(gas_per_byte_f >= 0.0, "gas per byte can not be negative");
+    eosio::check(gas_per_byte_f * contract_fixed_bytes < (double)(0x7ffffffffffull), "gas per byte excceed limit");
+
+    uint64_t gas_per_byte = (uint64_t)(gas_per_byte_f + 1.0);
+
+    param.pending = gas_parameter_type::gas_parameter_data_v1 {
+        .gas_txnewaccount = account_bytes * gas_per_byte,
+        .gas_newaccount = account_bytes * gas_per_byte,
+        .gas_txcreate = contract_fixed_bytes * gas_per_byte,
+        .gas_codedeposit = gas_per_byte,
+        .gas_sset = 100 + storage_slot_bytes * gas_per_byte
+    };
+    param.pending_time = get_current_time();
+
+    set_dirty();
+}
+
+std::pair<const gas_parameter_type::gas_parameter_data_type &, bool> config_wrapper::get_gas_param_maybe_update() {
+    if (!_cached_config.gas_parameter.has_value()) {
+        _cached_config.gas_parameter = gas_parameter_type();
+        set_dirty();
+        return std::pair<const gas_parameter_type::gas_parameter_data_type &, bool>(_cached_config.gas_parameter->current, false);
+    }
+
+    auto pair = _cached_config.gas_parameter->get_gas_param_maybe_update(_cached_config.genesis_time, get_current_time());
+
+    if (pair.second) {
+        set_dirty();
+    }
+
+    return pair;
+}
+
 bool config_wrapper::is_dirty()const {
     return _dirty;
 }

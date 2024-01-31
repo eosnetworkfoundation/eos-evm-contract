@@ -422,6 +422,11 @@ void evm_contract::process_tx(const runtime_config& rc, eosio::name miner, const
 
     auto current_version = _config->get_evm_version_and_maybe_promote();
 
+    std::pair<const gas_parameter_type::gas_parameter_data_type &, bool> gas_param_pair = _config->get_gas_param_maybe_update();
+    if (gas_param_pair.second) {
+        eosio::check(current_version >= 1, "gas parameter change not allowed if evm_version is 0");
+    }
+
     std::optional<std::pair<const std::string, const ChainConfig*>> found_chain_config = lookup_known_chain(_config->get_chainid());
     check( found_chain_config.has_value(), "failed to find expected chain config" );
 
@@ -452,6 +457,19 @@ void evm_contract::process_tx(const runtime_config& rc, eosio::name miner, const
 
     engine.finalize(ep.state(), ep.evm().block());
     ep.state().write_to_db(ep.evm().block().header.number);
+
+    if (gas_param_pair.second) {
+        const auto& gas_param_v1 = std::get<gas_parameter_type::gas_parameter_data_v1>(gas_param_pair.first);
+        action(std::vector<permission_level>{}, get_self(), "configchgdv1"_n, 
+            std::tuple<uint64_t, uint64_t, uint64_t, uint64_t, uint64_t>(
+                gas_param_v1.gas_txnewaccount,
+                gas_param_v1.gas_newaccount,
+                gas_param_v1.gas_txcreate,
+                gas_param_v1.gas_codedeposit,
+                gas_param_v1.gas_sset
+        )).send();
+    }
+
     if (current_version >= 1) {
         auto event = evmtx_type{evmtx_v0{current_version, txn.get_rlptx()}};
         action(std::vector<permission_level>{}, get_self(), "evmtx"_n, event)
@@ -781,6 +799,11 @@ void evm_contract::assertnonce(eosio::name account, uint64_t next_nonce) {
 void evm_contract::setversion(uint64_t version) {
     require_auth(get_self());
     _config->set_evm_version(version);
+}
+
+void evm_contract::updtgasparam(double kb_ram_price) {
+    require_auth(get_self());
+    _config->update_gas_params(kb_ram_price);
 }
 
 } //evm_runtime

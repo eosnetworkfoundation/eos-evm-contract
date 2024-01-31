@@ -273,6 +273,41 @@ struct evm_version_type {
     uint64_t               cached_version=0;
 };
 
+struct gas_parameter_type {
+    struct gas_parameter_data_v1 {
+        uint64_t gas_txnewaccount = 0;
+        uint64_t gas_newaccount = 0;
+        uint64_t gas_txcreate = 0;
+        uint64_t gas_codedeposit = 0;
+        uint64_t gas_sset = 0;
+    };
+
+    using gas_parameter_data_type = std::variant<gas_parameter_data_v1>;
+
+    gas_parameter_data_type                  current;
+    std::optional<gas_parameter_data_type>   pending;
+    time_point                               pending_time;
+
+    bool is_active(time_point_sec genesis_time, time_point current_time)const {
+        eosevm::block_mapping bm(genesis_time.sec_since_epoch());
+        auto current_block_num = bm.timestamp_to_evm_block_num(current_time.time_since_epoch().count());
+        auto pending_block_num = bm.timestamp_to_evm_block_num(pending_time.time_since_epoch().count());
+        return current_block_num > pending_block_num;
+    }
+
+    std::pair<const gas_parameter_data_type &, bool> get_gas_param_maybe_update(
+        time_point_sec genesis_time, time_point current_time) {
+        if (pending.has_value() && is_active(genesis_time, current_time)) {
+            current = *pending;
+            pending.reset();
+            pending_time = time_point();
+            // don't use make_pair as it create ref to temp objects
+            return std::pair<const gas_parameter_data_type &, bool>(current, true);
+        }
+        return std::pair<const gas_parameter_data_type &, bool>(current, false);
+    }
+};
+
 struct [[eosio::table]] [[eosio::contract("evm_contract")]] config
 {
     unsigned_int version; // placeholder for future variant index
@@ -283,8 +318,9 @@ struct [[eosio::table]] [[eosio::contract("evm_contract")]] config
     uint32_t miner_cut = 0;
     uint32_t status = 0; // <- bit mask values from status_flags
     binary_extension<evm_version_type> evm_version;
+    binary_extension<gas_parameter_type> gas_parameter;
 
-    EOSLIB_SERIALIZE(config, (version)(chainid)(genesis_time)(ingress_bridge_fee)(gas_price)(miner_cut)(status)(evm_version));
+    EOSLIB_SERIALIZE(config, (version)(chainid)(genesis_time)(ingress_bridge_fee)(gas_price)(miner_cut)(status)(evm_version)(gas_parameter));
 };
 
 } //namespace evm_runtime
