@@ -422,9 +422,10 @@ void evm_contract::process_tx(const runtime_config& rc, eosio::name miner, const
 
     auto current_version = _config->get_evm_version_and_maybe_promote();
 
-    std::pair<const gas_parameter_type::gas_parameter_data_type &, bool> gas_param_pair = _config->get_gas_param_maybe_update();
+    std::pair<const gas_parameter_data_type &, bool> gas_param_pair = _config->get_gas_param_maybe_update();
     if (gas_param_pair.second) {
-        eosio::check(current_version >= 1, "gas parameter change not allowed if evm_version is 0");
+        // should not happen
+        eosio::check(current_version >= 1, "gas param change requires evm_version >= 1");
     }
 
     std::optional<std::pair<const std::string, const ChainConfig*>> found_chain_config = lookup_known_chain(_config->get_chainid());
@@ -459,15 +460,8 @@ void evm_contract::process_tx(const runtime_config& rc, eosio::name miner, const
     ep.state().write_to_db(ep.evm().block().header.number);
 
     if (gas_param_pair.second) {
-        const auto& gas_param_v1 = std::get<gas_parameter_type::gas_parameter_data_v1>(gas_param_pair.first);
-        action(std::vector<permission_level>{}, get_self(), "configchgdv1"_n, 
-            std::tuple<uint64_t, uint64_t, uint64_t, uint64_t, uint64_t>(
-                gas_param_v1.gas_txnewaccount,
-                gas_param_v1.gas_newaccount,
-                gas_param_v1.gas_txcreate,
-                gas_param_v1.gas_codedeposit,
-                gas_param_v1.gas_sset
-        )).send();
+        action(std::vector<permission_level>{}, get_self(), 
+               "configchange"_n, gas_param_pair.first).send();
     }
 
     if (current_version >= 1) {
@@ -801,9 +795,23 @@ void evm_contract::setversion(uint64_t version) {
     _config->set_evm_version(version);
 }
 
-void evm_contract::updtgasparam(double kb_ram_price) {
+void evm_contract::updtgasparam(eosio::asset ram_price_mb, std::optional<uint64_t> minimum_gas_price) {
     require_auth(get_self());
-    _config->update_gas_params(kb_ram_price);
+    _config->update_gas_params(ram_price_mb, minimum_gas_price);
+}
+
+void evm_contract::updtgaspara2(uint64_t gas_txnewaccount, 
+                                uint64_t gas_newaccount, 
+                                uint64_t gas_txcreate, 
+                                uint64_t gas_codedeposit, 
+                                uint64_t gas_sset) {
+    require_auth(get_self());
+    _config->update_gas_params2(gas_txnewaccount,
+                                gas_newaccount,
+                                gas_txcreate,
+                                gas_codedeposit,
+                                gas_sset,
+                                std::optional<uint64_t>() /* min_gas_price*/);
 }
 
 } //evm_runtime

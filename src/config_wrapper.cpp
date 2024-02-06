@@ -65,12 +65,14 @@ void config_wrapper::set_ingress_bridge_fee(const eosio::asset& ingress_bridge_f
 }
 
 uint64_t config_wrapper::get_gas_price()const {
-    return _cached_config.gas_price;
-}
-
-void config_wrapper::set_gas_price(uint64_t gas_price) {
-    _cached_config.gas_price = gas_price;
-    set_dirty();
+    uint64_t gas_price = _cached_config.gas_price;
+    if (_cached_config.gas_parameter.has_value() && 
+        _cached_config.gas_parameter->will_update(_cached_config.genesis_time, get_current_time())) {
+        std::visit([&](const auto &v) {
+            if (v.minimum_gas_price) gas_price = v.minimum_gas_price;
+        }, *(_cached_config.gas_parameter->pending));
+    }
+    return gas_price;
 }
 
 uint32_t config_wrapper::get_miner_cut()const {
@@ -121,7 +123,18 @@ void config_wrapper::set_fee_parameters(const fee_parameters& fee_params,
                         bool allow_any_to_be_unspecified)
 {
     if (fee_params.gas_price.has_value()) {
-        _cached_config.gas_price = *fee_params.gas_price;
+        if (_cached_config.evm_version.has_value() && _cached_config.evm_version->cached_version >= 1) {
+            // activate in the next evm block
+            this->update_gas_params2(std::optional<uint64_t>(), /* gas_txnewaccount */
+                                     std::optional<uint64_t>(), /* gas_newaccount */
+                                     std::optional<uint64_t>(), /* gas_txcreate */
+                                     std::optional<uint64_t>(), /* gas_codedeposit */
+                                     std::optional<uint64_t>(), /* gas_sset */
+                                     *fee_params.gas_price      /* minimum_gas_price */
+            );
+        } else {
+            _cached_config.gas_price = *fee_params.gas_price;
+        }
     } else {
         eosio::check(allow_any_to_be_unspecified, "All required fee parameters not specified: missing gas_price");
     }
@@ -144,52 +157,80 @@ void config_wrapper::set_fee_parameters(const fee_parameters& fee_params,
     set_dirty();
 }
 
-void config_wrapper::update_gas_params(double kb_ram_price) {
+void config_wrapper::update_gas_params(eosio::asset ram_price_mb, std::optional<uint64_t> minimum_gas_price) {
 
-    // for simplicity, just ensure last (cached) evm_version >= 1, not touching promote logic
-    eosio::check(_cached_config.evm_version.has_value() && _cached_config.evm_version->cached_version >= 1,
-        "required evm_version at least 1");
+    uint64_t gas_price = (minimum_gas_price.has_value() && *minimum_gas_price) > 0 ?
+                         *minimum_gas_price : _cached_config.gas_price;
+    eosio::check(ram_price_mb.symbol == token_symbol, "invalid price symbol");
 
-    if (!_cached_config.gas_parameter.has_value()) {
-        _cached_config.gas_parameter = gas_parameter_type();
-    }
-    gas_parameter_type &param = *(_cached_config.gas_parameter);
+    double gas_per_byte_f = (ram_price_mb.amount / 10000.0 * 1e18 / (1024.0 * 1024.0)) / 
+        (gas_price * (double)(100000 - _cached_config.miner_cut) / 100000.0);
 
-    double gas_per_byte_f = 
-        (kb_ram_price * 1e18 / (1024.0)) / (_cached_config.gas_price * (100000 - _cached_config.miner_cut) / 100000);
-
-    // round up to multiple of 8 bytes
-    constexpr uint64_t account_bytes = 352;
+    constexpr uint64_t account_bytes = 347;
     constexpr uint64_t contract_fixed_bytes = 606;
-    constexpr uint64_t storage_slot_bytes = 352;
+    constexpr uint64_t storage_slot_bytes = 346;
 
-    eosio::check(gas_per_byte_f >= 0.0, "gas per byte can not be negative");
-    eosio::check(gas_per_byte_f * contract_fixed_bytes < (double)(0x7ffffffffffull), "gas per byte excceed limit");
+    eosio::check(gas_per_byte_f >= 0.0, "gas_per_byte must >= 0");
+    eosio::check(gas_per_byte_f * contract_fixed_bytes < (double)(0x7ffffffffffull), "gas_per_byte too big");
 
     uint64_t gas_per_byte = (uint64_t)(gas_per_byte_f + 1.0);
 
-    param.pending = gas_parameter_type::gas_parameter_data_v1 {
-        .gas_txnewaccount = account_bytes * gas_per_byte,
-        .gas_newaccount = account_bytes * gas_per_byte,
-        .gas_txcreate = contract_fixed_bytes * gas_per_byte,
-        .gas_codedeposit = gas_per_byte,
-        .gas_sset = 100 + storage_slot_bytes * gas_per_byte
-    };
-    param.pending_time = get_current_time();
+    this->update_gas_params2(account_bytes * gas_per_byte, /* gas_txnewaccount */
+                             account_bytes * gas_per_byte, /* gas_newaccount */
+                             contract_fixed_bytes * gas_per_byte, /*gas_txcreate*/
+                             gas_per_byte,/*gas_codedeposit*/
+                             100 + storage_slot_bytes * gas_per_byte,/*gas_sset*/
+                             minimum_gas_price /*minimum_gas_price*/
+    );
+}
 
+void config_wrapper::update_gas_params2(std::optional<uint64_t> gas_txnewaccount, std::optional<uint64_t> gas_newaccount, std::optional<uint64_t> gas_txcreate, std::optional<uint64_t> gas_codedeposit, std::optional<uint64_t> gas_sset, std::optional<uint64_t> minimum_gas_price)
+{
+    // for simplicity, ensure last (cached) evm_version >= 1, not touching promote logic
+    eosio::check(_cached_config.evm_version.has_value() && _cached_config.evm_version->cached_version >= 1,
+        "evm_version must >= 1");
+
+    // for simplcity, wait for at least 1 trx to trigger the creation of _cached_config.gas_parameter
+    eosio::check(_cached_config.gas_parameter.has_value(), "current gas_parameter must exist");
+
+    gas_parameter_type &param = *(_cached_config.gas_parameter);
+
+    gas_parameter_data_type new_pending = (param.pending.has_value() ? *(param.pending) : param.current);
+
+    std::visit([&](auto & v) {
+        if (gas_txnewaccount.has_value()) v.gas_txnewaccount = *gas_txnewaccount;
+        if (gas_newaccount.has_value()) v.gas_newaccount = *gas_newaccount;
+        if (gas_txcreate.has_value()) v.gas_txcreate = *gas_txcreate;
+        if (gas_codedeposit.has_value()) v.gas_codedeposit = *gas_codedeposit;
+        if (gas_sset.has_value()) v.gas_sset = *gas_sset;
+        if (minimum_gas_price.has_value()) {
+            v.minimum_gas_price = *minimum_gas_price;
+        } else if (v.minimum_gas_price == 0) {
+            v.minimum_gas_price = _cached_config.gas_price;
+        }
+    }, new_pending);
+
+    param.pending = new_pending;
+    param.pending_time = get_current_time();
     set_dirty();
 }
 
-std::pair<const gas_parameter_type::gas_parameter_data_type &, bool> config_wrapper::get_gas_param_maybe_update() {
+std::pair<const gas_parameter_data_type &, bool> config_wrapper::get_gas_param_maybe_update() {
     if (!_cached_config.gas_parameter.has_value()) {
         _cached_config.gas_parameter = gas_parameter_type();
         set_dirty();
-        return std::pair<const gas_parameter_type::gas_parameter_data_type &, bool>(_cached_config.gas_parameter->current, false);
+        return std::pair<const gas_parameter_data_type &, bool>(_cached_config.gas_parameter->current, false);
     }
 
     auto pair = _cached_config.gas_parameter->get_gas_param_maybe_update(_cached_config.genesis_time, get_current_time());
 
-    if (pair.second) {
+    if (pair.second) { // update
+        // populate minimum_gas_price to config only if minimum_gas_price > 0
+        uint64_t minimum_gas_price = 0;
+        std::visit([&](const auto &v) {
+            minimum_gas_price = v.minimum_gas_price;
+        }, pair.first);
+        if (minimum_gas_price) _cached_config.gas_price = minimum_gas_price;
         set_dirty();
     }
 

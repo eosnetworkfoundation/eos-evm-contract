@@ -7,6 +7,7 @@
 #include <eosio/binary_extension.hpp>
 
 #include <evm_runtime/types.hpp>
+#include <evm_runtime/runtime_config.hpp>
 #include <eosevm/block_mapping.hpp>
 
 #include <silkworm/core/common/base.hpp>
@@ -274,15 +275,6 @@ struct evm_version_type {
 };
 
 struct gas_parameter_type {
-    struct gas_parameter_data_v1 {
-        uint64_t gas_txnewaccount = 0;
-        uint64_t gas_newaccount = 0;
-        uint64_t gas_txcreate = 0;
-        uint64_t gas_codedeposit = 0;
-        uint64_t gas_sset = 0;
-    };
-
-    using gas_parameter_data_type = std::variant<gas_parameter_data_v1>;
 
     gas_parameter_data_type                  current;
     std::optional<gas_parameter_data_type>   pending;
@@ -295,9 +287,13 @@ struct gas_parameter_type {
         return current_block_num > pending_block_num;
     }
 
+    bool will_update(time_point_sec genesis_time, time_point current_time) const {
+        return (pending.has_value() && is_active(genesis_time, current_time));
+    }
+
     std::pair<const gas_parameter_data_type &, bool> get_gas_param_maybe_update(
         time_point_sec genesis_time, time_point current_time) {
-        if (pending.has_value() && is_active(genesis_time, current_time)) {
+        if (will_update(genesis_time, current_time)) {
             current = *pending;
             pending.reset();
             pending_time = time_point();
