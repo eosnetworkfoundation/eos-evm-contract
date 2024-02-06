@@ -280,20 +280,17 @@ struct gas_parameter_type {
     std::optional<gas_parameter_data_type>   pending;
     time_point                               pending_time;
 
-    bool is_active(time_point_sec genesis_time, time_point current_time)const {
+    bool is_pending_active(time_point_sec genesis_time, time_point current_time)const {
+        if (!pending.has_value()) return false;
         eosevm::block_mapping bm(genesis_time.sec_since_epoch());
         auto current_block_num = bm.timestamp_to_evm_block_num(current_time.time_since_epoch().count());
         auto pending_block_num = bm.timestamp_to_evm_block_num(pending_time.time_since_epoch().count());
         return current_block_num > pending_block_num;
     }
 
-    bool will_update(time_point_sec genesis_time, time_point current_time) const {
-        return (pending.has_value() && is_active(genesis_time, current_time));
-    }
-
-    std::pair<const gas_parameter_data_type &, bool> get_gas_param_maybe_update(
+    std::pair<const gas_parameter_data_type &, bool> get_gas_param_and_maybe_promote(
         time_point_sec genesis_time, time_point current_time) {
-        if (will_update(genesis_time, current_time)) {
+        if (is_pending_active(genesis_time, current_time)) {
             current = *pending;
             pending.reset();
             pending_time = time_point();
@@ -301,6 +298,14 @@ struct gas_parameter_type {
             return std::pair<const gas_parameter_data_type &, bool>(current, true);
         }
         return std::pair<const gas_parameter_data_type &, bool>(current, false);
+    }
+
+    template <typename Visitor>
+    void update_gas_param(Visitor visitor_fn, time_point current_time) {
+        gas_parameter_data_type new_pending = (pending.has_value() ? *pending : current);
+        std::visit(visitor_fn, new_pending);   
+        pending = new_pending;
+        pending_time = current_time;
     }
 };
 

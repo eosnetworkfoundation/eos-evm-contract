@@ -67,7 +67,7 @@ void config_wrapper::set_ingress_bridge_fee(const eosio::asset& ingress_bridge_f
 uint64_t config_wrapper::get_gas_price()const {
     uint64_t gas_price = _cached_config.gas_price;
     if (_cached_config.gas_parameter.has_value() && 
-        _cached_config.gas_parameter->will_update(_cached_config.genesis_time, get_current_time())) {
+        _cached_config.gas_parameter->is_pending_active(_cached_config.genesis_time, get_current_time())) {
         std::visit([&](const auto &v) {
             if (v.minimum_gas_price) gas_price = v.minimum_gas_price;
         }, *(_cached_config.gas_parameter->pending));
@@ -193,11 +193,7 @@ void config_wrapper::update_gas_params2(std::optional<uint64_t> gas_txnewaccount
     // for simplcity, wait for at least 1 trx to trigger the creation of _cached_config.gas_parameter
     eosio::check(_cached_config.gas_parameter.has_value(), "current gas_parameter must exist");
 
-    gas_parameter_type &param = *(_cached_config.gas_parameter);
-
-    gas_parameter_data_type new_pending = (param.pending.has_value() ? *(param.pending) : param.current);
-
-    std::visit([&](auto & v) {
+    _cached_config.gas_parameter->update_gas_param([&](auto & v) {
         if (gas_txnewaccount.has_value()) v.gas_txnewaccount = *gas_txnewaccount;
         if (gas_newaccount.has_value()) v.gas_newaccount = *gas_newaccount;
         if (gas_txcreate.has_value()) v.gas_txcreate = *gas_txcreate;
@@ -208,21 +204,19 @@ void config_wrapper::update_gas_params2(std::optional<uint64_t> gas_txnewaccount
         } else if (v.minimum_gas_price == 0) {
             v.minimum_gas_price = _cached_config.gas_price;
         }
-    }, new_pending);
+    }, get_current_time());
 
-    param.pending = new_pending;
-    param.pending_time = get_current_time();
     set_dirty();
 }
 
-std::pair<const gas_parameter_data_type &, bool> config_wrapper::get_gas_param_maybe_update() {
+std::pair<const gas_parameter_data_type &, bool> config_wrapper::get_gas_param_and_maybe_promote() {
     if (!_cached_config.gas_parameter.has_value()) {
         _cached_config.gas_parameter = gas_parameter_type();
         set_dirty();
         return std::pair<const gas_parameter_data_type &, bool>(_cached_config.gas_parameter->current, false);
     }
 
-    auto pair = _cached_config.gas_parameter->get_gas_param_maybe_update(_cached_config.genesis_time, get_current_time());
+    auto pair = _cached_config.gas_parameter->get_gas_param_and_maybe_promote(_cached_config.genesis_time, get_current_time());
 
     if (pair.second) { // update
         // populate minimum_gas_price to config only if minimum_gas_price > 0

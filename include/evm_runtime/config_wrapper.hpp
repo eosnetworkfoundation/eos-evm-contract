@@ -45,7 +45,7 @@ struct config_wrapper {
     void update_gas_params(eosio::asset ram_price_mb, std::optional<uint64_t> minimum_gas_price);
     void update_gas_params2(std::optional<uint64_t> gas_txnewaccount, std::optional<uint64_t> gas_newaccount, std::optional<uint64_t> gas_txcreate, std::optional<uint64_t> gas_codedeposit, std::optional<uint64_t> gas_sset, std::optional<uint64_t> minimum_gas_price);
 
-    std::pair<const gas_parameter_data_type &, bool> get_gas_param_maybe_update();
+    std::pair<const gas_parameter_data_type &, bool> get_gas_param_and_maybe_promote();
 
 private:
     bool is_dirty()const;
