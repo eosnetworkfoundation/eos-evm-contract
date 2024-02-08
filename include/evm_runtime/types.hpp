@@ -12,6 +12,7 @@
 
 namespace evm_runtime {
    using intx::operator""_u256;
+   static constexpr uint32_t ninety_percent = 90'000;
    static constexpr uint32_t hundred_percent = 100'000;
 
    constexpr unsigned evm_precision = 18;

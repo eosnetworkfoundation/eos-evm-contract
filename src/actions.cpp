@@ -422,7 +422,7 @@ void evm_contract::process_tx(const runtime_config& rc, eosio::name miner, const
 
     auto current_version = _config->get_evm_version_and_maybe_promote();
 
-    std::pair<const gas_parameter_data_type &, bool> gas_param_pair = _config->get_gas_param_and_maybe_promote();
+    std::pair<const consensus_parameter_data_type &, bool> gas_param_pair = _config->get_consensus_param_and_maybe_promote();
     if (gas_param_pair.second) {
         // should not happen
         eosio::check(current_version >= 1, "gas param change requires evm_version >= 1");
@@ -795,12 +795,12 @@ void evm_contract::setversion(uint64_t version) {
     _config->set_evm_version(version);
 }
 
-void evm_contract::updtgasparam(eosio::asset ram_price_mb, std::optional<uint64_t> minimum_gas_price) {
+void evm_contract::updtgasparam(eosio::asset ram_price_mb, uint64_t minimum_gas_price) {
     require_auth(get_self());
     _config->update_gas_params(ram_price_mb, minimum_gas_price);
 }
 
-void evm_contract::updtgaspara2(uint64_t gas_txnewaccount, 
+void evm_contract::setgasparam(uint64_t gas_txnewaccount, 
                                 uint64_t gas_newaccount, 
                                 uint64_t gas_txcreate, 
                                 uint64_t gas_codedeposit, 

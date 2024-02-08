@@ -66,11 +66,11 @@ void config_wrapper::set_ingress_bridge_fee(const eosio::asset& ingress_bridge_f
 
 uint64_t config_wrapper::get_gas_price()const {
     uint64_t gas_price = _cached_config.gas_price;
-    if (_cached_config.gas_parameter.has_value() && 
-        _cached_config.gas_parameter->is_pending_active(_cached_config.genesis_time, get_current_time())) {
+    if (_cached_config.consensus_parameter.has_value() && 
+        _cached_config.consensus_parameter->is_pending_active(_cached_config.genesis_time, get_current_time())) {
         std::visit([&](const auto &v) {
             if (v.minimum_gas_price) gas_price = v.minimum_gas_price;
-        }, *(_cached_config.gas_parameter->pending));
+        }, *(_cached_config.consensus_parameter->pending));
     }
     return gas_price;
 }
@@ -80,6 +80,7 @@ uint32_t config_wrapper::get_miner_cut()const {
 }
 
 void config_wrapper::set_miner_cut(uint32_t miner_cut) {
+    eosio::check(miner_cut <= ninety_percent, "miner_cut must <= 90%");
     _cached_config.miner_cut = miner_cut;
     set_dirty();
 }
@@ -123,6 +124,7 @@ void config_wrapper::set_fee_parameters(const fee_parameters& fee_params,
                         bool allow_any_to_be_unspecified)
 {
     if (fee_params.gas_price.has_value()) {
+        eosio::check(*fee_params.gas_price >= 1000000000ull, "gas_price must >= 1Gwei");
         if (_cached_config.evm_version.has_value() && _cached_config.evm_version->cached_version >= 1) {
             // activate in the next evm block
             this->update_gas_params2(std::optional<uint64_t>(), /* gas_txnewaccount */
@@ -140,8 +142,7 @@ void config_wrapper::set_fee_parameters(const fee_parameters& fee_params,
     }
 
     if (fee_params.miner_cut.has_value()) {
-        eosio::check(*fee_params.miner_cut <= hundred_percent, "miner_cut cannot exceed 100,000 (100%)");
-
+        eosio::check(*fee_params.miner_cut <= ninety_percent, "miner_cut must <= 90%");
         _cached_config.miner_cut = *fee_params.miner_cut;
     } else {
         eosio::check(allow_any_to_be_unspecified, "All required fee parameters not specified: missing miner_cut");
@@ -157,14 +158,13 @@ void config_wrapper::set_fee_parameters(const fee_parameters& fee_params,
     set_dirty();
 }
 
-void config_wrapper::update_gas_params(eosio::asset ram_price_mb, std::optional<uint64_t> minimum_gas_price) {
+void config_wrapper::update_gas_params(eosio::asset ram_price_mb, uint64_t minimum_gas_price) {
 
-    uint64_t gas_price = (minimum_gas_price.has_value() && *minimum_gas_price) > 0 ?
-                         *minimum_gas_price : _cached_config.gas_price;
     eosio::check(ram_price_mb.symbol == token_symbol, "invalid price symbol");
+    eosio::check(minimum_gas_price >= 1000000000ull, "gas_price must >= 1Gwei");
 
     double gas_per_byte_f = (ram_price_mb.amount / 10000.0 * 1e18 / (1024.0 * 1024.0)) / 
-        (gas_price * (double)(100000 - _cached_config.miner_cut) / 100000.0);
+        (minimum_gas_price * (double)(100000 - _cached_config.miner_cut) / 100000.0);
 
     constexpr uint64_t account_bytes = 347;
     constexpr uint64_t contract_fixed_bytes = 606;
@@ -190,15 +190,19 @@ void config_wrapper::update_gas_params2(std::optional<uint64_t> gas_txnewaccount
     eosio::check(_cached_config.evm_version.has_value() && _cached_config.evm_version->cached_version >= 1,
         "evm_version must >= 1");
 
-    // for simplcity, wait for at least 1 trx to trigger the creation of _cached_config.gas_parameter
-    eosio::check(_cached_config.gas_parameter.has_value(), "current gas_parameter must exist");
+    // for simplcity, wait for at least 1 trx to trigger the creation of _cached_config.consensus_parameter
+    eosio::check(_cached_config.consensus_parameter.has_value(), "consensus_parameter must exist");
 
-    _cached_config.gas_parameter->update_gas_param([&](auto & v) {
-        if (gas_txnewaccount.has_value()) v.gas_txnewaccount = *gas_txnewaccount;
-        if (gas_newaccount.has_value()) v.gas_newaccount = *gas_newaccount;
-        if (gas_txcreate.has_value()) v.gas_txcreate = *gas_txcreate;
-        if (gas_codedeposit.has_value()) v.gas_codedeposit = *gas_codedeposit;
-        if (gas_sset.has_value()) v.gas_sset = *gas_sset;
+    if (minimum_gas_price.has_value()) {
+        eosio::check(*minimum_gas_price >= 1000000000ull, "gas_price must >= 1Gwei");
+    }
+
+    _cached_config.consensus_parameter->update_consensus_param([&](auto & v) {
+        if (gas_txnewaccount.has_value()) v.gas_parameter.gas_txnewaccount = *gas_txnewaccount;
+        if (gas_newaccount.has_value()) v.gas_parameter.gas_newaccount = *gas_newaccount;
+        if (gas_txcreate.has_value()) v.gas_parameter.gas_txcreate = *gas_txcreate;
+        if (gas_codedeposit.has_value()) v.gas_parameter.gas_codedeposit = *gas_codedeposit;
+        if (gas_sset.has_value()) v.gas_parameter.gas_sset = *gas_sset;
         if (minimum_gas_price.has_value()) {
             v.minimum_gas_price = *minimum_gas_price;
         } else if (v.minimum_gas_price == 0) {
@@ -209,14 +213,14 @@ void config_wrapper::update_gas_params2(std::optional<uint64_t> gas_txnewaccount
     set_dirty();
 }
 
-std::pair<const gas_parameter_data_type &, bool> config_wrapper::get_gas_param_and_maybe_promote() {
-    if (!_cached_config.gas_parameter.has_value()) {
-        _cached_config.gas_parameter = gas_parameter_type();
+std::pair<const consensus_parameter_data_type &, bool> config_wrapper::get_consensus_param_and_maybe_promote() {
+    if (!_cached_config.consensus_parameter.has_value()) {
+        _cached_config.consensus_parameter = consensus_parameter_type();
         set_dirty();
-        return std::pair<const gas_parameter_data_type &, bool>(_cached_config.gas_parameter->current, false);
+        return std::pair<const consensus_parameter_data_type &, bool>(_cached_config.consensus_parameter->current, false);
     }
 
-    auto pair = _cached_config.gas_parameter->get_gas_param_and_maybe_promote(_cached_config.genesis_time, get_current_time());
+    auto pair = _cached_config.consensus_parameter->get_consensus_param_and_maybe_promote(_cached_config.genesis_time, get_current_time());
 
     if (pair.second) { // update
         // populate minimum_gas_price to config only if minimum_gas_price > 0

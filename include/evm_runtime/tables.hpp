@@ -274,10 +274,10 @@ struct evm_version_type {
     uint64_t               cached_version=0;
 };
 
-struct gas_parameter_type {
+struct consensus_parameter_type {
 
-    gas_parameter_data_type                  current;
-    std::optional<gas_parameter_data_type>   pending;
+    consensus_parameter_data_type                  current;
+    std::optional<consensus_parameter_data_type>   pending;
     time_point                               pending_time;
 
     bool is_pending_active(time_point_sec genesis_time, time_point current_time)const {
@@ -288,21 +288,21 @@ struct gas_parameter_type {
         return current_block_num > pending_block_num;
     }
 
-    std::pair<const gas_parameter_data_type &, bool> get_gas_param_and_maybe_promote(
+    std::pair<const consensus_parameter_data_type &, bool> get_consensus_param_and_maybe_promote(
         time_point_sec genesis_time, time_point current_time) {
         if (is_pending_active(genesis_time, current_time)) {
             current = *pending;
             pending.reset();
             pending_time = time_point();
             // don't use make_pair as it create ref to temp objects
-            return std::pair<const gas_parameter_data_type &, bool>(current, true);
+            return std::pair<const consensus_parameter_data_type &, bool>(current, true);
         }
-        return std::pair<const gas_parameter_data_type &, bool>(current, false);
+        return std::pair<const consensus_parameter_data_type &, bool>(current, false);
     }
 
     template <typename Visitor>
-    void update_gas_param(Visitor visitor_fn, time_point current_time) {
-        gas_parameter_data_type new_pending = (pending.has_value() ? *pending : current);
+    void update_consensus_param(Visitor visitor_fn, time_point current_time) {
+        consensus_parameter_data_type new_pending = (pending.has_value() ? *pending : current);
         std::visit(visitor_fn, new_pending);   
         pending = new_pending;
         pending_time = current_time;
@@ -319,9 +319,9 @@ struct [[eosio::table]] [[eosio::contract("evm_contract")]] config
     uint32_t miner_cut = 0;
     uint32_t status = 0; // <- bit mask values from status_flags
     binary_extension<evm_version_type> evm_version;
-    binary_extension<gas_parameter_type> gas_parameter;
+    binary_extension<consensus_parameter_type> consensus_parameter;
 
-    EOSLIB_SERIALIZE(config, (version)(chainid)(genesis_time)(ingress_bridge_fee)(gas_price)(miner_cut)(status)(evm_version)(gas_parameter));
+    EOSLIB_SERIALIZE(config, (version)(chainid)(genesis_time)(ingress_bridge_fee)(gas_price)(miner_cut)(status)(evm_version)(consensus_parameter));
 };
 
 } //namespace evm_runtime
