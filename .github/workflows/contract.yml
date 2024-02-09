@@ -67,7 +67,7 @@ jobs:
         with:
           owner: AntelopeIO
           repo: leap
-          target: 'release/5.0'
+          target: '^5.0.1'
           prereleases: false
           file: 'leap-dev.*ubuntu22\.04_amd64.deb'
           container-package: experimental-binaries
