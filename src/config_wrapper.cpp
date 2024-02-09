@@ -179,7 +179,7 @@ void config_wrapper::update_gas_params(eosio::asset ram_price_mb, uint64_t minim
                              account_bytes * gas_per_byte, /* gas_newaccount */
                              contract_fixed_bytes * gas_per_byte, /*gas_txcreate*/
                              gas_per_byte,/*gas_codedeposit*/
-                             100 + storage_slot_bytes * gas_per_byte,/*gas_sset*/
+                             2900 + storage_slot_bytes * gas_per_byte,/*gas_sset*/
                              minimum_gas_price /*minimum_gas_price*/
     );
 }
@@ -202,7 +202,10 @@ void config_wrapper::update_gas_params2(std::optional<uint64_t> gas_txnewaccount
         if (gas_newaccount.has_value()) v.gas_parameter.gas_newaccount = *gas_newaccount;
         if (gas_txcreate.has_value()) v.gas_parameter.gas_txcreate = *gas_txcreate;
         if (gas_codedeposit.has_value()) v.gas_parameter.gas_codedeposit = *gas_codedeposit;
-        if (gas_sset.has_value()) v.gas_parameter.gas_sset = *gas_sset;
+        if (gas_sset.has_value()) {
+            eosio::check(*gas_sset >= 2900, "G_sset must >= 2900");
+            v.gas_parameter.gas_sset = *gas_sset;
+        }
         if (minimum_gas_price.has_value()) {
             v.minimum_gas_price = *minimum_gas_price;
         } else if (v.minimum_gas_price == 0) {
