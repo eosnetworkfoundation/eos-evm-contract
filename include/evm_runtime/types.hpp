@@ -14,6 +14,7 @@ namespace evm_runtime {
    using intx::operator""_u256;
    static constexpr uint32_t ninety_percent = 90'000;
    static constexpr uint32_t hundred_percent = 100'000;
+   static constexpr uint64_t one_gwei = 1'000'000'000ull;
 
    constexpr unsigned evm_precision = 18;
    constexpr eosio::name token_account(eosio::name(TOKEN_ACCOUNT_NAME));

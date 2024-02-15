@@ -274,26 +274,28 @@ struct evm_version_type {
     uint64_t               cached_version=0;
 };
 
+struct pending_consensus_parameter_data_type {
+    consensus_parameter_data_type  data;
+    time_point                     pending_time;
+};
 struct consensus_parameter_type {
 
-    consensus_parameter_data_type                  current;
-    std::optional<consensus_parameter_data_type>   pending;
-    time_point                               pending_time;
+    consensus_parameter_data_type                          current;
+    std::optional<pending_consensus_parameter_data_type>   pending;
 
     bool is_pending_active(time_point_sec genesis_time, time_point current_time)const {
         if (!pending.has_value()) return false;
         eosevm::block_mapping bm(genesis_time.sec_since_epoch());
         auto current_block_num = bm.timestamp_to_evm_block_num(current_time.time_since_epoch().count());
-        auto pending_block_num = bm.timestamp_to_evm_block_num(pending_time.time_since_epoch().count());
+        auto pending_block_num = bm.timestamp_to_evm_block_num(pending->pending_time.time_since_epoch().count());
         return current_block_num > pending_block_num;
     }
 
     std::pair<const consensus_parameter_data_type &, bool> get_consensus_param_and_maybe_promote(
         time_point_sec genesis_time, time_point current_time) {
         if (is_pending_active(genesis_time, current_time)) {
-            current = *pending;
+            current = pending->data;
             pending.reset();
-            pending_time = time_point();
             // don't use make_pair as it create ref to temp objects
             return std::pair<const consensus_parameter_data_type &, bool>(current, true);
         }
@@ -302,10 +304,12 @@ struct consensus_parameter_type {
 
     template <typename Visitor>
     void update_consensus_param(Visitor visitor_fn, time_point current_time) {
-        consensus_parameter_data_type new_pending = (pending.has_value() ? *pending : current);
-        std::visit(visitor_fn, new_pending);   
-        pending = new_pending;
-        pending_time = current_time;
+        consensus_parameter_data_type new_pending = (pending.has_value() ? pending->data : current);
+        std::visit(visitor_fn, new_pending);
+        pending = pending_consensus_parameter_data_type{
+            .data = new_pending, 
+            .pending_time = current_time
+        };
     }
 };
 

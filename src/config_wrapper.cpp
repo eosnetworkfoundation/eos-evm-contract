@@ -9,6 +9,15 @@ config_wrapper::config_wrapper(eosio::name self) : _self(self), _config(self, se
     if(_exists) {
         _cached_config = _config.get();
     }
+    if (!_cached_config.consensus_parameter.has_value()){
+        _cached_config.consensus_parameter = consensus_parameter_type();
+    }
+    std::visit([&](auto &v) {
+        if (v.minimum_gas_price == 0) {
+            v.minimum_gas_price = _cached_config.gas_price;
+            // don't set dirty, as trxs can be read-only
+        }
+    }, _cached_config.consensus_parameter->current);
 }
 
 config_wrapper::~config_wrapper() {
@@ -69,8 +78,8 @@ uint64_t config_wrapper::get_gas_price()const {
     if (_cached_config.consensus_parameter.has_value() && 
         _cached_config.consensus_parameter->is_pending_active(_cached_config.genesis_time, get_current_time())) {
         std::visit([&](const auto &v) {
-            if (v.minimum_gas_price) gas_price = v.minimum_gas_price;
-        }, *(_cached_config.consensus_parameter->pending));
+            gas_price = v.minimum_gas_price;
+        }, _cached_config.consensus_parameter->pending->data);
     }
     return gas_price;
 }
@@ -190,8 +199,8 @@ void config_wrapper::update_gas_params2(std::optional<uint64_t> gas_txnewaccount
     eosio::check(_cached_config.evm_version.has_value() && _cached_config.evm_version->cached_version >= 1,
         "evm_version must >= 1");
 
-    // for simplcity, wait for at least 1 trx to trigger the creation of _cached_config.consensus_parameter
-    eosio::check(_cached_config.consensus_parameter.has_value(), "consensus_parameter must exist");
+    // should not happen
+    eosio::check(_cached_config.consensus_parameter.has_value(), "consensus_parameter not exist");
 
     if (minimum_gas_price.has_value()) {
         eosio::check(*minimum_gas_price >= 1000000000ull, "gas_price must >= 1Gwei");
@@ -206,32 +215,22 @@ void config_wrapper::update_gas_params2(std::optional<uint64_t> gas_txnewaccount
             eosio::check(*gas_sset >= 2900, "G_sset must >= 2900");
             v.gas_parameter.gas_sset = *gas_sset;
         }
-        if (minimum_gas_price.has_value()) {
-            v.minimum_gas_price = *minimum_gas_price;
-        } else if (v.minimum_gas_price == 0) {
-            v.minimum_gas_price = _cached_config.gas_price;
-        }
+        if (minimum_gas_price.has_value()) v.minimum_gas_price = *minimum_gas_price;
     }, get_current_time());
 
     set_dirty();
 }
 
 std::pair<const consensus_parameter_data_type &, bool> config_wrapper::get_consensus_param_and_maybe_promote() {
-    if (!_cached_config.consensus_parameter.has_value()) {
-        _cached_config.consensus_parameter = consensus_parameter_type();
-        set_dirty();
-        return std::pair<const consensus_parameter_data_type &, bool>(_cached_config.consensus_parameter->current, false);
-    }
+
+    // should not happen
+    eosio::check(_cached_config.consensus_parameter.has_value(), "consensus_parameter not exist");
 
     auto pair = _cached_config.consensus_parameter->get_consensus_param_and_maybe_promote(_cached_config.genesis_time, get_current_time());
-
-    if (pair.second) { // update
-        // populate minimum_gas_price to config only if minimum_gas_price > 0
-        uint64_t minimum_gas_price = 0;
+    if (pair.second) {
         std::visit([&](const auto &v) {
-            minimum_gas_price = v.minimum_gas_price;
+            _cached_config.gas_price = v.minimum_gas_price;
         }, pair.first);
-        if (minimum_gas_price) _cached_config.gas_price = minimum_gas_price;
         set_dirty();
     }
 
