@@ -419,6 +419,24 @@ transaction_trace_ptr basic_evm_tester::setversion(uint64_t version, name actor)
       mvo()("version", version));
 }
 
+transaction_trace_ptr basic_evm_tester::updtgasparam(asset ram_price_mb, uint64_t minimum_gas_price, name actor) {
+   return basic_evm_tester::push_action(evm_account_name, "updtgasparam"_n, actor,
+      mvo()("ram_price_mb", ram_price_mb)("minimum_gas_price", minimum_gas_price));
+}
+
+transaction_trace_ptr basic_evm_tester::setgasparam(uint64_t gas_txnewaccount, 
+                                uint64_t gas_newaccount, 
+                                uint64_t gas_txcreate, 
+                                uint64_t gas_codedeposit, 
+                                uint64_t gas_sset, name actor) {
+   return basic_evm_tester::push_action(evm_account_name, "setgasparam"_n, actor,
+      mvo()("gas_txnewaccount", gas_txnewaccount)
+           ("gas_newaccount", gas_newaccount)
+           ("gas_txcreate", gas_txcreate)
+           ("gas_codedeposit", gas_codedeposit)
+           ("gas_sset", gas_sset));
+}
+
 transaction_trace_ptr basic_evm_tester::rmgcstore(uint64_t id, name actor) {
    return basic_evm_tester::push_action(evm_account_name, "rmgcstore"_n, actor,
       mvo()("id", id));
