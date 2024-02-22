@@ -97,6 +97,7 @@ public:
    [[eosio::action]] void configchange(consensus_parameter_data_type consensus_parameter_data) {
       eosio::check(get_sender() == get_self(), "forbidden to call");
    };
+   using configchange_action = eosio::action_wrapper<"configchange"_n, &evm_contract::configchange>;
 
 #ifdef WITH_ADMIN_ACTIONS
    [[eosio::action]] void rmgcstore(uint64_t id);

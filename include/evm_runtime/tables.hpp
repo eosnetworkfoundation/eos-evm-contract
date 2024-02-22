@@ -291,6 +291,15 @@ struct consensus_parameter_type {
         return current_block_num > pending_block_num;
     }
 
+    // Reference invalidated by get_consensus_param_and_maybe_promote and update_consensus_param.
+    const consensus_parameter_data_type& get_consensus_param(
+        time_point_sec genesis_time, time_point current_time) const {
+        if (is_pending_active(genesis_time, current_time)) {
+            return pending->data;
+        }
+        return current;
+    }
+
     std::pair<const consensus_parameter_data_type &, bool> get_consensus_param_and_maybe_promote(
         time_point_sec genesis_time, time_point current_time) {
         if (is_pending_active(genesis_time, current_time)) {

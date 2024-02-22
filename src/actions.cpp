@@ -460,8 +460,8 @@ void evm_contract::process_tx(const runtime_config& rc, eosio::name miner, const
     ep.state().write_to_db(ep.evm().block().header.number);
 
     if (gas_param_pair.second) {
-        action(std::vector<permission_level>{}, get_self(), 
-               "configchange"_n, gas_param_pair.first).send();
+        configchange_action act{get_self(), std::vector<eosio::permission_level>()};
+        act.send(gas_param_pair.first);
     }
 
     if (current_version >= 1) {
