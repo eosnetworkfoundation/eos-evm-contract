@@ -42,8 +42,8 @@ struct config_wrapper {
     void set_fee_parameters(const fee_parameters& fee_params,
                             bool allow_any_to_be_unspecified);
 
-    void update_gas_params(eosio::asset ram_price_mb, uint64_t minimum_gas_price);
-    void update_gas_params2(std::optional<uint64_t> gas_txnewaccount, std::optional<uint64_t> gas_newaccount, std::optional<uint64_t> gas_txcreate, std::optional<uint64_t> gas_codedeposit, std::optional<uint64_t> gas_sset, std::optional<uint64_t> minimum_gas_price);
+    void update_consensus_parameters(eosio::asset ram_price_mb, uint64_t minimum_gas_price);
+    void update_consensus_parameters2(std::optional<uint64_t> gas_txnewaccount, std::optional<uint64_t> gas_newaccount, std::optional<uint64_t> gas_txcreate, std::optional<uint64_t> gas_codedeposit, std::optional<uint64_t> gas_sset, std::optional<uint64_t> minimum_gas_price);
 
     std::pair<const consensus_parameter_data_type &, bool> get_consensus_param_and_maybe_promote();
 

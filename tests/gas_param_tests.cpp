@@ -60,12 +60,6 @@ BOOST_FIXTURE_TEST_CASE(basic, gas_param_evm_tester) try {
     produce_block();
     produce_block();
 
-    // require promoted evm_version larger or equal to 1
-    BOOST_REQUIRE_EXCEPTION(
-        updtgasparam(asset(10'0000, native_symbol), 1'000'000'000, evm_account_name),
-        eosio_assert_message_exception,
-        eosio_assert_message_is("evm_version must >= 1"));
-
     // kick of setverion, evmtx event generated
     {
         evm_eoa recipient;
@@ -104,7 +98,7 @@ BOOST_FIXTURE_TEST_CASE(basic, gas_param_evm_tester) try {
     BOOST_REQUIRE_EXCEPTION(
         setgasparam(21000,21000,21000,21000,2899, evm_account_name),
         eosio_assert_message_exception,
-        eosio_assert_message_is("G_sset must >= 2900"));
+        eosio_assert_message_is("gas_sset too small"));
 
     updtgasparam(asset(10'0000, native_symbol), 1'000'000'000, evm_account_name);
 

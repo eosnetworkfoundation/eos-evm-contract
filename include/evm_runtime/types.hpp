@@ -15,6 +15,7 @@ namespace evm_runtime {
    static constexpr uint32_t ninety_percent = 90'000;
    static constexpr uint32_t hundred_percent = 100'000;
    static constexpr uint64_t one_gwei = 1'000'000'000ull;
+   static constexpr uint64_t gas_sset_min = 2900;
 
    constexpr unsigned evm_precision = 18;
    constexpr eosio::name token_account(eosio::name(TOKEN_ACCOUNT_NAME));

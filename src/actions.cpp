@@ -797,7 +797,7 @@ void evm_contract::setversion(uint64_t version) {
 
 void evm_contract::updtgasparam(eosio::asset ram_price_mb, uint64_t minimum_gas_price) {
     require_auth(get_self());
-    _config->update_gas_params(ram_price_mb, minimum_gas_price);
+    _config->update_consensus_parameters(ram_price_mb, minimum_gas_price);
 }
 
 void evm_contract::setgasparam(uint64_t gas_txnewaccount, 
@@ -806,7 +806,7 @@ void evm_contract::setgasparam(uint64_t gas_txnewaccount,
                                 uint64_t gas_codedeposit, 
                                 uint64_t gas_sset) {
     require_auth(get_self());
-    _config->update_gas_params2(gas_txnewaccount,
+    _config->update_consensus_parameters2(gas_txnewaccount,
                                 gas_newaccount,
                                 gas_txcreate,
                                 gas_codedeposit,

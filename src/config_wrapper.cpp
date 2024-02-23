@@ -127,9 +127,9 @@ void config_wrapper::set_fee_parameters(const fee_parameters& fee_params,
 {
     if (fee_params.gas_price.has_value()) {
         eosio::check(*fee_params.gas_price >= one_gwei, "gas_price must >= 1Gwei");
-        if (_cached_config.evm_version.has_value() && _cached_config.evm_version->cached_version >= 1) {
+        if (get_evm_version() >= 1) {
             // activate in the next evm block
-            this->update_gas_params2(std::optional<uint64_t>(), /* gas_txnewaccount */
+            this->update_consensus_parameters2(std::optional<uint64_t>(), /* gas_txnewaccount */
                                      std::optional<uint64_t>(), /* gas_newaccount */
                                      std::optional<uint64_t>(), /* gas_txcreate */
                                      std::optional<uint64_t>(), /* gas_codedeposit */
@@ -164,7 +164,7 @@ void config_wrapper::set_fee_parameters(const fee_parameters& fee_params,
     set_dirty();
 }
 
-void config_wrapper::update_gas_params(eosio::asset ram_price_mb, uint64_t minimum_gas_price) {
+void config_wrapper::update_consensus_parameters(eosio::asset ram_price_mb, uint64_t minimum_gas_price) {
 
     eosio::check(ram_price_mb.symbol == token_symbol, "invalid price symbol");
     eosio::check(minimum_gas_price >= one_gwei, "gas_price must >= 1Gwei");
@@ -175,25 +175,25 @@ void config_wrapper::update_gas_params(eosio::asset ram_price_mb, uint64_t minim
     constexpr uint64_t contract_fixed_bytes = 606;
     constexpr uint64_t storage_slot_bytes = 346;
 
+    constexpr uint64_t max_gas_per_byte = (1ull << 43) - 1;
+
     eosio::check(gas_per_byte_f >= 0.0, "gas_per_byte must >= 0");
-    eosio::check(gas_per_byte_f * contract_fixed_bytes < (double)(0x7ffffffffffull), "gas_per_byte too big");
+    eosio::check(gas_per_byte_f * contract_fixed_bytes < (double)(max_gas_per_byte), "gas_per_byte too big");
 
     uint64_t gas_per_byte = (uint64_t)(gas_per_byte_f + 1.0);
 
-    this->update_gas_params2(account_bytes * gas_per_byte, /* gas_txnewaccount */
+    this->update_consensus_parameters2(account_bytes * gas_per_byte, /* gas_txnewaccount */
                              account_bytes * gas_per_byte, /* gas_newaccount */
                              contract_fixed_bytes * gas_per_byte, /*gas_txcreate*/
                              gas_per_byte,/*gas_codedeposit*/
-                             2900 + storage_slot_bytes * gas_per_byte,/*gas_sset*/
+                             gas_sset_min + storage_slot_bytes * gas_per_byte,/*gas_sset*/
                              minimum_gas_price /*minimum_gas_price*/
     );
 }
 
-void config_wrapper::update_gas_params2(std::optional<uint64_t> gas_txnewaccount, std::optional<uint64_t> gas_newaccount, std::optional<uint64_t> gas_txcreate, std::optional<uint64_t> gas_codedeposit, std::optional<uint64_t> gas_sset, std::optional<uint64_t> minimum_gas_price)
+void config_wrapper::update_consensus_parameters2(std::optional<uint64_t> gas_txnewaccount, std::optional<uint64_t> gas_newaccount, std::optional<uint64_t> gas_txcreate, std::optional<uint64_t> gas_codedeposit, std::optional<uint64_t> gas_sset, std::optional<uint64_t> minimum_gas_price)
 {
-    // for simplicity, ensure last (cached) evm_version >= 1, not touching promote logic
-    eosio::check(_cached_config.evm_version.has_value() && _cached_config.evm_version->cached_version >= 1,
-        "evm_version must >= 1");
+    eosio::check(get_evm_version() >= 1, "evm_version must >= 1");
 
     // should not happen
     eosio::check(_cached_config.consensus_parameter.has_value(), "consensus_parameter not exist");
@@ -208,7 +208,7 @@ void config_wrapper::update_gas_params2(std::optional<uint64_t> gas_txnewaccount
         if (gas_txcreate.has_value()) v.gas_parameter.gas_txcreate = *gas_txcreate;
         if (gas_codedeposit.has_value()) v.gas_parameter.gas_codedeposit = *gas_codedeposit;
         if (gas_sset.has_value()) {
-            eosio::check(*gas_sset >= 2900, "G_sset must >= 2900");
+            eosio::check(*gas_sset >= gas_sset_min, "gas_sset too small");
             v.gas_parameter.gas_sset = *gas_sset;
         }
         if (minimum_gas_price.has_value()) v.minimum_gas_price = *minimum_gas_price;
