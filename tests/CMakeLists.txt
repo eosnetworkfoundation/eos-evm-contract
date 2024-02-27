@@ -30,6 +30,7 @@ add_eosio_test_executable( unit_test
     ${CMAKE_SOURCE_DIR}/native_token_tests.cpp
     ${CMAKE_SOURCE_DIR}/mapping_tests.cpp
     ${CMAKE_SOURCE_DIR}/gas_fee_tests.cpp
+    ${CMAKE_SOURCE_DIR}/gas_param_tests.cpp
     ${CMAKE_SOURCE_DIR}/blockhash_tests.cpp
     ${CMAKE_SOURCE_DIR}/exec_tests.cpp
     ${CMAKE_SOURCE_DIR}/call_tests.cpp

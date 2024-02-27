@@ -422,6 +422,12 @@ void evm_contract::process_tx(const runtime_config& rc, eosio::name miner, const
 
     auto current_version = _config->get_evm_version_and_maybe_promote();
 
+    std::pair<const consensus_parameter_data_type &, bool> gas_param_pair = _config->get_consensus_param_and_maybe_promote();
+    if (gas_param_pair.second) {
+        // should not happen
+        eosio::check(current_version >= 1, "gas param change requires evm_version >= 1");
+    }
+
     std::optional<std::pair<const std::string, const ChainConfig*>> found_chain_config = lookup_known_chain(_config->get_chainid());
     check( found_chain_config.has_value(), "failed to find expected chain config" );
 
@@ -452,6 +458,12 @@ void evm_contract::process_tx(const runtime_config& rc, eosio::name miner, const
 
     engine.finalize(ep.state(), ep.evm().block());
     ep.state().write_to_db(ep.evm().block().header.number);
+
+    if (gas_param_pair.second) {
+        configchange_action act{get_self(), std::vector<eosio::permission_level>()};
+        act.send(gas_param_pair.first);
+    }
+
     if (current_version >= 1) {
         auto event = evmtx_type{evmtx_v0{current_version, txn.get_rlptx()}};
         action(std::vector<permission_level>{}, get_self(), "evmtx"_n, event)
@@ -781,6 +793,25 @@ void evm_contract::assertnonce(eosio::name account, uint64_t next_nonce) {
 void evm_contract::setversion(uint64_t version) {
     require_auth(get_self());
     _config->set_evm_version(version);
+}
+
+void evm_contract::updtgasparam(eosio::asset ram_price_mb, uint64_t minimum_gas_price) {
+    require_auth(get_self());
+    _config->update_consensus_parameters(ram_price_mb, minimum_gas_price);
+}
+
+void evm_contract::setgasparam(uint64_t gas_txnewaccount, 
+                                uint64_t gas_newaccount, 
+                                uint64_t gas_txcreate, 
+                                uint64_t gas_codedeposit, 
+                                uint64_t gas_sset) {
+    require_auth(get_self());
+    _config->update_consensus_parameters2(gas_txnewaccount,
+                                gas_newaccount,
+                                gas_txcreate,
+                                gas_codedeposit,
+                                gas_sset,
+                                std::optional<uint64_t>() /* min_gas_price*/);
 }
 
 } //evm_runtime

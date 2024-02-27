@@ -84,26 +84,36 @@ try {
    BOOST_CHECK_EQUAL(conf1.miner_cut, starting_miner_cut);
    BOOST_CHECK_EQUAL(conf1.ingress_bridge_fee, make_asset(starting_ingress_bridge_fee_amount));
 
-   // Cannot set miner_cut to above 100%.
-   BOOST_REQUIRE_EXCEPTION(setfeeparams({.miner_cut = 100'001}),
+   // Cannot set miner_cut to above 90%.
+   BOOST_REQUIRE_EXCEPTION(setfeeparams({.miner_cut = 90'001}),
                            eosio_assert_message_exception,
-                           eosio_assert_message_is("miner_cut cannot exceed 100,000 (100%)"));
+                           eosio_assert_message_is("miner_cut must <= 90%"));
 
-   // Change only miner_cut to 100%.
-   setfeeparams({.miner_cut = 100'000});
+   // Change only miner_cut to 90%.
+   setfeeparams({.miner_cut = 90'000});
 
    const auto& conf2 = get_config();
 
    BOOST_CHECK_EQUAL(conf2.gas_price, conf1.gas_price);
-   BOOST_CHECK_EQUAL(conf2.miner_cut, 100'000);
+   BOOST_CHECK_EQUAL(conf2.miner_cut, 90'000);
    BOOST_CHECK_EQUAL(conf2.ingress_bridge_fee, conf1.ingress_bridge_fee);
 
-   // Change only gas_price to 0
-   setfeeparams({.gas_price = 0});
+
+
+   BOOST_REQUIRE_EXCEPTION(setfeeparams({.gas_price = 0}),
+                           eosio_assert_message_exception,
+                           eosio_assert_message_is("gas_price must >= 1Gwei"));
+   
+   BOOST_REQUIRE_EXCEPTION(setfeeparams({.gas_price = 999'999'999}),
+                        eosio_assert_message_exception,
+                        eosio_assert_message_is("gas_price must >= 1Gwei"));
+
+   // Change only gas_price to 1Gwei
+   setfeeparams({.gas_price = 1'000'000'000});
 
    const auto& conf3 = get_config();
 
-   BOOST_CHECK_EQUAL(conf3.gas_price, 0);
+   BOOST_CHECK_EQUAL(conf3.gas_price, 1'000'000'000);
    BOOST_CHECK_EQUAL(conf3.miner_cut, conf2.miner_cut);
    BOOST_CHECK_EQUAL(conf3.ingress_bridge_fee, conf2.ingress_bridge_fee);
 
@@ -205,10 +215,10 @@ try {
    };
 
    std::vector<gas_fee_data> gas_fee_trials = {
-      {0,             50'000,  0,                  0                 },
+      {1'000'000'000, 50'000,  10'500'000'000'000, 10'500'000'000'000},
       {1'000'000'000, 0,       0,                  21'000'000'000'000},
       {1'000'000'000, 10'000,  2'100'000'000'000,  18'900'000'000'000},
-      {1'000'000'000, 100'000, 21'000'000'000'000, 0                 },
+      {1'000'000'000, 90'000, 18'900'000'000'000,   2'100'000'000'000},
    };
 
    // EVM contract account acts as the miner

@@ -28,7 +28,6 @@ struct config_wrapper {
     void set_ingress_bridge_fee(const eosio::asset& ingress_bridge_fee);
 
     uint64_t get_gas_price()const;
-    void set_gas_price(uint64_t gas_price);
 
     uint32_t get_miner_cut()const;
     void set_miner_cut(uint32_t miner_cut);
@@ -42,6 +41,11 @@ struct config_wrapper {
 
     void set_fee_parameters(const fee_parameters& fee_params,
                             bool allow_any_to_be_unspecified);
+
+    void update_consensus_parameters(eosio::asset ram_price_mb, uint64_t minimum_gas_price);
+    void update_consensus_parameters2(std::optional<uint64_t> gas_txnewaccount, std::optional<uint64_t> gas_newaccount, std::optional<uint64_t> gas_txcreate, std::optional<uint64_t> gas_codedeposit, std::optional<uint64_t> gas_sset, std::optional<uint64_t> minimum_gas_price);
+
+    std::pair<const consensus_parameter_data_type &, bool> get_consensus_param_and_maybe_promote();
 
 private:
     bool is_dirty()const;

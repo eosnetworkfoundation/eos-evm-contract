@@ -9,6 +9,13 @@ config_wrapper::config_wrapper(eosio::name self) : _self(self), _config(self, se
     if(_exists) {
         _cached_config = _config.get();
     }
+    if (!_cached_config.consensus_parameter.has_value()) {
+        _cached_config.consensus_parameter = consensus_parameter_type();
+        std::visit([&](auto &v) {
+            v.minimum_gas_price = _cached_config.gas_price;
+        }, _cached_config.consensus_parameter->current);
+        // Don't set dirty because action can be read-only.
+    }
 }
 
 config_wrapper::~config_wrapper() {
@@ -65,12 +72,9 @@ void config_wrapper::set_ingress_bridge_fee(const eosio::asset& ingress_bridge_f
 }
 
 uint64_t config_wrapper::get_gas_price()const {
-    return _cached_config.gas_price;
-}
-
-void config_wrapper::set_gas_price(uint64_t gas_price) {
-    _cached_config.gas_price = gas_price;
-    set_dirty();
+    return std::visit([&](const auto& v) {
+        return v.minimum_gas_price;
+    }, _cached_config.consensus_parameter->get_consensus_param(_cached_config.genesis_time, get_current_time()));
 }
 
 uint32_t config_wrapper::get_miner_cut()const {
@@ -78,6 +82,7 @@ uint32_t config_wrapper::get_miner_cut()const {
 }
 
 void config_wrapper::set_miner_cut(uint32_t miner_cut) {
+    eosio::check(miner_cut <= ninety_percent, "miner_cut must <= 90%");
     _cached_config.miner_cut = miner_cut;
     set_dirty();
 }
@@ -121,14 +126,29 @@ void config_wrapper::set_fee_parameters(const fee_parameters& fee_params,
                         bool allow_any_to_be_unspecified)
 {
     if (fee_params.gas_price.has_value()) {
-        _cached_config.gas_price = *fee_params.gas_price;
+        eosio::check(*fee_params.gas_price >= one_gwei, "gas_price must >= 1Gwei");
+        if (get_evm_version() >= 1) {
+            // activate in the next evm block
+            this->update_consensus_parameters2(std::optional<uint64_t>(), /* gas_txnewaccount */
+                                     std::optional<uint64_t>(), /* gas_newaccount */
+                                     std::optional<uint64_t>(), /* gas_txcreate */
+                                     std::optional<uint64_t>(), /* gas_codedeposit */
+                                     std::optional<uint64_t>(), /* gas_sset */
+                                     *fee_params.gas_price      /* minimum_gas_price */
+            );
+        } else {
+            _cached_config.gas_price = *fee_params.gas_price;
+            std::visit([&](auto &v) {
+                v.minimum_gas_price = _cached_config.gas_price;
+            }, 
+            _cached_config.consensus_parameter->current);
+        }
     } else {
         eosio::check(allow_any_to_be_unspecified, "All required fee parameters not specified: missing gas_price");
     }
 
     if (fee_params.miner_cut.has_value()) {
-        eosio::check(*fee_params.miner_cut <= hundred_percent, "miner_cut cannot exceed 100,000 (100%)");
-
+        eosio::check(*fee_params.miner_cut <= ninety_percent, "miner_cut must <= 90%");
         _cached_config.miner_cut = *fee_params.miner_cut;
     } else {
         eosio::check(allow_any_to_be_unspecified, "All required fee parameters not specified: missing miner_cut");
@@ -142,6 +162,75 @@ void config_wrapper::set_fee_parameters(const fee_parameters& fee_params,
     }
 
     set_dirty();
+}
+
+void config_wrapper::update_consensus_parameters(eosio::asset ram_price_mb, uint64_t minimum_gas_price) {
+
+    eosio::check(ram_price_mb.symbol == token_symbol, "invalid price symbol");
+    eosio::check(minimum_gas_price >= one_gwei, "gas_price must >= 1Gwei");
+
+    double gas_per_byte_f = (ram_price_mb.amount / (1024.0 * 1024.0) * minimum_natively_representable_f) / (minimum_gas_price * static_cast<double>(hundred_percent - _cached_config.miner_cut) / hundred_percent);
+
+    constexpr uint64_t account_bytes = 347;
+    constexpr uint64_t contract_fixed_bytes = 606;
+    constexpr uint64_t storage_slot_bytes = 346;
+
+    constexpr uint64_t max_gas_per_byte = (1ull << 43) - 1;
+
+    eosio::check(gas_per_byte_f >= 0.0, "gas_per_byte must >= 0");
+    eosio::check(gas_per_byte_f * contract_fixed_bytes < (double)(max_gas_per_byte), "gas_per_byte too big");
+
+    uint64_t gas_per_byte = (uint64_t)(gas_per_byte_f + 1.0);
+
+    this->update_consensus_parameters2(account_bytes * gas_per_byte, /* gas_txnewaccount */
+                             account_bytes * gas_per_byte, /* gas_newaccount */
+                             contract_fixed_bytes * gas_per_byte, /*gas_txcreate*/
+                             gas_per_byte,/*gas_codedeposit*/
+                             gas_sset_min + storage_slot_bytes * gas_per_byte,/*gas_sset*/
+                             minimum_gas_price /*minimum_gas_price*/
+    );
+}
+
+void config_wrapper::update_consensus_parameters2(std::optional<uint64_t> gas_txnewaccount, std::optional<uint64_t> gas_newaccount, std::optional<uint64_t> gas_txcreate, std::optional<uint64_t> gas_codedeposit, std::optional<uint64_t> gas_sset, std::optional<uint64_t> minimum_gas_price)
+{
+    eosio::check(get_evm_version() >= 1, "evm_version must >= 1");
+
+    // should not happen
+    eosio::check(_cached_config.consensus_parameter.has_value(), "consensus_parameter not exist");
+
+    if (minimum_gas_price.has_value()) {
+        eosio::check(*minimum_gas_price >= one_gwei, "gas_price must >= 1Gwei");
+    }
+
+    _cached_config.consensus_parameter->update_consensus_param([&](auto & v) {
+        if (gas_txnewaccount.has_value()) v.gas_parameter.gas_txnewaccount = *gas_txnewaccount;
+        if (gas_newaccount.has_value()) v.gas_parameter.gas_newaccount = *gas_newaccount;
+        if (gas_txcreate.has_value()) v.gas_parameter.gas_txcreate = *gas_txcreate;
+        if (gas_codedeposit.has_value()) v.gas_parameter.gas_codedeposit = *gas_codedeposit;
+        if (gas_sset.has_value()) {
+            eosio::check(*gas_sset >= gas_sset_min, "gas_sset too small");
+            v.gas_parameter.gas_sset = *gas_sset;
+        }
+        if (minimum_gas_price.has_value()) v.minimum_gas_price = *minimum_gas_price;
+    }, get_current_time());
+
+    set_dirty();
+}
+
+std::pair<const consensus_parameter_data_type &, bool> config_wrapper::get_consensus_param_and_maybe_promote() {
+
+    // should not happen
+    eosio::check(_cached_config.consensus_parameter.has_value(), "consensus_parameter not exist");
+
+    auto pair = _cached_config.consensus_parameter->get_consensus_param_and_maybe_promote(_cached_config.genesis_time, get_current_time());
+    if (pair.second) {
+        std::visit([&](const auto &v) {
+            _cached_config.gas_price = v.minimum_gas_price;
+        }, pair.first);
+        set_dirty();
+    }
+
+    return pair;
 }
 
 bool config_wrapper::is_dirty()const {

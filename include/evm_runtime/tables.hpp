@@ -7,6 +7,7 @@
 #include <eosio/binary_extension.hpp>
 
 #include <evm_runtime/types.hpp>
+#include <evm_runtime/runtime_config.hpp>
 #include <eosevm/block_mapping.hpp>
 
 #include <silkworm/core/common/base.hpp>
@@ -273,6 +274,54 @@ struct evm_version_type {
     uint64_t               cached_version=0;
 };
 
+struct pending_consensus_parameter_data_type {
+    consensus_parameter_data_type  data;
+    time_point                     pending_time;
+};
+struct consensus_parameter_type {
+
+    consensus_parameter_data_type                          current;
+    std::optional<pending_consensus_parameter_data_type>   pending;
+
+    bool is_pending_active(time_point_sec genesis_time, time_point current_time)const {
+        if (!pending.has_value()) return false;
+        eosevm::block_mapping bm(genesis_time.sec_since_epoch());
+        auto current_block_num = bm.timestamp_to_evm_block_num(current_time.time_since_epoch().count());
+        auto pending_block_num = bm.timestamp_to_evm_block_num(pending->pending_time.time_since_epoch().count());
+        return current_block_num > pending_block_num;
+    }
+
+    // Reference invalidated by get_consensus_param_and_maybe_promote and update_consensus_param.
+    const consensus_parameter_data_type& get_consensus_param(
+        time_point_sec genesis_time, time_point current_time) const {
+        if (is_pending_active(genesis_time, current_time)) {
+            return pending->data;
+        }
+        return current;
+    }
+
+    std::pair<const consensus_parameter_data_type &, bool> get_consensus_param_and_maybe_promote(
+        time_point_sec genesis_time, time_point current_time) {
+        if (is_pending_active(genesis_time, current_time)) {
+            current = pending->data;
+            pending.reset();
+            // don't use make_pair as it create ref to temp objects
+            return std::pair<const consensus_parameter_data_type &, bool>(current, true);
+        }
+        return std::pair<const consensus_parameter_data_type &, bool>(current, false);
+    }
+
+    template <typename Visitor>
+    void update_consensus_param(Visitor visitor_fn, time_point current_time) {
+        consensus_parameter_data_type new_pending = (pending.has_value() ? pending->data : current);
+        std::visit(visitor_fn, new_pending);
+        pending = pending_consensus_parameter_data_type{
+            .data = new_pending, 
+            .pending_time = current_time
+        };
+    }
+};
+
 struct [[eosio::table]] [[eosio::contract("evm_contract")]] config
 {
     unsigned_int version; // placeholder for future variant index
@@ -283,8 +332,9 @@ struct [[eosio::table]] [[eosio::contract("evm_contract")]] config
     uint32_t miner_cut = 0;
     uint32_t status = 0; // <- bit mask values from status_flags
     binary_extension<evm_version_type> evm_version;
+    binary_extension<consensus_parameter_type> consensus_parameter;
 
-    EOSLIB_SERIALIZE(config, (version)(chainid)(genesis_time)(ingress_bridge_fee)(gas_price)(miner_cut)(status)(evm_version));
+    EOSLIB_SERIALIZE(config, (version)(chainid)(genesis_time)(ingress_bridge_fee)(gas_price)(miner_cut)(status)(evm_version)(consensus_parameter));
 };
 
 } //namespace evm_runtime
