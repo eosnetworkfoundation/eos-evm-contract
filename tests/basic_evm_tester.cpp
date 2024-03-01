@@ -153,7 +153,7 @@ void evm_eoa::sign(silkworm::Transaction& trx, std::optional<uint64_t> evm_chain
    if(evm_chain_id.has_value())
       trx.chain_id = evm_chain_id.value();
    trx.nonce = next_nonce++;
-   silkworm::rlp::encode(rlp, trx);
+   trx.encode_for_signing(rlp);
    ethash::hash256 hash{silkworm::keccak256(rlp)};
 
    secp256k1_ecdsa_recoverable_signature sig;
