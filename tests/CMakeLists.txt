@@ -10,15 +10,15 @@ configure_file(${CMAKE_SOURCE_DIR}/contracts.hpp.in ${CMAKE_BINARY_DIR}/contract
 include_directories(
     ${CMAKE_BINARY_DIR}
     ${CMAKE_SOURCE_DIR}/../silkworm/
-    ${CMAKE_SOURCE_DIR}/../external/expected/include
-    ${CMAKE_SOURCE_DIR}/external
     ${CMAKE_SOURCE_DIR}/../silkworm/third_party/evmone/lib
     ${CMAKE_SOURCE_DIR}/../silkworm/third_party/evmone/evmc/include
-    ${CMAKE_SOURCE_DIR}/../silkworm/third_party/magic_enum/include
-    ${CMAKE_SOURCE_DIR}/external/abseil
     ${CMAKE_SOURCE_DIR}/../silkworm/third_party/intx/include
     ${CMAKE_SOURCE_DIR}/../silkworm/third_party/ethash/include
     ${CMAKE_SOURCE_DIR}/../silkworm/third_party/secp256k1/include
+    ${CMAKE_SOURCE_DIR}/../external/expected/include
+    ${CMAKE_SOURCE_DIR}/external
+    ${CMAKE_SOURCE_DIR}/external/magic_enum/include
+    ${CMAKE_SOURCE_DIR}/external/abseil
 )
 
 add_eosio_test_executable( unit_test
