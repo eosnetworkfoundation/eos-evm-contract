@@ -64,12 +64,14 @@ BOOST_FIXTURE_TEST_CASE(basic, gas_param_evm_tester) try {
     {
         evm_eoa recipient;
         silkworm::Transaction tx{
-            .type = silkworm::Transaction::Type::kLegacy,
-            .max_priority_fee_per_gas = suggested_gas_price,
-            .max_fee_per_gas = suggested_gas_price,
-            .gas_limit = 21000,
-            .to = recipient.address,
-            .value = 1,
+            silkworm::UnsignedTransaction {
+                .type = silkworm::TransactionType::kLegacy,
+                .max_priority_fee_per_gas = suggested_gas_price,
+                .max_fee_per_gas = suggested_gas_price,
+                .gas_limit = 21000,
+                .to = recipient.address,
+                .value = 1,
+            }
         };
         faucet_eoa.sign(tx);
         chain::transaction_trace_ptr trace = pushtx(tx);
@@ -107,12 +109,14 @@ BOOST_FIXTURE_TEST_CASE(basic, gas_param_evm_tester) try {
     {
         evm_eoa recipient;
         silkworm::Transaction tx{
-            .type = silkworm::Transaction::Type::kLegacy,
-            .max_priority_fee_per_gas = 1'000'000'000,
-            .max_fee_per_gas = 1'000'000'000,
-            .gas_limit = 21000,
-            .to = recipient.address,
-            .value = 1,
+            silkworm::UnsignedTransaction {
+                .type = silkworm::TransactionType::kLegacy,
+                .max_priority_fee_per_gas = 1'000'000'000,
+                .max_fee_per_gas = 1'000'000'000,
+                .gas_limit = 21000,
+                .to = recipient.address,
+                .value = 1,
+            }
         };
         uint64_t cur_nonce = faucet_eoa.next_nonce;
         faucet_eoa.sign(tx);
@@ -130,12 +134,14 @@ BOOST_FIXTURE_TEST_CASE(basic, gas_param_evm_tester) try {
     {
         evm_eoa recipient;
         silkworm::Transaction tx{
-            .type = silkworm::Transaction::Type::kLegacy,
-            .max_priority_fee_per_gas = 1'000'000'000,
-            .max_fee_per_gas = 1'000'000'000,
-            .gas_limit = 21000,
-            .to = recipient.address,
-            .value = 1,
+            silkworm::UnsignedTransaction {
+                .type = silkworm::TransactionType::kLegacy,
+                .max_priority_fee_per_gas = 1'000'000'000,
+                .max_fee_per_gas = 1'000'000'000,
+                .gas_limit = 21000,
+                .to = recipient.address,
+                .value = 1,
+            }
         };
         faucet_eoa.sign(tx);
         chain::transaction_trace_ptr trace = pushtx(tx);
@@ -149,12 +155,14 @@ BOOST_FIXTURE_TEST_CASE(basic, gas_param_evm_tester) try {
     {
         evm_eoa recipient;
         silkworm::Transaction tx{
-            .type = silkworm::Transaction::Type::kLegacy,
-            .max_priority_fee_per_gas = 1'000'000'000,
-            .max_fee_per_gas = 1'000'000'000,
-            .gas_limit = 21000,
-            .to = recipient.address,
-            .value = 2,
+            silkworm::UnsignedTransaction {
+                .type = silkworm::TransactionType::kLegacy,
+                .max_priority_fee_per_gas = 1'000'000'000,
+                .max_fee_per_gas = 1'000'000'000,
+                .gas_limit = 21000,
+                .to = recipient.address,
+                .value = 2,
+            }
         };
         faucet_eoa.sign(tx);
         chain::transaction_trace_ptr trace = pushtx(tx);
