@@ -884,7 +884,7 @@ struct evm_runtime_tester : eosio_system_tester, silkworm::State {
 
       Block block;
       ByteView view{*rlp};
-      if (rlp::decode(view, block) || !view.empty()) {
+      if (!rlp::decode(view, block) || !view.empty()) {
          if (invalid) {
                dlog("invalid=kPassed 2");
                return Status::kPassed;
