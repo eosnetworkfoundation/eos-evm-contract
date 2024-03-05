@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 1
           submodules: 'false'
@@ -23,40 +23,29 @@ jobs:
         run: cat .github/workflows/contract.md >> $GITHUB_STEP_SUMMARY
 
   build:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
         DWITH_TEST_ACTIONS: ['on', 'off']
     name: EOS EVM Contract Build - Tests ${{ matrix.DWITH_TEST_ACTIONS }}
     env:
-      CC: gcc-10
-      CXX: g++-10
       DCMAKE_BUILD_TYPE: 'Release'
 
     steps:
-      - name: Authenticate
-        id: auth
-        uses: AntelopeIO/github-app-token-action@v1
-        with:
-          app_id: ${{ secrets.TRUSTEVM_CI_APP_ID }}
-          private_key: ${{ secrets.TRUSTEVM_CI_APP_KEY }}
-
       - name: Checkout Repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
           submodules: 'recursive'
-          token: ${{ steps.auth.outputs.token }}
 
       - name: Download CDT
-        uses: AntelopeIO/asset-artifact-download-action@v2
+        uses: AntelopeIO/asset-artifact-download-action@v3
         with:
           owner: AntelopeIO
           repo: cdt
           target: 'v3.1.0'
           prereleases: false
           file: 'cdt_.*amd64.deb'
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install CDT
         run: sudo apt-get install -y ./cdt*.deb
@@ -74,15 +63,15 @@ jobs:
           if-no-files-found: error
 
       - name: Download Leap - dev binary
-        uses: AntelopeIO/asset-artifact-download-action@v2
+        uses: AntelopeIO/asset-artifact-download-action@v3
         with:
           owner: AntelopeIO
           repo: leap
-          target: 'v3.1.3'
+          target: '^5.0.1'
           prereleases: false
-          file: 'leap-dev.*(x86_64|amd64).deb'
+          file: 'leap-dev.*ubuntu22\.04_amd64.deb'
           container-package: experimental-binaries
-          token: ${{ secrets.GITHUB_TOKEN }}
+          artifact-name: leap-dev-ubuntu22-amd64
 
       - name: Install Leap
         run: sudo apt-get install -y ./leap*.deb
@@ -108,3 +97,4 @@ jobs:
           name: test-results.xml
           path: test-results.xml
           if-no-files-found: error
+
