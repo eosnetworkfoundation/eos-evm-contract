@@ -52,6 +52,6 @@ add_eosio_test_executable( unit_test
 )
 
 # TODO: add back eos-vm-oc once change to disable EOS VM OC subjective limits during unit test are added
-add_test(NAME consensus_tests COMMAND unit_test --report_level=detailed --color_output --run_test=evm_runtime_tests)
+add_test(NAME consensus_tests COMMAND unit_test --report_level=detailed --color_output --run_test=evm_runtime_tests -- --eos-vm-oc)
 
-add_test(NAME unit_tests COMMAND unit_test --report_level=detailed --color_output --run_test=!evm_runtime_tests)
+add_test(NAME unit_tests COMMAND unit_test --report_level=detailed --color_output --run_test=!evm_runtime_tests -- --eos-vm-oc)
