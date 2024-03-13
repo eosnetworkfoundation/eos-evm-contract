@@ -234,7 +234,9 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
     }
 
     ValidationResult r = silkworm::protocol::pre_validate_transaction(tx, ep.evm().revision(), ep.evm().config().chain_id,
-                                                             ep.evm().block().header.base_fee_per_gas, ep.evm().block().header.data_gas_price());
+                            ep.evm().block().header.base_fee_per_gas, ep.evm().block().header.data_gas_price(),
+                            ep.evm().get_eos_evm_version(), ep.evm().get_gas_params());
+
     check_result( r, tx, "pre_validate_transaction error" );
     r = silkworm::protocol::validate_transaction(tx, ep.state(), ep.available_gas());
     check_result( r, tx, "validate_transaction error" );
