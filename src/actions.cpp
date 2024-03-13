@@ -335,7 +335,19 @@ void evm_contract::exec(const exec_input& input, const std::optional<exec_callba
     evm_runtime::state state{get_self(), get_self(), true};
     IntraBlockState ibstate{state};
 
-    EVM evm{block, ibstate, *found_chain_config.value().second};
+    const auto& consensus_param = _config->get_consensus_param();
+
+    auto gas_params = std::visit([&](const auto &v) {
+        return evmone::gas_parameters(
+            v.gas_parameter.gas_txnewaccount,
+            v.gas_parameter.gas_newaccount,
+            v.gas_parameter.gas_txcreate,
+            v.gas_parameter.gas_codedeposit,
+            v.gas_parameter.gas_sset
+        );
+    }, consensus_param);
+
+    EVM evm{block, ibstate, *found_chain_config.value().second, gas_params};
 
     Transaction txn;
     txn.to    = to_address(input.to);
