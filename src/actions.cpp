@@ -442,7 +442,18 @@ void evm_contract::process_tx(const runtime_config& rc, eosio::name miner, const
     silkworm::protocol::TrustRuleSet engine{*found_chain_config->second};
 
     evm_runtime::state state{get_self(), get_self(), false, false};
-    silkworm::ExecutionProcessor ep{block, engine, state, *found_chain_config->second};
+
+    auto gas_params = std::visit([&](const auto &v) {
+        return evmone::gas_parameters(
+            v.gas_parameter.gas_txnewaccount,
+            v.gas_parameter.gas_newaccount,
+            v.gas_parameter.gas_txcreate,
+            v.gas_parameter.gas_codedeposit,
+            v.gas_parameter.gas_sset
+        );
+    }, gas_param_pair.first);
+
+    silkworm::ExecutionProcessor ep{block, engine, state, *found_chain_config->second, gas_params};
 
     check(tx.max_priority_fee_per_gas == tx.max_fee_per_gas, "max_priority_fee_per_gas must be equal to max_fee_per_gas");
     check(tx.max_fee_per_gas >= _config->get_gas_price(), "gas price is too low");
