@@ -22,6 +22,12 @@ struct gas_param_evm_tester : basic_evm_tester
    {
       transfer_token(faucet_account_name, evm_account_name, make_asset(100'0000), faucet_eoa.address_0x());
    }
+
+   uint64_t gas_txnewaccount = 0;
+   uint64_t gas_newaccount   = 25000;
+   uint64_t gas_txcreate     = 32000;
+   uint64_t gas_codedeposit  = 200;
+   uint64_t gas_sset         = 20000;
 };
 
 BOOST_FIXTURE_TEST_CASE(basic, gas_param_evm_tester) try {
@@ -162,6 +168,286 @@ BOOST_FIXTURE_TEST_CASE(basic, gas_param_evm_tester) try {
         BOOST_ASSERT(trace->action_traces.size() >= 2 && trace->action_traces[0].act.name == "pushtx"_n);
         BOOST_ASSERT(trace->action_traces.size() >= 2 && trace->action_traces[1].act.name == "evmtx"_n);
     }
+
+} FC_LOG_AND_RETHROW()
+
+BOOST_FIXTURE_TEST_CASE(gas_param_G_txnewaccount, gas_param_evm_tester) try {
+
+    uint64_t suggested_gas_price = 150'000'000'000ull;
+    init(15555, suggested_gas_price);
+
+    produce_block();
+    fund_evm_faucet();
+    produce_block();
+
+    setversion(1, evm_account_name);
+    produce_block();
+    produce_block();
+
+    // Fund evm1 address with 100 EOS
+    evm_eoa evm1, evm2, evm3;
+    transfer_token("alice"_n, "evm"_n, make_asset(100'0000), evm1.address_0x());
+
+    // transfer to non-existent account (21k gas used)
+    auto txn = generate_tx(evm2.address, 1, 21'000);
+    evm1.sign(txn);
+    pushtx(txn);
+    auto bal = evm_balance(evm2.address);
+    BOOST_CHECK(*bal == 1);
+
+    // Set gas_txnewaccount = 1000
+    setgasparam(1000, gas_newaccount, gas_txcreate, gas_codedeposit, gas_sset, evm_account_name);
+    produce_block();
+    produce_block();
+
+    // transfer to non-existent account fail (need 22k)
+    txn = generate_tx(evm3.address, 1, 21'000);
+    evm1.sign(txn);
+    pushtx(txn);
+    bal = evm_balance(evm3.address);
+    BOOST_CHECK(!bal.has_value());
+
+    // transfer to non-existent account (22k used)
+    txn = generate_tx(evm3.address, 1, 22'000);
+    evm1.sign(txn);
+    pushtx(txn);
+    bal = evm_balance(evm3.address);
+    BOOST_ASSERT(*bal == 1);
+
+} FC_LOG_AND_RETHROW()
+
+BOOST_FIXTURE_TEST_CASE(gas_param_G_newaccount, gas_param_evm_tester) try {
+
+    uint64_t suggested_gas_price = 150'000'000'000ull;
+    init(15555, suggested_gas_price);
+
+    produce_block();
+    fund_evm_faucet();
+    produce_block();
+
+    setversion(1, evm_account_name);
+    produce_block();
+    produce_block();
+
+    // Fund evm1 address with 100 EOS
+    evm_eoa evm1;
+    transfer_token("alice"_n, "evm"_n, make_asset(100'0000), evm1.address_0x());
+
+    // // SPDX-License-Identifier: MIT
+    // pragma solidity ^0.8.0;
+    // contract Creator {
+    //     function sendTo(address payable dst) public {
+    //         dst.transfer(1);
+    //     }
+    //     receive() external payable {}
+    //     fallback() external payable {}
+    // }
+    const std::string contract_bytecode = "608060405234801561001057600080fd5b50610165806100206000396000f3fe6080604052600436106100225760003560e01c8063e6d252451461002b57610029565b3661002957005b005b34801561003757600080fd5b50610052600480360381019061004d9190610102565b610054565b005b8073ffffffffffffffffffffffffffffffffffffffff166108fc60019081150290604051600060405180830381858888f1935050505015801561009b573d6000803e3d6000fd5b5050565b600080fd5b600073ffffffffffffffffffffffffffffffffffffffff82169050919050565b60006100cf826100a4565b9050919050565b6100df816100c4565b81146100ea57600080fd5b50565b6000813590506100fc816100d6565b92915050565b6000602082840312156101185761011761009f565b5b6000610126848285016100ed565b9150509291505056fea2646970667358221220d80ddae6515d1642665d8d23a536c6d60bfc9a5e3137367f0a4d589a1b0a4d7c64736f6c634300080d0033";
+
+    // Deploy and fund the contract with 1000 Wei
+    auto contract_address = deploy_contract(evm1, evmc::from_hex(contract_bytecode).value());
+    auto txn = generate_tx(contract_address, 1000, 210000);
+    evm1.sign(txn);
+    pushtx(txn);
+
+    auto call_contract = [&](auto& eoa, const evmc::address& dst) -> auto {
+        auto pre = evm_balance(eoa);
+        auto txn = generate_tx(contract_address, 0, 1'000'000);
+        txn.data = evmc::from_hex("e6d25245").value(); //sha3(sendTo(address))
+        txn.data += evmc::from_hex("000000000000000000000000").value();
+        txn.data += dst;
+
+        eoa.sign(txn);
+        pushtx(txn);
+        auto post = evm_balance(eoa);
+        BOOST_REQUIRE(pre.has_value() && post.has_value());
+        return (*pre - *post)/suggested_gas_price - tx_data_cost(txn);
+    };
+
+    evm_eoa evm2;
+    auto gas_used1 = call_contract(evm1, evm2.address);
+    BOOST_REQUIRE(evm_balance(evm2) == 1);
+
+    // Set gas_newaccount = 26000, previous was 25000
+    setgasparam(gas_txnewaccount, 26000, gas_txcreate, gas_codedeposit, gas_sset, evm_account_name);
+    produce_block();
+    produce_block();
+
+    evm_eoa evm3;
+    auto gas_used2 = call_contract(evm1, evm3.address);
+    BOOST_REQUIRE(evm_balance(evm3) == 1);
+
+    BOOST_REQUIRE(gas_used2-gas_used1 == 1000);
+
+} FC_LOG_AND_RETHROW()
+
+BOOST_FIXTURE_TEST_CASE(gas_param_G_txcreate, gas_param_evm_tester) try {
+
+    uint64_t suggested_gas_price = 150'000'000'000ull;
+    init(15555, suggested_gas_price);
+
+    produce_block();
+    fund_evm_faucet();
+    produce_block();
+
+    setversion(1, evm_account_name);
+    produce_block();
+    produce_block();
+
+    // Fund evm1 address with 100 EOS
+    evm_eoa evm1;
+    transfer_token("alice"_n, "evm"_n, make_asset(100'0000), evm1.address_0x());
+
+    const std::string contract_bytecode = "600d600c600039600d6000f3600F60005260006001600FF000";
+
+    auto deploy_contract_gas = [&](auto& eoa, const auto& bytecode){
+        auto pre = evm_balance(eoa);
+        auto contract_address = deploy_contract(eoa, evmc::from_hex(bytecode).value());
+        auto post = evm_balance(eoa);
+        BOOST_REQUIRE(pre.has_value() && post.has_value());
+        return std::make_tuple((*pre - *post)/suggested_gas_price, contract_address);
+    };
+
+    auto [gas_used1, contract_address1] = deploy_contract_gas(evm1, contract_bytecode);
+    produce_block();
+    produce_block();
+
+    auto call_contract = [&](auto& eoa) -> auto {
+        auto pre = evm_balance(eoa);
+        auto txn = generate_tx(contract_address1, 0, 1'000'000);
+        eoa.sign(txn);
+        pushtx(txn);
+        auto post = evm_balance(eoa);
+        BOOST_REQUIRE(pre.has_value() && post.has_value());
+        return (*pre - *post)/suggested_gas_price;
+    };
+
+    auto gas_used = call_contract(evm1);
+    BOOST_CHECK(gas_used == 21000 + 32000 + 21);
+
+    // Set gas_txcreate = 0
+    setgasparam(gas_txnewaccount, gas_newaccount, 0, gas_codedeposit, gas_sset, evm_account_name);
+    produce_block();
+    produce_block();
+
+    gas_used = call_contract(evm1);
+    BOOST_CHECK(gas_used == 21000 + 0 + 21);
+
+    auto [gas_used2, contract_address2] = deploy_contract_gas(evm1, contract_bytecode);
+
+    // Check gas used to deploy the contract (from the tx)
+    BOOST_REQUIRE(gas_used1 == 32000 + 21000 + 13*200 + 364);
+    BOOST_REQUIRE(gas_used2 ==     0 + 21000 + 13*200 + 364);
+
+} FC_LOG_AND_RETHROW()
+
+BOOST_FIXTURE_TEST_CASE(gas_param_G_codedeposit, gas_param_evm_tester) try {
+
+    uint64_t suggested_gas_price = 150'000'000'000ull;
+    init(15555, suggested_gas_price);
+
+    produce_block();
+    fund_evm_faucet();
+    produce_block();
+
+    setversion(1, evm_account_name);
+    produce_block();
+    produce_block();
+
+    // Fund evm1 address with 100 EOS
+    evm_eoa evm1;
+    transfer_token("alice"_n, "evm"_n, make_asset(100'0000), evm1.address_0x());
+
+    const std::string contract_bytecode = "600d600c600039600d6000f3600F60005260006001600FF000";
+
+    auto deploy_contract_gas = [&](auto& eoa, const auto& bytecode){
+        auto pre = evm_balance(eoa);
+        auto contract_address = deploy_contract(eoa, evmc::from_hex(bytecode).value());
+        auto post = evm_balance(eoa);
+        BOOST_REQUIRE(pre.has_value() && post.has_value());
+        return std::make_tuple((*pre - *post)/suggested_gas_price, contract_address);
+    };
+
+    // code_len = 13
+    auto [gas_used1, contract_address1] = deploy_contract_gas(evm1, contract_bytecode);
+    BOOST_REQUIRE(gas_used1 == 32000 + 21000 + 13*200 + 364);
+
+    // Set gas_codedeposit = 0
+    setgasparam(gas_txnewaccount, gas_newaccount, gas_txcreate, 0, gas_sset, evm_account_name);
+    produce_block();
+    produce_block();
+
+    auto [gas_used2, contract_address2] = deploy_contract_gas(evm1, contract_bytecode);
+    BOOST_REQUIRE(gas_used2 == 32000 + 21000 + 13*0 + 364);
+
+} FC_LOG_AND_RETHROW()
+
+BOOST_FIXTURE_TEST_CASE(gas_param_G_sset, gas_param_evm_tester) try {
+
+    uint64_t suggested_gas_price = 150'000'000'000ull;
+    init(15555, suggested_gas_price);
+
+    produce_block();
+    fund_evm_faucet();
+    produce_block();
+
+    setversion(1, evm_account_name);
+    produce_block();
+    produce_block();
+
+    // Fund evm1 address with 100 EOS
+    evm_eoa evm1;
+    transfer_token("alice"_n, "evm"_n, make_asset(100'0000), evm1.address_0x());
+
+    // pragma solidity >=0.8.2 <0.9.0;
+    // contract Storage {
+    //     uint256 number;
+    //     function store(uint256 num) public {
+    //         number = num;
+    //     }
+    //     function retrieve() public view returns (uint256){
+    //         return number;
+    //     }
+    // }
+
+    const std::string contract_bytecode = "608060405234801561001057600080fd5b50610150806100206000396000f3fe608060405234801561001057600080fd5b50600436106100365760003560e01c80632e64cec11461003b5780636057361d14610059575b600080fd5b610043610075565b60405161005091906100a1565b60405180910390f35b610073600480360381019061006e91906100ed565b61007e565b005b60008054905090565b8060008190555050565b6000819050919050565b61009b81610088565b82525050565b60006020820190506100b66000830184610092565b92915050565b600080fd5b6100ca81610088565b81146100d557600080fd5b50565b6000813590506100e7816100c1565b92915050565b600060208284031215610103576101026100bc565b5b6000610111848285016100d8565b9150509291505056fea2646970667358221220b25953072dcb52f66b23db9a7a904276bfa83cfa62a0e8feaf281d9d8c0ed59664736f6c634300080d0033";
+    auto contract_address = deploy_contract(evm1, evmc::from_hex(contract_bytecode).value());
+    uint64_t contract_account_id = find_account_by_address(contract_address).value().id;
+
+    auto pad = [](const std::string& s){
+        const size_t l = 64;
+        if (s.length() >= l) return s;
+        size_t pl = l - s.length();
+        return std::string(pl, '0') + s;
+    };
+
+    auto set_value = [&](auto& eoa, const intx::uint256& v) -> auto {
+        auto pre = evm_balance(eoa);
+        auto txn = generate_tx(contract_address, 0, 1'000'000);
+        txn.data = evmc::from_hex("6057361d").value(); //sha3(store(uint256))
+        txn.data += evmc::from_hex(pad(intx::hex(v))).value();
+        eoa.sign(txn);
+        pushtx(txn);
+        auto post = evm_balance(eoa);
+        BOOST_REQUIRE(pre.has_value() && post.has_value());
+        return (*pre - *post)/suggested_gas_price - tx_data_cost(txn);
+    };
+
+    auto gas_used1 = set_value(evm1, intx::uint256{3});
+
+    // Set gas_sset = 20001
+    setgasparam(gas_txnewaccount, gas_newaccount, gas_txcreate, gas_codedeposit, 20001, evm_account_name);
+    produce_block();
+    produce_block();
+    produce_block();
+
+    set_value(evm1, intx::uint256{0});
+    produce_block();
+    produce_block();
+
+    auto gas_used2 = set_value(evm1, intx::uint256{4});
+
+    BOOST_REQUIRE(gas_used1 + 1 == gas_used2);
 
 } FC_LOG_AND_RETHROW()
 
