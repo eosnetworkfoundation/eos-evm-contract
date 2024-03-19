@@ -1,6 +1,6 @@
 #include "basic_evm_tester.hpp"
-#include <silkworm/execution/address.hpp>
-#include <silkworm/types/transaction.hpp>
+#include <silkworm/core/execution/address.hpp>
+#include <silkworm/core/types/transaction.hpp>
 #include <eosevm/block_mapping.hpp>
 
 using namespace evm_test;
@@ -41,11 +41,13 @@ struct version_tester : basic_evm_tester {
     const auto gas_price = get_config().gas_price;
 
     silkworm::Transaction tx{
-        .type = silkworm::Transaction::Type::kLegacy,
+      silkworm::UnsignedTransaction {
+        .type = silkworm::TransactionType::kLegacy,
         .max_priority_fee_per_gas = gas_price,
         .max_fee_per_gas = gas_price,
         .gas_limit = 10'000'000,
         .data = std::move(bytecode),
+      }
     };
 
     eoa.sign(tx);
@@ -226,12 +228,14 @@ BOOST_FIXTURE_TEST_CASE(traces_in_different_eosevm_version, version_tester) try 
 
     // Test traces of `pushtx` (EVM VERSION=1)
     silkworm::Transaction txin {
-      .type = silkworm::Transaction::Type::kLegacy,
-      .max_priority_fee_per_gas = config.gas_price,
-      .max_fee_per_gas = config.gas_price,
-      .gas_limit = 10'000'000,
-      .to = contract_address,
-      .data = *data
+      silkworm::UnsignedTransaction {
+        .type = silkworm::TransactionType::kLegacy,
+        .max_priority_fee_per_gas = config.gas_price,
+        .max_fee_per_gas = config.gas_price,
+        .gas_limit = 10'000'000,
+        .to = contract_address,
+        .data = *data
+      }
     };
 
     evm1.sign(txin);
@@ -298,12 +302,14 @@ BOOST_FIXTURE_TEST_CASE(exec_does_not_update_version, version_tester) try {
 
     // Call `increment` from evm1 address
     silkworm::Transaction txin {
-      .type = silkworm::Transaction::Type::kLegacy,
-      .max_priority_fee_per_gas = config.gas_price,
-      .max_fee_per_gas = config.gas_price,
-      .gas_limit = 10'000'000,
-      .to = contract_address,
-      .data = *evmc::from_hex(increment_)
+      silkworm::UnsignedTransaction {
+        .type = silkworm::TransactionType::kLegacy,
+        .max_priority_fee_per_gas = config.gas_price,
+        .max_fee_per_gas = config.gas_price,
+        .gas_limit = 10'000'000,
+        .to = contract_address,
+        .data = *evmc::from_hex(increment_)
+      }
     };
 
     evm1.sign(txin);
@@ -345,12 +351,14 @@ BOOST_FIXTURE_TEST_CASE(call_promote_pending, version_tester) try {
 
     // Call `increment` from evm1 address
     silkworm::Transaction txin {
-      .type = silkworm::Transaction::Type::kLegacy,
-      .max_priority_fee_per_gas = config.gas_price,
-      .max_fee_per_gas = config.gas_price,
-      .gas_limit = 10'000'000,
-      .to = contract_address,
-      .data = *evmc::from_hex(increment_)
+      silkworm::UnsignedTransaction {
+        .type = silkworm::TransactionType::kLegacy,
+        .max_priority_fee_per_gas = config.gas_price,
+        .max_fee_per_gas = config.gas_price,
+        .gas_limit = 10'000'000,
+        .to = contract_address,
+        .data = *evmc::from_hex(increment_)
+      }
     };
 
     evm1.sign(txin);
@@ -392,12 +400,14 @@ BOOST_FIXTURE_TEST_CASE(admincall_promote_pending, version_tester) try {
 
     // Call `increment` from evm1 address
     silkworm::Transaction txin {
-      .type = silkworm::Transaction::Type::kLegacy,
-      .max_priority_fee_per_gas = config.gas_price,
-      .max_fee_per_gas = config.gas_price,
-      .gas_limit = 10'000'000,
-      .to = contract_address,
-      .data = *evmc::from_hex(increment_)
+      silkworm::UnsignedTransaction {
+        .type = silkworm::TransactionType::kLegacy,
+        .max_priority_fee_per_gas = config.gas_price,
+        .max_fee_per_gas = config.gas_price,
+        .gas_limit = 10'000'000,
+        .to = contract_address,
+        .data = *evmc::from_hex(increment_)
+      }
     };
 
     evm1.sign(txin);

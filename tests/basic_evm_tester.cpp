@@ -1,5 +1,6 @@
 #include "basic_evm_tester.hpp"
 #include <fc/io/raw.hpp>
+#include <secp256k1_recovery.h>
 
 namespace fc {
 
@@ -97,6 +98,16 @@ FC_REFLECT(evm_test::storage_table_row, (id)(key)(value))
 
 namespace evm_test {
 
+// Copied from old silkworm code as new silkworm code do not expose this function
+std::optional<evmc::address> public_key_to_address(const std::basic_string<uint8_t>& public_key) noexcept {
+    if (public_key.length() != 65 || public_key[0] != 4u) {
+        return std::nullopt;
+    }
+    // Ignore first byte of public key
+    const auto key_hash{ethash::keccak256(public_key.data() + 1, 64)};
+    return evmc::address(*reinterpret_cast<const evmc_address*>(&key_hash.bytes[12]));
+}
+
 evm_eoa::evm_eoa(std::basic_string<uint8_t> optional_private_key)
 {
    if (optional_private_key.size() == 0) {
@@ -117,7 +128,8 @@ evm_eoa::evm_eoa(std::basic_string<uint8_t> optional_private_key)
    size_t serialized_result_sz = public_key.size();
    secp256k1_ec_pubkey_serialize(ctx, public_key.data(), &serialized_result_sz, &pubkey, SECP256K1_EC_UNCOMPRESSED);
 
-   std::optional<evmc::address> addr = silkworm::ecdsa::public_key_to_address(public_key);
+   std::optional<evmc::address> addr = public_key_to_address(public_key);
+
    BOOST_REQUIRE(!!addr);
    address = *addr;
 }
@@ -141,7 +153,7 @@ void evm_eoa::sign(silkworm::Transaction& trx, std::optional<uint64_t> evm_chain
    if(evm_chain_id.has_value())
       trx.chain_id = evm_chain_id.value();
    trx.nonce = next_nonce++;
-   silkworm::rlp::encode(rlp, trx, true, false);
+   trx.encode_for_signing(rlp);
    ethash::hash256 hash{silkworm::keccak256(rlp)};
 
    secp256k1_ecdsa_recoverable_signature sig;
@@ -333,12 +345,14 @@ basic_evm_tester::generate_tx(const evmc::address& to, const intx::uint256& valu
    const auto gas_price = get_config().gas_price;
 
    return silkworm::Transaction{
-      .type = silkworm::Transaction::Type::kLegacy,
-      .max_priority_fee_per_gas = gas_price,
-      .max_fee_per_gas = gas_price,
-      .gas_limit = gas_limit,
-      .to = to,
-      .value = value,
+      silkworm::UnsignedTransaction {
+         .type = silkworm::TransactionType::kLegacy,
+         .max_priority_fee_per_gas = gas_price,
+         .max_fee_per_gas = gas_price,
+         .gas_limit = gas_limit,
+         .to = to,
+         .value = value,
+      }
    };
 }
 transaction_trace_ptr basic_evm_tester::exec(const exec_input& input, const std::optional<exec_callback>& callback) {
@@ -476,11 +490,13 @@ evmc::address basic_evm_tester::deploy_contract(evm_eoa& eoa, evmc::bytes byteco
    const auto gas_price = get_config().gas_price;
 
    silkworm::Transaction tx{
-      .type = silkworm::Transaction::Type::kLegacy,
-      .max_priority_fee_per_gas = gas_price,
-      .max_fee_per_gas = gas_price,
-      .gas_limit = 10'000'000,
-      .data = std::move(bytecode),
+      silkworm::UnsignedTransaction {
+         .type = silkworm::TransactionType::kLegacy,
+         .max_priority_fee_per_gas = gas_price,
+         .max_fee_per_gas = gas_price,
+         .gas_limit = 10'000'000,
+         .data = std::move(bytecode),
+      }
    };
 
    eoa.sign(tx);

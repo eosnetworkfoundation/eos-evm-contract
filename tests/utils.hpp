@@ -11,19 +11,19 @@
 #include <fc/variant_object.hpp>
 #include <eosio/chain/types.hpp>
 
-#include <silkworm/common/as_range.hpp>
-#include <silkworm/common/cast.hpp>
-#include <silkworm/common/endian.hpp>
-#include <silkworm/common/rlp_err.hpp>
-#include <silkworm/common/stopwatch.hpp>
-#include <silkworm/common/terminal.hpp>
-#include <silkworm/common/test_util.hpp>
-#include <silkworm/types/block.hpp>
-#include <silkworm/types/transaction.hpp>
-#include <silkworm/rlp/encode.hpp>
+#include <silkworm/core/common/as_range.hpp>
+#include <silkworm/core/common/cast.hpp>
+#include <silkworm/core/common/endian.hpp>
+#include <silkworm/core/common/decoding_result.hpp>
+#include <silkworm/infra/common/stopwatch.hpp>
+#include <silkworm/infra/common/terminal.hpp>
+#include <silkworm/core/common/test_util.hpp>
+#include <silkworm/core/types/block.hpp>
+#include <silkworm/core/types/transaction.hpp>
+#include <silkworm/core/rlp/encode.hpp>
 
-#include <silkworm/state/state.hpp>
-#include <silkworm/consensus/blockchain.hpp>
+#include <silkworm/core/state/state.hpp>
+#include <silkworm/core/protocol/blockchain.hpp>
 
 #include <nlohmann/json.hpp>
 #include <ethash/keccak.hpp>
