@@ -8,15 +8,15 @@
 #include <fc/crypto/rand.hpp>
 #include <fc/crypto/hex.hpp>
 
-#include <silkworm/crypto/ecdsa.hpp>
-#include <silkworm/types/transaction.hpp>
-#include <silkworm/rlp/encode.hpp>
-#include <silkworm/common/util.hpp>
-#include <silkworm/execution/address.hpp>
+#include <silkworm/core/crypto/ecdsa.h>
+#include <silkworm/core/types/transaction.hpp>
+#include <silkworm/core/rlp/encode.hpp>
+#include <silkworm/core/common/util.hpp>
+#include <silkworm/core/execution/address.hpp>
 
 #include <secp256k1.h>
 
-#include <silkworm/common/util.hpp>
+#include <silkworm/core/common/util.hpp>
 
 #include <contracts.hpp>
 

@@ -143,12 +143,14 @@ try {
       auto restore_nonce = faucet_eoa.next_nonce;
 
       silkworm::Transaction tx{
-         .type = silkworm::Transaction::Type::kLegacy,
-         .max_priority_fee_per_gas = suggested_gas_price - 1,
-         .max_fee_per_gas = suggested_gas_price - 1,
-         .gas_limit = 21000,
-         .to = recipient.address,
-         .value = 1,
+         silkworm::UnsignedTransaction {
+            .type = silkworm::TransactionType::kLegacy,
+            .max_priority_fee_per_gas = suggested_gas_price - 1,
+            .max_fee_per_gas = suggested_gas_price - 1,
+            .gas_limit = 21000,
+            .to = recipient.address,
+            .value = 1,
+         }
       };
       faucet_eoa.sign(tx);
 
@@ -162,12 +164,14 @@ try {
       // Exactly matching gas price is accepted
 
       silkworm::Transaction tx{
-         .type = silkworm::Transaction::Type::kLegacy,
-         .max_priority_fee_per_gas = suggested_gas_price,
-         .max_fee_per_gas = suggested_gas_price,
-         .gas_limit = 21000,
-         .to = recipient.address,
-         .value = 1,
+         silkworm::UnsignedTransaction {
+            .type = silkworm::TransactionType::kLegacy,
+            .max_priority_fee_per_gas = suggested_gas_price,
+            .max_fee_per_gas = suggested_gas_price,
+            .gas_limit = 21000,
+            .to = recipient.address,
+            .value = 1,
+         }
       };
       faucet_eoa.sign(tx);
       pushtx(tx);
@@ -177,12 +181,14 @@ try {
       // Higher gas price is also okay
 
       silkworm::Transaction tx{
-         .type = silkworm::Transaction::Type::kLegacy,
-         .max_priority_fee_per_gas = suggested_gas_price + 1,
-         .max_fee_per_gas = suggested_gas_price + 1,
-         .gas_limit = 21000,
-         .to = recipient.address,
-         .value = 1,
+         silkworm::UnsignedTransaction {
+            .type = silkworm::TransactionType::kLegacy,
+            .max_priority_fee_per_gas = suggested_gas_price + 1,
+            .max_fee_per_gas = suggested_gas_price + 1,
+            .gas_limit = 21000,
+            .to = recipient.address,
+            .value = 1,
+         }
       };
       faucet_eoa.sign(tx);
       pushtx(tx);
