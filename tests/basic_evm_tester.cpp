@@ -681,10 +681,10 @@ intx::uint128 basic_evm_tester::tx_data_cost(const silkworm::Transaction& txn) c
     }
 
     const intx::uint128 non_zero_bytes{as_range::count_if(txn.data, [](uint8_t c) { return c != 0; })};
-    const intx::uint128 nonZeroGas{silkworm::fee::kGTxDataNonZeroIstanbul};
+    const intx::uint128 nonZeroGas{silkworm::protocol::fee::kGTxDataNonZeroIstanbul};
     gas += non_zero_bytes * nonZeroGas;
     const intx::uint128 zero_bytes{data_len - non_zero_bytes};
-    gas += zero_bytes * silkworm::fee::kGTxDataZero;
+    gas += zero_bytes * silkworm::protocol::fee::kGTxDataZero;
 
     return gas;
 }
