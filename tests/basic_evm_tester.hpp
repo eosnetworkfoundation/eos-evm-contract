@@ -13,6 +13,7 @@
 #include <silkworm/core/rlp/encode.hpp>
 #include <silkworm/core/common/util.hpp>
 #include <silkworm/core/execution/address.hpp>
+#include <silkworm/core/protocol/param.hpp>
 
 #include <secp256k1.h>
 
@@ -467,6 +468,8 @@ public:
    bool scan_gcstore(std::function<bool(gcstore)> visitor) const;
    bool scan_account_code(std::function<bool(account_code)> visitor) const;
    void scan_balances(std::function<bool(evm_test::vault_balance_row)> visitor) const;
+
+   intx::uint128 tx_data_cost(const silkworm::Transaction& txn) const;
 };
 
 inline constexpr intx::uint256 operator"" _wei(const char* s) { return intx::from_string<intx::uint256>(s); }

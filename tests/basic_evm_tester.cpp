@@ -672,6 +672,24 @@ std::optional<account_object> basic_evm_tester::find_account_by_id(uint64_t id) 
    return convert_to_account_object(row);
 }
 
+intx::uint128 basic_evm_tester::tx_data_cost(const silkworm::Transaction& txn) const {
+    intx::uint128 gas{0};
+
+    const intx::uint128 data_len{txn.data.length()};
+    if (data_len == 0) {
+        return gas;
+    }
+
+    const intx::uint128 non_zero_bytes{as_range::count_if(txn.data, [](uint8_t c) { return c != 0; })};
+    const intx::uint128 nonZeroGas{silkworm::protocol::fee::kGTxDataNonZeroIstanbul};
+    gas += non_zero_bytes * nonZeroGas;
+    const intx::uint128 zero_bytes{data_len - non_zero_bytes};
+    gas += zero_bytes * silkworm::protocol::fee::kGTxDataZero;
+
+    return gas;
+}
+
+
 bool basic_evm_tester::scan_account_storage(uint64_t account_id, std::function<bool(storage_slot)> visitor) const
 {
    static constexpr eosio::chain::name storage_table_name = "storage"_n;

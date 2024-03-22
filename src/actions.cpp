@@ -234,7 +234,9 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
     }
 
     ValidationResult r = silkworm::protocol::pre_validate_transaction(tx, ep.evm().revision(), ep.evm().config().chain_id,
-                                                             ep.evm().block().header.base_fee_per_gas, ep.evm().block().header.data_gas_price());
+                            ep.evm().block().header.base_fee_per_gas, ep.evm().block().header.data_gas_price(),
+                            ep.evm().get_eos_evm_version(), ep.evm().get_gas_params());
+
     check_result( r, tx, "pre_validate_transaction error" );
     r = silkworm::protocol::validate_transaction(tx, ep.state(), ep.available_gas());
     check_result( r, tx, "validate_transaction error" );
@@ -333,7 +335,19 @@ void evm_contract::exec(const exec_input& input, const std::optional<exec_callba
     evm_runtime::state state{get_self(), get_self(), true};
     IntraBlockState ibstate{state};
 
-    EVM evm{block, ibstate, *found_chain_config.value().second};
+    const auto& consensus_param = _config->get_consensus_param();
+
+    auto gas_params = std::visit([&](const auto &v) {
+        return evmone::gas_parameters(
+            v.gas_parameter.gas_txnewaccount,
+            v.gas_parameter.gas_newaccount,
+            v.gas_parameter.gas_txcreate,
+            v.gas_parameter.gas_codedeposit,
+            v.gas_parameter.gas_sset
+        );
+    }, consensus_param);
+
+    EVM evm{block, ibstate, *found_chain_config.value().second, gas_params};
 
     Transaction txn;
     txn.to    = to_address(input.to);
@@ -440,7 +454,18 @@ void evm_contract::process_tx(const runtime_config& rc, eosio::name miner, const
     silkworm::protocol::TrustRuleSet engine{*found_chain_config->second};
 
     evm_runtime::state state{get_self(), get_self(), false, false};
-    silkworm::ExecutionProcessor ep{block, engine, state, *found_chain_config->second};
+
+    auto gas_params = std::visit([&](const auto &v) {
+        return evmone::gas_parameters(
+            v.gas_parameter.gas_txnewaccount,
+            v.gas_parameter.gas_newaccount,
+            v.gas_parameter.gas_txcreate,
+            v.gas_parameter.gas_codedeposit,
+            v.gas_parameter.gas_sset
+        );
+    }, gas_param_pair.first);
+
+    silkworm::ExecutionProcessor ep{block, engine, state, *found_chain_config->second, gas_params};
 
     check(tx.max_priority_fee_per_gas == tx.max_fee_per_gas, "max_priority_fee_per_gas must be equal to max_fee_per_gas");
     check(tx.max_fee_per_gas >= _config->get_gas_price(), "gas price is too low");
