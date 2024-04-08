@@ -16,8 +16,7 @@ struct gas_parameter_type {
     uint64_t gas_sset = 20000;
 };
 struct consensus_parameter_data_v0 {
-    uint64_t                   minimum_gas_price = 0;
-    gas_parameter_type         gas_parameter;
+    gas_parameter_type gas_parameter;
 };
 using consensus_parameter_data_type = std::variant<consensus_parameter_data_v0>;
 

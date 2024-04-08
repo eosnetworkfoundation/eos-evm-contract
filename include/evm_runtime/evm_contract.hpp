@@ -85,7 +85,7 @@ public:
 
    [[eosio::action]] void setversion(uint64_t version);
 
-   [[eosio::action]] void updtgasparam(eosio::asset ram_price_mb, uint64_t minimum_gas_price);
+   [[eosio::action]] void updtgasparam(eosio::asset ram_price_mb, uint64_t gas_price);
    [[eosio::action]] void setgasparam(uint64_t gas_txnewaccount, uint64_t gas_newaccount, uint64_t gas_txcreate, uint64_t gas_codedeposit, uint64_t gas_sset);
 
    // Events

@@ -433,9 +433,9 @@ transaction_trace_ptr basic_evm_tester::setversion(uint64_t version, name actor)
       mvo()("version", version));
 }
 
-transaction_trace_ptr basic_evm_tester::updtgasparam(asset ram_price_mb, uint64_t minimum_gas_price, name actor) {
+transaction_trace_ptr basic_evm_tester::updtgasparam(asset ram_price_mb, uint64_t gas_price, name actor) {
    return basic_evm_tester::push_action(evm_account_name, "updtgasparam"_n, actor,
-      mvo()("ram_price_mb", ram_price_mb)("minimum_gas_price", minimum_gas_price));
+      mvo()("ram_price_mb", ram_price_mb)("gas_price", gas_price));
 }
 
 transaction_trace_ptr basic_evm_tester::setgasparam(uint64_t gas_txnewaccount, 
