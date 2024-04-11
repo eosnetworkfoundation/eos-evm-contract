@@ -404,7 +404,7 @@ public:
    transaction_trace_ptr call(name from, const evmc::bytes& to, const evmc::bytes& value, evmc::bytes& data, uint64_t gas_limit, name actor);
    transaction_trace_ptr admincall(const evmc::bytes& from, const evmc::bytes& to, const evmc::bytes& value, evmc::bytes& data, uint64_t gas_limit, name actor);
    evmc::address deploy_contract(evm_eoa& eoa, evmc::bytes bytecode);
-   transaction_trace_ptr updtgasparam(asset ram_price_mb, uint64_t minimum_gas_price, name actor);
+   transaction_trace_ptr updtgasparam(asset ram_price_mb, uint64_t gas_price, name actor);
    transaction_trace_ptr setgasparam(uint64_t gas_txnewaccount, 
                                 uint64_t gas_newaccount, 
                                 uint64_t gas_txcreate, 
