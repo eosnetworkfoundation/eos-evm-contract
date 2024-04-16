@@ -52,6 +52,7 @@ namespace evm_test {
 struct evmtx_v0 {
    uint64_t  eos_evm_version;
    bytes     rlptx;
+   uint64_t  base_fee_per_gas;
 };
 
 using evmtx_type = std::variant<evmtx_v0>;
@@ -195,7 +196,7 @@ FC_REFLECT(evm_test::message_receiver, (account)(handler)(min_fee)(flags));
 FC_REFLECT(evm_test::bridge_message_v0, (receiver)(sender)(timestamp)(value)(data));
 FC_REFLECT(evm_test::gcstore, (id)(storage_id));
 FC_REFLECT(evm_test::account_code, (id)(ref_count)(code)(code_hash));
-FC_REFLECT(evm_test::evmtx_v0, (eos_evm_version)(rlptx));
+FC_REFLECT(evm_test::evmtx_v0, (eos_evm_version)(rlptx)(base_fee_per_gas));
 
 namespace evm_test {
 class evm_eoa
