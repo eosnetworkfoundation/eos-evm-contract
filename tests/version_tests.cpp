@@ -110,7 +110,16 @@ BOOST_FIXTURE_TEST_CASE(set_version, version_tester) try {
     // Fund evm1 address with 100 EOS (this will NOT trigger an update of the evm version)
     evm_eoa evm1;
     const int64_t to_bridge = 1000000;
-    transfer_token("alice"_n, evm_account_name, make_asset(to_bridge), evm1.address_0x());
+    auto trace0 = transfer_token("alice"_n, evm_account_name, make_asset(to_bridge), evm1.address_0x());
+    BOOST_CHECK_EQUAL(trace0->action_traces.size(), 4);
+    BOOST_REQUIRE(trace0->action_traces[0].act.account == token_account_name);
+    BOOST_REQUIRE(trace0->action_traces[0].act.name == "transfer"_n);
+    BOOST_REQUIRE(trace0->action_traces[1].act.account == token_account_name);
+    BOOST_REQUIRE(trace0->action_traces[1].act.name == "transfer"_n);
+    BOOST_REQUIRE(trace0->action_traces[2].act.account == token_account_name);
+    BOOST_REQUIRE(trace0->action_traces[2].act.name == "transfer"_n);
+    BOOST_REQUIRE(trace0->action_traces[3].act.account == evm_account_name);
+    BOOST_REQUIRE(trace0->action_traces[3].act.name == "pushtx"_n);
 
     config = get_config();
     BOOST_CHECK_EQUAL(config.evm_version.has_value(), true);
@@ -127,12 +136,30 @@ BOOST_FIXTURE_TEST_CASE(set_version, version_tester) try {
     }
 
     // Fund evm1 address with 100 more EOS (this will trigger an update of the evm version)
-    transfer_token("alice"_n, evm_account_name, make_asset(to_bridge), evm1.address_0x());
+    auto trace = transfer_token("alice"_n, evm_account_name, make_asset(to_bridge), evm1.address_0x());
     config = get_config();
 
     BOOST_CHECK_EQUAL(config.evm_version.has_value(), true);
     BOOST_CHECK_EQUAL(config.evm_version.value().cached_version, 1);
     BOOST_CHECK_EQUAL(config.evm_version.value().pending_version.has_value(), false);
+
+    BOOST_CHECK_EQUAL(trace->action_traces.size(), 4);
+    BOOST_REQUIRE(trace->action_traces[0].act.account == token_account_name);
+    BOOST_REQUIRE(trace->action_traces[0].act.name == "transfer"_n);
+    BOOST_REQUIRE(trace->action_traces[1].act.account == token_account_name);
+    BOOST_REQUIRE(trace->action_traces[1].act.name == "transfer"_n);
+    BOOST_REQUIRE(trace->action_traces[2].act.account == token_account_name);
+    BOOST_REQUIRE(trace->action_traces[2].act.name == "transfer"_n);
+    BOOST_REQUIRE(trace->action_traces[3].act.account == evm_account_name);
+    BOOST_REQUIRE(trace->action_traces[3].act.name == "evmtx"_n);
+
+    auto evmtx_v = fc::raw::unpack<evm_test::evmtx_type>(
+        trace->action_traces[3].act.data.data(), trace->action_traces[3].act.data.size());
+    BOOST_REQUIRE(std::holds_alternative<evm_test::evmtx_v0>(evmtx_v));
+
+    const auto &evmtx = std::get<evm_test::evmtx_v0>(evmtx_v);
+    BOOST_CHECK_EQUAL(evmtx.eos_evm_version, 1);
+    BOOST_CHECK_EQUAL(evmtx.base_fee_per_gas, config.gas_price);
 
 } FC_LOG_AND_RETHROW()
 
