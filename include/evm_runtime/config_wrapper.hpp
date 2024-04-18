@@ -30,6 +30,9 @@ struct config_wrapper {
     uint64_t get_gas_price()const;
     void set_gas_price(uint64_t gas_price);
 
+    void enqueue_gas_price(uint64_t gas_price);
+    void process_price_queue();
+
     uint32_t get_miner_cut()const;
     void set_miner_cut(uint32_t miner_cut);
 

@@ -13,6 +13,9 @@ config_wrapper::config_wrapper(eosio::name self) : _self(self), _config(self, se
         _cached_config.consensus_parameter = consensus_parameter_type();
         // Don't set dirty because action can be read-only.
     }
+    if (!_cached_config.base_price_queue.has_value()) {
+        _cached_config.base_price_queue = std::deque<price_time>();
+    }
 }
 
 config_wrapper::~config_wrapper() {
@@ -77,6 +80,36 @@ void config_wrapper::set_gas_price(uint64_t gas_price) {
     set_dirty();
 }
 
+void config_wrapper::enqueue_gas_price(uint64_t gas_price) {
+    auto pt = price_time{gas_price, eosio::current_time_point() + eosio::seconds(grace_period_seconds)};
+    // should not happen
+    check(_cached_config.base_price_queue.has_value(), "no queue");
+    auto& q = _cached_config.base_price_queue.value();
+    if(!q.size()) {
+        q.push_back(pt);
+    } else {
+        if(q.back().price == gas_price) {
+            return;
+        }
+        if(q.back().time == pt.time) {
+            q.back() = pt;
+        } else {
+            q.push_back(pt);
+        }
+    }
+    set_dirty();
+}
+
+void config_wrapper::process_price_queue() {
+    if(!_cached_config.base_price_queue.has_value()) return;
+    auto now = eosio::current_time_point();
+    auto& q = _cached_config.base_price_queue.value();
+    while( q.size() && now >= q.front().time ) {
+        set_gas_price(q.front().price);
+        q.pop_front();
+    }
+}
+
 uint32_t config_wrapper::get_miner_cut()const {
     return _cached_config.miner_cut;
 }
@@ -127,7 +160,11 @@ void config_wrapper::set_fee_parameters(const fee_parameters& fee_params,
 {
     if (fee_params.gas_price.has_value()) {
         eosio::check(*fee_params.gas_price >= one_gwei, "gas_price must >= 1Gwei");
-        _cached_config.gas_price = *fee_params.gas_price;
+        if(get_evm_version() >= 1) {
+            enqueue_gas_price(*fee_params.gas_price);
+        } else {
+            set_gas_price(*fee_params.gas_price);
+        }
     } else {
         eosio::check(allow_any_to_be_unspecified, "All required fee parameters not specified: missing gas_price");
     }
@@ -174,7 +211,11 @@ void config_wrapper::update_consensus_parameters(eosio::asset ram_price_mb, uint
                              gas_sset_min + storage_slot_bytes * gas_per_byte /*gas_sset*/
     );
 
-    set_gas_price(gas_price);
+    if(get_evm_version() >= 1) {
+        enqueue_gas_price(gas_price);
+    } else {
+        set_gas_price(gas_price);
+    }
 }
 
 void config_wrapper::update_consensus_parameters2(std::optional<uint64_t> gas_txnewaccount, std::optional<uint64_t> gas_newaccount, std::optional<uint64_t> gas_txcreate, std::optional<uint64_t> gas_codedeposit, std::optional<uint64_t> gas_sset)
