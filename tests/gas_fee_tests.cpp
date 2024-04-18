@@ -300,4 +300,81 @@ try {
 }
 FC_LOG_AND_RETHROW()
 
+
+BOOST_FIXTURE_TEST_CASE(set_gas_price_v1, gas_fee_evm_tester)
+try {
+   init();
+
+   setversion(1, evm_account_name);
+   produce_blocks(2);
+
+   const auto ten_gwei = 10'000'000'000ull;
+
+   // Queue change of gas_price to 10Gwei
+   setfeeparams({.gas_price = ten_gwei});
+
+   auto conf1 = get_config();
+   BOOST_REQUIRE(conf1.base_price_queue.has_value());
+
+   auto& q = conf1.base_price_queue.value();
+
+   auto gp1 = price_time{
+      .price=ten_gwei,
+      .time=control->pending_block_time()+fc::seconds(price_queue_grace_period)
+   };
+
+   BOOST_CHECK_EQUAL(q.size(), 1);
+   BOOST_CHECK_EQUAL(q.front(), gp1);
+
+   produce_blocks(2);
+
+   // different time, same price => no effect
+   setfeeparams({.gas_price = ten_gwei});
+   conf1 = get_config();;
+   q = conf1.base_price_queue.value();
+   BOOST_CHECK_EQUAL(q.size(), 1);
+   BOOST_CHECK_EQUAL(q.front(), gp1);
+
+   produce_blocks(2);
+
+   // different time, different price => [ok]
+   setfeeparams({.gas_price = ten_gwei+1});
+   conf1 = get_config();;
+   q = conf1.base_price_queue.value();
+   auto gp2 = price_time{
+      .price=ten_gwei+1,
+      .time=control->pending_block_time()+fc::seconds(price_queue_grace_period)
+   };
+
+   BOOST_CHECK_EQUAL(q.size(), 2);
+   BOOST_CHECK_EQUAL(q.front(), gp1);
+   BOOST_CHECK_EQUAL(q.back(), gp2);
+
+   // Process price queue
+   conf1 = get_config();
+   BOOST_CHECK_EQUAL(conf1.gas_price, suggested_gas_price);
+
+   auto trigger_price_queue_processing = [&](){
+      transfer_token("alice"_n, evm_account_name, make_asset(1), evm_account_name.to_string());
+   };
+
+   while(control->pending_block_time() != gp1.time) {
+      produce_blocks(1);
+   }
+   trigger_price_queue_processing();
+   conf1 = get_config();
+   BOOST_CHECK_EQUAL(conf1.gas_price, gp1.price);
+
+   while(control->pending_block_time() != gp2.time) {
+      produce_blocks(1);
+   }
+   trigger_price_queue_processing();
+   conf1 = get_config();
+   BOOST_CHECK_EQUAL(conf1.gas_price, gp2.price);
+
+   q = conf1.base_price_queue.value();
+   BOOST_CHECK_EQUAL(q.size(), 0);
+}
+FC_LOG_AND_RETHROW()
+
 BOOST_AUTO_TEST_SUITE_END()

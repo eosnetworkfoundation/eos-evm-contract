@@ -88,6 +88,16 @@ namespace fc { namespace raw {
          fc::raw::unpack(ds, version);
          tmp.evm_version.emplace(version);
       }
+      if(ds.remaining()) {
+         evm_test::consensus_parameter_type consensus_parameter;
+         fc::raw::unpack(ds, consensus_parameter);
+         tmp.consensus_parameter.emplace(consensus_parameter);
+      }
+      if(ds.remaining()) {
+         std::deque<evm_test::price_time> base_price_queue;
+         fc::raw::unpack(ds, base_price_queue);
+         tmp.base_price_queue.emplace(base_price_queue);
+      }
     } FC_RETHROW_EXCEPTIONS(warn, "error unpacking partial_account_table_row") }
 }}
 
