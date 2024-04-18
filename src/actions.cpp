@@ -329,8 +329,14 @@ void evm_contract::exec(const exec_input& input, const std::optional<exec_callba
     eosevm::block_mapping bm(_config->get_genesis_time().sec_since_epoch());
 
     Block block;
+
+    auto evm_version = _config->get_evm_version();
+    std::optional<uint64_t> base_fee_per_gas;
+    if (evm_version >= 1) {
+        base_fee_per_gas = _config->get_gas_price();
+    }
     eosevm::prepare_block_header(block.header, bm, get_self().value,
-        bm.timestamp_to_evm_block_num(eosio::current_time_point().time_since_epoch().count()), _config->get_evm_version());
+        bm.timestamp_to_evm_block_num(eosio::current_time_point().time_since_epoch().count()), evm_version, base_fee_per_gas);
 
     evm_runtime::state state{get_self(), get_self(), true};
     IntraBlockState ibstate{state};
@@ -448,8 +454,14 @@ void evm_contract::process_tx(const runtime_config& rc, eosio::name miner, const
     eosevm::block_mapping bm(_config->get_genesis_time().sec_since_epoch());
 
     Block block;
+
+    std::optional<uint64_t> base_fee_per_gas;
+    if (current_version >= 1) {
+        base_fee_per_gas = _config->get_gas_price();
+    }
+
     eosevm::prepare_block_header(block.header, bm, get_self().value,
-        bm.timestamp_to_evm_block_num(eosio::current_time_point().time_since_epoch().count()), current_version);
+        bm.timestamp_to_evm_block_num(eosio::current_time_point().time_since_epoch().count()), current_version, base_fee_per_gas);
 
     silkworm::protocol::TrustRuleSet engine{*found_chain_config->second};
 
@@ -490,7 +502,7 @@ void evm_contract::process_tx(const runtime_config& rc, eosio::name miner, const
     }
 
     if (current_version >= 1) {
-        auto event = evmtx_type{evmtx_v0{current_version, txn.get_rlptx()}};
+        auto event = evmtx_type{evmtx_v0{current_version, txn.get_rlptx(), *base_fee_per_gas}};
         action(std::vector<permission_level>{}, get_self(), "evmtx"_n, event)
             .send();
     }

@@ -90,8 +90,9 @@ namespace evm_runtime {
    struct evmtx_v0 {
       uint64_t  eos_evm_version;
       bytes     rlptx;
-
-      EOSLIB_SERIALIZE(evmtx_v0, (eos_evm_version)(rlptx));
+      uint64_t  base_fee_per_gas;
+      
+      EOSLIB_SERIALIZE(evmtx_v0, (eos_evm_version)(rlptx)(base_fee_per_gas));
    };
 
    using evmtx_type = std::variant<evmtx_v0>;
