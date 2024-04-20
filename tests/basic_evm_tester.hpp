@@ -40,6 +40,12 @@ inline std::ostream& operator<<(std::ostream& ds, const intx::uint256& num)
 
 } // namespace intx
 
+inline std::ostream& operator<<(std::ostream& ds, const fc::time_point& tp)
+{
+   ds << tp.to_iso_string();
+   return ds;
+}
+
 namespace fc {
 
 void to_variant(const intx::uint256& o, fc::variant& v);
@@ -85,17 +91,6 @@ struct consensus_parameter_type {
    consensus_parameter_data_type current;
    std::optional<pending_consensus_parameter_data_type> pending;
 };
-struct price_time {
-   uint64_t price;
-   fc::time_point time;
-   bool operator==(const price_time& o) const { return price == o.price && time == o.time; }
-};
-
-inline std::ostream& operator<<(std::ostream& ds, const price_time& pt)
-{
-   ds << "{" << pt.price << "," << pt.time.to_iso_string() << "}";
-   return ds;
-}
 struct config_table_row
 {
    unsigned_int version;
@@ -107,7 +102,6 @@ struct config_table_row
    uint32_t status;
    std::optional<evm_version_type> evm_version;
    std::optional<consensus_parameter_type> consensus_parameter;
-   std::optional<std::deque<price_time>> base_price_queue;
 };
 
 struct config2_table_row
@@ -207,9 +201,14 @@ struct account_code {
 
 using bridge_message = std::variant<bridge_message_v0>;
 
+struct price_queue {
+   uint64_t time;
+   uint64_t price;
+};
+
 } // namespace evm_test
 
-
+FC_REFLECT(evm_test::price_queue, (time)(price))
 FC_REFLECT(evm_test::evm_version_type, (pending_version)(cached_version))
 FC_REFLECT(evm_test::evm_version_type::pending, (version)(time))
 FC_REFLECT(evm_test::config2_table_row,(next_account_id))
@@ -228,7 +227,6 @@ FC_REFLECT(evm_test::gcstore, (id)(storage_id));
 FC_REFLECT(evm_test::account_code, (id)(ref_count)(code)(code_hash));
 FC_REFLECT(evm_test::evmtx_v0, (eos_evm_version)(rlptx)(base_fee_per_gas));
 
-FC_REFLECT(evm_test::price_time, (price)(time));
 FC_REFLECT(evm_test::consensus_parameter_type, (current)(pending));
 FC_REFLECT(evm_test::pending_consensus_parameter_data_type, (data)(pending_time));
 FC_REFLECT(evm_test::consensus_parameter_data_v0, (gas_parameter));
@@ -506,6 +504,7 @@ public:
    bool scan_gcstore(std::function<bool(gcstore)> visitor) const;
    bool scan_account_code(std::function<bool(account_code)> visitor) const;
    void scan_balances(std::function<bool(evm_test::vault_balance_row)> visitor) const;
+   bool scan_price_queue(std::function<bool(evm_test::price_queue)> visitor) const;
 
    intx::uint128 tx_data_cost(const silkworm::Transaction& txn) const;
 };

@@ -13,9 +13,6 @@ config_wrapper::config_wrapper(eosio::name self) : _self(self), _config(self, se
         _cached_config.consensus_parameter = consensus_parameter_type();
         // Don't set dirty because action can be read-only.
     }
-    if (!_cached_config.base_price_queue.has_value()) {
-        _cached_config.base_price_queue = std::deque<price_time>();
-    }
 }
 
 config_wrapper::~config_wrapper() {
@@ -81,32 +78,21 @@ void config_wrapper::set_gas_price(uint64_t gas_price) {
 }
 
 void config_wrapper::enqueue_gas_price(uint64_t gas_price) {
-    auto pt = price_time{gas_price, eosio::current_time_point() + eosio::seconds(grace_period_seconds)};
-    // should not happen
-    check(_cached_config.base_price_queue.has_value(), "no queue");
-    auto& q = _cached_config.base_price_queue.value();
-    if(!q.size()) {
-        q.push_back(pt);
-    } else {
-        if(q.back().price == gas_price) {
-            return;
-        }
-        if(q.back().time == pt.time) {
-            q.back() = pt;
-        } else {
-            q.push_back(pt);
-        }
-    }
-    set_dirty();
+    price_queue_table queue(_self, _self.value);
+    auto time = eosio::current_time_point() + eosio::seconds(grace_period_seconds);
+    queue.emplace(_self, [&](auto& el) {
+        el.time = time.elapsed.count();
+        el.price = gas_price;
+    });
 }
 
 void config_wrapper::process_price_queue() {
-    if(!_cached_config.base_price_queue.has_value()) return;
-    auto now = eosio::current_time_point();
-    auto& q = _cached_config.base_price_queue.value();
-    while( q.size() && now >= q.front().time ) {
-        set_gas_price(q.front().price);
-        q.pop_front();
+    auto now = eosio::current_time_point().elapsed.count();
+    price_queue_table queue(_self, _self.value);
+    auto it = queue.begin();
+    while( it != queue.end() && now >= it->time ) {
+        set_gas_price(it->price);
+        it = queue.erase(it);
     }
 }
 

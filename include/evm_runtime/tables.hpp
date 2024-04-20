@@ -322,11 +322,6 @@ struct consensus_parameter_type {
     }
 };
 
-struct price_time {
-    uint64_t   price;
-    time_point time;
-};
-
 struct [[eosio::table]] [[eosio::contract("evm_contract")]] config
 {
     unsigned_int version; // placeholder for future variant index
@@ -338,9 +333,20 @@ struct [[eosio::table]] [[eosio::contract("evm_contract")]] config
     uint32_t status = 0; // <- bit mask values from status_flags
     binary_extension<evm_version_type> evm_version;
     binary_extension<consensus_parameter_type> consensus_parameter;
-    binary_extension<std::deque<price_time>> base_price_queue;
 
-    EOSLIB_SERIALIZE(config, (version)(chainid)(genesis_time)(ingress_bridge_fee)(gas_price)(miner_cut)(status)(evm_version)(consensus_parameter)(base_price_queue));
+    EOSLIB_SERIALIZE(config, (version)(chainid)(genesis_time)(ingress_bridge_fee)(gas_price)(miner_cut)(status)(evm_version)(consensus_parameter));
 };
+
+struct [[eosio::table]] [[eosio::contract("evm_contract")]] price_queue
+{
+    uint64_t time;
+    uint64_t price;
+
+    uint64_t primary_key()const { return time; }
+
+    EOSLIB_SERIALIZE(price_queue, (time)(price));
+};
+
+typedef eosio::multi_index<"pricequeue"_n, price_queue> price_queue_table;
 
 } //namespace evm_runtime
