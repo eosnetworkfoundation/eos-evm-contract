@@ -416,7 +416,7 @@ transaction_trace_ptr basic_evm_tester::assertnonce(name account, uint64_t next_
       mvo()("account", account)("next_nonce", next_nonce));
 }
 
-transaction_trace_ptr basic_evm_tester::pushtx(const silkworm::Transaction& trx, name miner)
+transaction_trace_ptr basic_evm_tester::pushtx(const silkworm::Transaction& trx, name miner, uint64_t min_inclusion_price)
 {
    silkworm::Bytes rlp;
    silkworm::rlp::encode(rlp, trx);
@@ -425,7 +425,7 @@ transaction_trace_ptr basic_evm_tester::pushtx(const silkworm::Transaction& trx,
    rlp_bytes.resize(rlp.size());
    memcpy(rlp_bytes.data(), rlp.data(), rlp.size());
 
-   return push_action(evm_account_name, "pushtx"_n, miner, mvo()("miner", miner)("rlptx", rlp_bytes));
+   return push_action(evm_account_name, "pushtx"_n, miner, mvo()("miner", miner)("rlptx", rlp_bytes)("min_inclusion_price", min_inclusion_price));
 }
 
 transaction_trace_ptr basic_evm_tester::setversion(uint64_t version, name actor) {

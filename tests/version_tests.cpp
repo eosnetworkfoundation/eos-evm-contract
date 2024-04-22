@@ -457,4 +457,78 @@ BOOST_FIXTURE_TEST_CASE(admincall_promote_pending, version_tester) try {
 
 } FC_LOG_AND_RETHROW()
 
+
+BOOST_FIXTURE_TEST_CASE(min_inclusion_price, version_tester) try {
+
+    auto config = get_config();
+
+    evm_eoa evm1;
+    const int64_t to_bridge = 1000000;
+
+    // Open alice internal balance
+    open("alice"_n);
+    transfer_token("alice"_n, evm_account_name, make_asset(to_bridge), "alice");
+    auto alice_addr = make_reserved_address("alice"_n.to_uint64_t());
+
+    // Fund evm1 address
+    transfer_token("alice"_n, evm_account_name, make_asset(to_bridge), evm1.address_0x());
+
+    /////////////////////////////////////
+    /// change EOS EVM VERSION => 1   ///
+    /////////////////////////////////////
+
+    setversion(1, evm_account_name);
+    produce_blocks(2);
+
+    // Test traces of `handle_evm_transfer` (EVM VERSION=1)
+    transfer_token("alice"_n, evm_account_name, make_asset(to_bridge), evm1.address_0x());
+
+    // test max priority fee too low
+    silkworm::Transaction txin {
+      silkworm::UnsignedTransaction {
+        .type = silkworm::TransactionType::kDynamicFee,
+        .max_priority_fee_per_gas = 1,
+        .max_fee_per_gas = config.gas_price + 10,
+        .gas_limit = 10'000'000,
+        .to = evmc::address{},
+        .data = silkworm::Bytes{}
+      }
+    };
+    evm1.sign(txin);
+    BOOST_REQUIRE_EXCEPTION(pushtx(txin, evm_account_name, 2),
+        eosio_assert_message_exception,
+        eosio_assert_message_is("max priority fee too low"));
+
+    // gas fee too low: miner expect 11Gwei inclusion fee
+    silkworm::Transaction txin2 {
+      silkworm::UnsignedTransaction {
+        .type = silkworm::TransactionType::kDynamicFee,
+        .max_priority_fee_per_gas = config.gas_price,
+        .max_fee_per_gas = config.gas_price + 10,
+        .gas_limit = 10'000'000,
+        .to = evmc::address{},
+        .data = silkworm::Bytes{}
+      }
+    };
+    evm1.sign(txin2);
+    BOOST_REQUIRE_EXCEPTION(pushtx(txin2, evm_account_name, 11),
+        eosio_assert_message_exception,
+        eosio_assert_message_is("gas price is too low"));
+
+    // gas fee just fine. (miner expect 10Gwei inclusion fee)
+    silkworm::Transaction txin3 {
+      silkworm::UnsignedTransaction {
+        .type = silkworm::TransactionType::kDynamicFee,
+        .max_priority_fee_per_gas = config.gas_price,
+        .max_fee_per_gas = config.gas_price + 10,
+        .gas_limit = 10'000'000,
+        .to = evmc::address{},
+        .data = silkworm::Bytes{}
+      }
+    };
+    evm1.sign(txin3);
+    pushtx(txin3, evm_account_name, 10);
+
+} FC_LOG_AND_RETHROW()
+
 BOOST_AUTO_TEST_SUITE_END()
