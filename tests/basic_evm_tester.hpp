@@ -1,5 +1,4 @@
 #pragma once
-#include <deque>
 #include <eosio/chain/abi_serializer.hpp>
 #include <eosio/testing/tester.hpp>
 #include <eosio/chain/fixed_bytes.hpp>

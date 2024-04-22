@@ -80,10 +80,25 @@ void config_wrapper::set_gas_price(uint64_t gas_price) {
 void config_wrapper::enqueue_gas_price(uint64_t gas_price) {
     price_queue_table queue(_self, _self.value);
     auto time = eosio::current_time_point() + eosio::seconds(grace_period_seconds);
+    auto time_us = time.elapsed.count();
+
+    auto it = queue.end();
+    if( it != queue.begin()) {
+        --it;
+        eosio::check(time_us >= it->time, "internal error");
+        if(it->time == time_us) {
+            queue.modify(*it, eosio::same_payer, [&](auto& el) {
+                el.price = gas_price;
+            });
+            return;
+        }
+    }
+
     queue.emplace(_self, [&](auto& el) {
-        el.time = time.elapsed.count();
+        el.time = time_us;
         el.price = gas_price;
     });
+
 }
 
 void config_wrapper::process_price_queue() {

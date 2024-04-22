@@ -334,9 +334,19 @@ try {
 
    produce_blocks(100);
 
-   // Queue change of gas_price to 20Gwei
-   setfeeparams({.gas_price = 2*ten_gwei});
+   // Queue change of gas_price to 30Gwei
+   setfeeparams({.gas_price = 3*ten_gwei});
    auto t2 = control->pending_block_time()+fc::seconds(price_queue_grace_period);
+
+   q = get_price_queue();
+   BOOST_CHECK_EQUAL(q.size(), 2);
+   BOOST_CHECK_EQUAL(q[0].time, t1.time_since_epoch().count());
+   BOOST_CHECK_EQUAL(q[0].price, ten_gwei);
+   BOOST_CHECK_EQUAL(q[1].time, t2.time_since_epoch().count());
+   BOOST_CHECK_EQUAL(q[1].price, 3*ten_gwei);
+
+   // Overwrite queue change (same block) 20Gwei
+   setfeeparams({.gas_price = 2*ten_gwei});
 
    q = get_price_queue();
    BOOST_CHECK_EQUAL(q.size(), 2);
