@@ -549,6 +549,23 @@ BOOST_FIXTURE_TEST_CASE(min_inclusion_price, version_tester) try {
         eosio_assert_message_exception,
         eosio_assert_message_is("inclusion price too low"));
 
+    // gas fee too low: gas fee < base fee
+	evm1.next_nonce = old_nonce;
+    silkworm::Transaction txin22 {
+      silkworm::UnsignedTransaction {
+        .type = silkworm::TransactionType::kDynamicFee,
+        .max_priority_fee_per_gas = config.gas_price - 10,
+        .max_fee_per_gas = config.gas_price - 10,
+        .gas_limit = 10'000'000,
+        .to = evmc::address{},
+        .data = silkworm::Bytes{}
+      }
+    };
+    evm1.sign(txin22);
+    BOOST_REQUIRE_EXCEPTION(pushtx(txin22, evm_account_name),
+        eosio_assert_message_exception,
+        eosio_assert_message_is("pre_validate_transaction error: 25 Max fee per gas less than block base fee"));
+
     // gas fee just fine. (miner expect 10Gwei inclusion fee)
 	evm1.next_nonce = old_nonce;
     silkworm::Transaction txin3 {
