@@ -434,7 +434,7 @@ public:
    transaction_trace_ptr bridgeunreg(name receiver);
    transaction_trace_ptr exec(const exec_input& input, const std::optional<exec_callback>& callback);
    transaction_trace_ptr assertnonce(name account, uint64_t next_nonce);
-   transaction_trace_ptr pushtx(const silkworm::Transaction& trx, name miner = evm_account_name, uint64_t min_inclusion_price = 0);
+   transaction_trace_ptr pushtx(const silkworm::Transaction& trx, name miner = evm_account_name, std::optional<uint64_t> min_inclusion_price={});
    transaction_trace_ptr setversion(uint64_t version, name actor);
    transaction_trace_ptr call(name from, const evmc::bytes& to, const evmc::bytes& value, evmc::bytes& data, uint64_t gas_limit, name actor);
    transaction_trace_ptr admincall(const evmc::bytes& from, const evmc::bytes& to, const evmc::bytes& value, evmc::bytes& data, uint64_t gas_limit, name actor);

@@ -433,7 +433,7 @@ void evm_contract::process_filtered_messages(const std::vector<silkworm::Filtere
 
 }
 
-void evm_contract::process_tx(const runtime_config& rc, eosio::name miner, const transaction& txn, uint64_t min_inclusion_price) {
+void evm_contract::process_tx(const runtime_config& rc, eosio::name miner, const transaction& txn, std::optional<uint64_t> min_inclusion_price) {
     LOGTIME("EVM START1");
 
     const auto& tx = txn.get_tx();
@@ -481,8 +481,9 @@ void evm_contract::process_tx(const runtime_config& rc, eosio::name miner, const
 
     if (current_version >= 1) {
         auto inclusion_price = std::min(tx.max_priority_fee_per_gas, tx.max_fee_per_gas - *base_fee_per_gas);
-        eosio::check(inclusion_price >= min_inclusion_price, "inclusion price too low");
+        eosio::check(inclusion_price >= (min_inclusion_price.has_value() ? *min_inclusion_price : 0), "inclusion price too low");
     } else { // old behavior
+        check(!min_inclusion_price.has_value(), "min_inclusion_price must not set");
         check(tx.max_priority_fee_per_gas == tx.max_fee_per_gas, "max_priority_fee_per_gas must be equal to max_fee_per_gas");
         check(tx.max_fee_per_gas >= _config->get_gas_price(), "gas price is too low");
     }
@@ -542,12 +543,12 @@ void evm_contract::pushtx(eosio::name miner, bytes rlptx, eosio::binary_extensio
         rc.allow_non_self_miner = false;
     }
 
-    auto current_version = _config->get_evm_version_and_maybe_promote();
-    if (current_version == 0) {
-        check(!min_inclusion_price.has_value() || *min_inclusion_price == 0, "min_inclusion_price must be 0");
+    std::optional<uint64_t> min_inclusion_price_;
+    if (min_inclusion_price.has_value()) {
+        min_inclusion_price_ = *min_inclusion_price;
     }
 
-    process_tx(rc, miner, transaction{std::move(rlptx)}, min_inclusion_price.has_value() ? *min_inclusion_price : 0);
+    process_tx(rc, miner, transaction{std::move(rlptx)}, min_inclusion_price_);
 }
 
 void evm_contract::open(eosio::name owner) {
@@ -728,8 +729,9 @@ void evm_contract::dispatch_tx(const runtime_config& rc, const transaction& tx) 
         process_tx(rc, get_self(), tx, 0 /* min_inclusion_price */);
     } else {
         eosio::check(rc.allow_special_signature && rc.abort_on_failure && !rc.enforce_chain_id && !rc.allow_non_self_miner, "invalid runtime config");
-        pushtx_action pushtx_act(get_self(), {{get_self(), "active"_n}});
-        pushtx_act.send(get_self(), tx.get_rlptx(), 0 /* min_inclusion_price */);
+        action(permission_level{get_self(),"active"_n}, get_self(), "pushtx"_n,
+            std::tuple<eosio::name, bytes>(get_self(), tx.get_rlptx())
+        ).send();
     }
 }
 

@@ -148,7 +148,7 @@ private:
 
    using pushtx_action = eosio::action_wrapper<"pushtx"_n, &evm_contract::pushtx>;
 
-   void process_tx(const runtime_config& rc, eosio::name miner, const transaction& tx, uint64_t min_inclusion_price);
+   void process_tx(const runtime_config& rc, eosio::name miner, const transaction& tx, std::optional<uint64_t> min_inclusion_price);
    void dispatch_tx(const runtime_config& rc, const transaction& tx);
 };
 

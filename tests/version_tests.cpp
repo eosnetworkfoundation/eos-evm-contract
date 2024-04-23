@@ -506,7 +506,7 @@ BOOST_FIXTURE_TEST_CASE(min_inclusion_price, version_tester) try {
     evm1.sign(txin01);
     BOOST_REQUIRE_EXCEPTION(pushtx(txin01, evm_account_name, 1),
         eosio_assert_message_exception,
-        eosio_assert_message_is("min_inclusion_price must be 0"));
+        eosio_assert_message_is("min_inclusion_price must not set"));
 
     /// change EOS EVM VERSION => 1   ///
     setversion(1, evm_account_name);
