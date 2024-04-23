@@ -337,4 +337,16 @@ struct [[eosio::table]] [[eosio::contract("evm_contract")]] config
     EOSLIB_SERIALIZE(config, (version)(chainid)(genesis_time)(ingress_bridge_fee)(gas_price)(miner_cut)(status)(evm_version)(consensus_parameter));
 };
 
+struct [[eosio::table]] [[eosio::contract("evm_contract")]] price_queue
+{
+    uint64_t time;
+    uint64_t price;
+
+    uint64_t primary_key()const { return time; }
+
+    EOSLIB_SERIALIZE(price_queue, (time)(price));
+};
+
+typedef eosio::multi_index<"pricequeue"_n, price_queue> price_queue_table;
+
 } //namespace evm_runtime
