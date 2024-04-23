@@ -482,11 +482,8 @@ void evm_contract::process_tx(const runtime_config& rc, eosio::name miner, const
     check(tx.max_fee_per_gas >= _config->get_gas_price(), "gas price is too low");
 
     if (current_version >= 1) {
-        if (min_inclusion_price > 0) {
-            eosio::check(tx.max_priority_fee_per_gas >= min_inclusion_price, "max priority fee too low");
-            intx::uint256 inclusion_price_ = tx.max_fee_per_gas - *base_fee_per_gas; // capped by max_priority_fee_per_gas
-            eosio::check(inclusion_price_ >= min_inclusion_price, "gas price is too low");
-        }
+        auto inclusion_price = std::min(tx.max_priority_fee_per_gas, tx.max_fee_per_gas - *base_fee_per_gas);
+        eosio::check(inclusion_price >= min_inclusion_price, "inclusion price too low");
     } else { // old behavior
         check(tx.max_priority_fee_per_gas == tx.max_fee_per_gas, "max_priority_fee_per_gas must be equal to max_fee_per_gas");
     }
@@ -543,6 +540,11 @@ void evm_contract::pushtx(eosio::name miner, bytes rlptx, eosio::binary_extensio
         rc.abort_on_failure = true;
         rc.enforce_chain_id = false;
         rc.allow_non_self_miner = false;
+    }
+
+    auto current_version = _config->get_evm_version_and_maybe_promote();
+    if (current_version == 0) {
+        check(!min_inclusion_price.has_value() || *min_inclusion_price == 0, "min_inclusion_price must be 0");
     }
 
     process_tx(rc, miner, transaction{std::move(rlptx)}, min_inclusion_price.has_value() ? *min_inclusion_price : 0);

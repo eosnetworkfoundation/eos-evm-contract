@@ -487,9 +487,26 @@ BOOST_FIXTURE_TEST_CASE(min_inclusion_price, version_tester) try {
       }
     };
     evm1.sign(txin0);
-    BOOST_REQUIRE_EXCEPTION(pushtx(txin0, evm_account_name, 1),
+    BOOST_REQUIRE_EXCEPTION(pushtx(txin0, evm_account_name),
         eosio_assert_message_exception,
         eosio_assert_message_is("pre_validate_transaction error: 29 Unsupported transaction type"));
+
+    evm1.next_nonce = old_nonce;
+    // EVM Version 0 does not support kDynamicFee transaction type
+    silkworm::Transaction txin01 {
+        silkworm::UnsignedTransaction {
+        .type = silkworm::TransactionType::kLegacy,
+        .max_priority_fee_per_gas = config.gas_price + 10,
+        .max_fee_per_gas = config.gas_price + 10,
+        .gas_limit = 10'000'000,
+        .to = evmc::address{},
+        .data = silkworm::Bytes{}
+        }
+    };
+    evm1.sign(txin01);
+    BOOST_REQUIRE_EXCEPTION(pushtx(txin01, evm_account_name, 1),
+        eosio_assert_message_exception,
+        eosio_assert_message_is("min_inclusion_price must be 0"));
 
     /// change EOS EVM VERSION => 1   ///
     setversion(1, evm_account_name);
@@ -500,7 +517,7 @@ BOOST_FIXTURE_TEST_CASE(min_inclusion_price, version_tester) try {
 
 	evm1.next_nonce = old_nonce;
     // test max priority fee too low
-    silkworm::Transaction txin {
+    silkworm::Transaction txin1 {
       silkworm::UnsignedTransaction {
         .type = silkworm::TransactionType::kDynamicFee,
         .max_priority_fee_per_gas = 1,
@@ -510,10 +527,10 @@ BOOST_FIXTURE_TEST_CASE(min_inclusion_price, version_tester) try {
         .data = silkworm::Bytes{}
       }
     };
-    evm1.sign(txin);
-    BOOST_REQUIRE_EXCEPTION(pushtx(txin, evm_account_name, 2),
+    evm1.sign(txin1);
+    BOOST_REQUIRE_EXCEPTION(pushtx(txin1, evm_account_name, 2),
         eosio_assert_message_exception,
-        eosio_assert_message_is("max priority fee too low"));
+        eosio_assert_message_is("inclusion price too low"));
 
     // gas fee too low: miner expect 11Gwei inclusion fee
 	evm1.next_nonce = old_nonce;
@@ -530,7 +547,7 @@ BOOST_FIXTURE_TEST_CASE(min_inclusion_price, version_tester) try {
     evm1.sign(txin2);
     BOOST_REQUIRE_EXCEPTION(pushtx(txin2, evm_account_name, 11),
         eosio_assert_message_exception,
-        eosio_assert_message_is("gas price is too low"));
+        eosio_assert_message_is("inclusion price too low"));
 
     // gas fee just fine. (miner expect 10Gwei inclusion fee)
 	evm1.next_nonce = old_nonce;
@@ -547,7 +564,7 @@ BOOST_FIXTURE_TEST_CASE(min_inclusion_price, version_tester) try {
     evm1.sign(txin3);
     pushtx(txin3, evm_account_name, 10);
 
-	// miner doesn't specify min_inclusion_price
+	// miner doesn't specify min_inclusion_price, default to 0
     silkworm::Transaction txin4 {
       silkworm::UnsignedTransaction {
         .type = silkworm::TransactionType::kDynamicFee,
