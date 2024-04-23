@@ -1,5 +1,4 @@
 #pragma once
-
 #include <eosio/chain/abi_serializer.hpp>
 #include <eosio/testing/tester.hpp>
 #include <eosio/chain/fixed_bytes.hpp>
@@ -40,6 +39,12 @@ inline std::ostream& operator<<(std::ostream& ds, const intx::uint256& num)
 
 } // namespace intx
 
+inline std::ostream& operator<<(std::ostream& ds, const fc::time_point& tp)
+{
+   ds << tp.to_iso_string();
+   return ds;
+}
+
 namespace fc {
 
 void to_variant(const intx::uint256& o, fc::variant& v);
@@ -66,7 +71,25 @@ struct evm_version_type {
    std::optional<pending> pending_version;
    uint64_t               cached_version=0;
 };
-
+struct gas_parameter_type {
+   uint64_t gas_txnewaccount = 0;
+   uint64_t gas_newaccount = 25000;
+   uint64_t gas_txcreate = 32000;
+   uint64_t gas_codedeposit = 200;
+   uint64_t gas_sset = 20000;
+};
+struct consensus_parameter_data_v0 {
+   gas_parameter_type gas_parameter;
+};
+using consensus_parameter_data_type = std::variant<consensus_parameter_data_v0>;
+struct pending_consensus_parameter_data_type {
+   consensus_parameter_data_type  data;
+   fc::time_point pending_time;
+};
+struct consensus_parameter_type {
+   consensus_parameter_data_type current;
+   std::optional<pending_consensus_parameter_data_type> pending;
+};
 struct config_table_row
 {
    unsigned_int version;
@@ -77,6 +100,7 @@ struct config_table_row
    uint32_t miner_cut;
    uint32_t status;
    std::optional<evm_version_type> evm_version;
+   std::optional<consensus_parameter_type> consensus_parameter;
 };
 
 struct config2_table_row
@@ -176,10 +200,14 @@ struct account_code {
 
 using bridge_message = std::variant<bridge_message_v0>;
 
+struct price_queue {
+   uint64_t time;
+   uint64_t price;
+};
+
 } // namespace evm_test
 
-
-FC_REFLECT(evm_test::config_table_row, (version)(chainid)(genesis_time)(ingress_bridge_fee)(gas_price)(miner_cut)(status)(evm_version))
+FC_REFLECT(evm_test::price_queue, (time)(price))
 FC_REFLECT(evm_test::evm_version_type, (pending_version)(cached_version))
 FC_REFLECT(evm_test::evm_version_type::pending, (version)(time))
 FC_REFLECT(evm_test::config2_table_row,(next_account_id))
@@ -197,6 +225,11 @@ FC_REFLECT(evm_test::bridge_message_v0, (receiver)(sender)(timestamp)(value)(dat
 FC_REFLECT(evm_test::gcstore, (id)(storage_id));
 FC_REFLECT(evm_test::account_code, (id)(ref_count)(code)(code_hash));
 FC_REFLECT(evm_test::evmtx_v0, (eos_evm_version)(rlptx)(base_fee_per_gas));
+
+FC_REFLECT(evm_test::consensus_parameter_type, (current)(pending));
+FC_REFLECT(evm_test::pending_consensus_parameter_data_type, (data)(pending_time));
+FC_REFLECT(evm_test::consensus_parameter_data_v0, (gas_parameter));
+FC_REFLECT(evm_test::gas_parameter_type, (gas_txnewaccount)(gas_newaccount)(gas_txcreate)(gas_codedeposit)(gas_sset));
 
 namespace evm_test {
 class evm_eoa
@@ -353,6 +386,7 @@ public:
    static constexpr uint64_t suggested_gas_price = 150'000'000'000;    // 150 gwei
    static constexpr uint32_t suggested_miner_cut = 10'000;             // 10%
    static constexpr uint64_t suggested_ingress_bridge_fee_amount = 70; // 0.0070 EOS
+   static constexpr uint64_t price_queue_grace_period = 180;           // 180 seconds
 
    const symbol native_symbol;
 
@@ -469,6 +503,7 @@ public:
    bool scan_gcstore(std::function<bool(gcstore)> visitor) const;
    bool scan_account_code(std::function<bool(account_code)> visitor) const;
    void scan_balances(std::function<bool(evm_test::vault_balance_row)> visitor) const;
+   bool scan_price_queue(std::function<bool(evm_test::price_queue)> visitor) const;
 
    intx::uint128 tx_data_cost(const silkworm::Transaction& txn) const;
 };

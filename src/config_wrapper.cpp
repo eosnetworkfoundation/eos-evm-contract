@@ -77,6 +77,40 @@ void config_wrapper::set_gas_price(uint64_t gas_price) {
     set_dirty();
 }
 
+void config_wrapper::enqueue_gas_price(uint64_t gas_price) {
+    price_queue_table queue(_self, _self.value);
+    auto time = eosio::current_time_point() + eosio::seconds(grace_period_seconds);
+    auto time_us = time.elapsed.count();
+
+    auto it = queue.end();
+    if( it != queue.begin()) {
+        --it;
+        eosio::check(time_us >= it->time, "internal error");
+        if(it->time == time_us) {
+            queue.modify(*it, eosio::same_payer, [&](auto& el) {
+                el.price = gas_price;
+            });
+            return;
+        }
+    }
+
+    queue.emplace(_self, [&](auto& el) {
+        el.time = time_us;
+        el.price = gas_price;
+    });
+
+}
+
+void config_wrapper::process_price_queue() {
+    auto now = eosio::current_time_point().elapsed.count();
+    price_queue_table queue(_self, _self.value);
+    auto it = queue.begin();
+    while( it != queue.end() && now >= it->time ) {
+        set_gas_price(it->price);
+        it = queue.erase(it);
+    }
+}
+
 uint32_t config_wrapper::get_miner_cut()const {
     return _cached_config.miner_cut;
 }
@@ -127,7 +161,11 @@ void config_wrapper::set_fee_parameters(const fee_parameters& fee_params,
 {
     if (fee_params.gas_price.has_value()) {
         eosio::check(*fee_params.gas_price >= one_gwei, "gas_price must >= 1Gwei");
-        _cached_config.gas_price = *fee_params.gas_price;
+        if(get_evm_version() >= 1) {
+            enqueue_gas_price(*fee_params.gas_price);
+        } else {
+            set_gas_price(*fee_params.gas_price);
+        }
     } else {
         eosio::check(allow_any_to_be_unspecified, "All required fee parameters not specified: missing gas_price");
     }
@@ -174,7 +212,11 @@ void config_wrapper::update_consensus_parameters(eosio::asset ram_price_mb, uint
                              gas_sset_min + storage_slot_bytes * gas_per_byte /*gas_sset*/
     );
 
-    set_gas_price(gas_price);
+    if(get_evm_version() >= 1) {
+        enqueue_gas_price(gas_price);
+    } else {
+        set_gas_price(gas_price);
+    }
 }
 
 void config_wrapper::update_consensus_parameters2(std::optional<uint64_t> gas_txnewaccount, std::optional<uint64_t> gas_newaccount, std::optional<uint64_t> gas_txcreate, std::optional<uint64_t> gas_codedeposit, std::optional<uint64_t> gas_sset)

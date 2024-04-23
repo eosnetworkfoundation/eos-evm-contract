@@ -300,4 +300,85 @@ try {
 }
 FC_LOG_AND_RETHROW()
 
+
+BOOST_FIXTURE_TEST_CASE(set_gas_price_queue, gas_fee_evm_tester)
+try {
+   init();
+
+   setversion(1, evm_account_name);
+   produce_blocks(2);
+
+   const auto ten_gwei = 10'000'000'000ull;
+
+   auto get_price_queue = [&]() -> std::vector<price_queue> {
+      std::vector<price_queue> queue;
+      scan_price_queue([&](price_queue&& row) -> bool {
+         queue.push_back(row);
+         return false;
+      });
+      return queue;
+   };
+
+   auto trigger_price_queue_processing = [&](){
+      transfer_token("alice"_n, evm_account_name, make_asset(1), evm_account_name.to_string());
+   };
+
+   // Queue change of gas_price to 10Gwei
+   setfeeparams({.gas_price = ten_gwei});
+   auto t1 = control->pending_block_time()+fc::seconds(price_queue_grace_period);
+
+   auto q = get_price_queue();
+   BOOST_CHECK_EQUAL(q.size(), 1);
+   BOOST_CHECK_EQUAL(q[0].time, t1.time_since_epoch().count());
+   BOOST_CHECK_EQUAL(q[0].price, ten_gwei);
+
+   produce_blocks(100);
+
+   // Queue change of gas_price to 30Gwei
+   setfeeparams({.gas_price = 3*ten_gwei});
+   auto t2 = control->pending_block_time()+fc::seconds(price_queue_grace_period);
+
+   q = get_price_queue();
+   BOOST_CHECK_EQUAL(q.size(), 2);
+   BOOST_CHECK_EQUAL(q[0].time, t1.time_since_epoch().count());
+   BOOST_CHECK_EQUAL(q[0].price, ten_gwei);
+   BOOST_CHECK_EQUAL(q[1].time, t2.time_since_epoch().count());
+   BOOST_CHECK_EQUAL(q[1].price, 3*ten_gwei);
+
+   // Overwrite queue change (same block) 20Gwei
+   setfeeparams({.gas_price = 2*ten_gwei});
+
+   q = get_price_queue();
+   BOOST_CHECK_EQUAL(q.size(), 2);
+   BOOST_CHECK_EQUAL(q[0].time, t1.time_since_epoch().count());
+   BOOST_CHECK_EQUAL(q[0].price, ten_gwei);
+   BOOST_CHECK_EQUAL(q[1].time, t2.time_since_epoch().count());
+   BOOST_CHECK_EQUAL(q[1].price, 2*ten_gwei);
+
+   while(control->pending_block_time() != t1) {
+      produce_blocks(1);
+   }
+   trigger_price_queue_processing();
+
+   auto cfg = get_config();
+   BOOST_CHECK_EQUAL(cfg.gas_price, ten_gwei);
+
+   q = get_price_queue();
+   BOOST_CHECK_EQUAL(q.size(), 1);
+   BOOST_CHECK_EQUAL(q[0].time, t2.time_since_epoch().count());
+   BOOST_CHECK_EQUAL(q[0].price, 2*ten_gwei);
+
+   while(control->pending_block_time() != t2) {
+      produce_blocks(1);
+   }
+   trigger_price_queue_processing();
+
+   cfg = get_config();
+   BOOST_CHECK_EQUAL(cfg.gas_price, 2*ten_gwei);
+
+   q = get_price_queue();
+   BOOST_CHECK_EQUAL(q.size(), 0);
+}
+FC_LOG_AND_RETHROW()
+
 BOOST_AUTO_TEST_SUITE_END()
