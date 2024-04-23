@@ -88,6 +88,11 @@ namespace fc { namespace raw {
          fc::raw::unpack(ds, version);
          tmp.evm_version.emplace(version);
       }
+      if(ds.remaining()) {
+         evm_test::consensus_parameter_type consensus_parameter;
+         fc::raw::unpack(ds, consensus_parameter);
+         tmp.consensus_parameter.emplace(consensus_parameter);
+      }
     } FC_RETHROW_EXCEPTIONS(warn, "error unpacking partial_account_table_row") }
 }}
 
@@ -737,6 +742,17 @@ bool basic_evm_tester::scan_account_code(std::function<bool(account_code)> visit
 
    scan_table<account_code>(
       account_code_table_name, evm_account_name, [&visitor](account_code&& row) { return visitor(row); }
+   );
+
+   return true;
+}
+
+bool basic_evm_tester::scan_price_queue(std::function<bool(price_queue)> visitor) const
+{
+   static constexpr eosio::chain::name price_queue_table_name = "pricequeue"_n;
+
+   scan_table<price_queue>(
+      price_queue_table_name, evm_account_name, [&visitor](price_queue&& row) { return visitor(row); }
    );
 
    return true;

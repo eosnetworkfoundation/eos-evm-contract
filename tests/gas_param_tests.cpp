@@ -108,8 +108,16 @@ BOOST_FIXTURE_TEST_CASE(basic, gas_param_evm_tester) try {
         eosio_assert_message_exception,
         eosio_assert_message_is("gas_sset too small"));
 
-    // This change in the gas price now takes effect immediately
+    // Change in the gas parameters now takes effect immediately, but not gas price
     updtgasparam(asset(10'0000, native_symbol), 1'000'000'000, evm_account_name);
+
+    auto t0 = control->pending_block_time() + fc::seconds(price_queue_grace_period);
+    while(control->pending_block_time() != t0) {
+        produce_blocks(1);
+    }
+
+    // Process price queue
+    transfer_token("alice"_n, evm_account_name, make_asset(1), evm_account_name.to_string());
 
     setgasparam(21000,21000,21000,21000,2900, evm_account_name);
 

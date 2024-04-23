@@ -517,6 +517,7 @@ void evm_contract::process_tx(const runtime_config& rc, eosio::name miner, const
 void evm_contract::pushtx(eosio::name miner, bytes rlptx, eosio::binary_extension<uint64_t> min_inclusion_price) {
     LOGTIME("EVM START0");
     assert_unfrozen();
+    if(_config->get_evm_version() >= 1) _config->process_price_queue();
 
     // Use default runtime configuration parameters.
     runtime_config rc;
@@ -609,6 +610,7 @@ checksum256 evm_contract::get_code_hash(name account) const {
 }
 
 void evm_contract::handle_account_transfer(const eosio::asset& quantity, const std::string& memo) {
+    if(_config->get_evm_version() >= 1) _config->process_price_queue();
     eosio::name receiver(memo);
 
     balances balance_table(get_self(), get_self().value);
@@ -620,6 +622,7 @@ void evm_contract::handle_account_transfer(const eosio::asset& quantity, const s
 }
 
 void evm_contract::handle_evm_transfer(eosio::asset quantity, const std::string& memo) {
+    if(_config->get_evm_version() >= 1) _config->process_price_queue();
     //move all incoming quantity in to the contract's balance. the evm bridge trx will "pull" from this balance
     balances balance_table(get_self(), get_self().value);
     balance_table.modify(balance_table.get(get_self().value), eosio::same_payer, [&](balance& b){
@@ -698,6 +701,7 @@ bool evm_contract::gc(uint32_t max) {
 }
 
 void evm_contract::call_(const runtime_config& rc, intx::uint256 s, const bytes& to, intx::uint256 value, const bytes& data, uint64_t gas_limit, uint64_t nonce) {
+    if(_config->get_evm_version() >= 1) _config->process_price_queue();
 
     Transaction txn;
     txn.type = TransactionType::kLegacy;
