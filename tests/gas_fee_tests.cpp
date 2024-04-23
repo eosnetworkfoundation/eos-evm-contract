@@ -3,6 +3,8 @@
 using namespace eosio::testing;
 using namespace evm_test;
 
+#include <eosevm/block_mapping.hpp>
+
 struct gas_fee_evm_tester : basic_evm_tester
 {
    evm_eoa faucet_eoa;
@@ -305,6 +307,10 @@ BOOST_FIXTURE_TEST_CASE(set_gas_price_queue, gas_fee_evm_tester)
 try {
    init();
 
+   auto cfg = get_config();
+
+   eosevm::block_mapping bm(cfg.genesis_time.sec_since_epoch());
+
    setversion(1, evm_account_name);
    produce_blocks(2);
 
@@ -325,24 +331,26 @@ try {
 
    // Queue change of gas_price to 10Gwei
    setfeeparams({.gas_price = ten_gwei});
-   auto t1 = control->pending_block_time()+fc::seconds(price_queue_grace_period);
-
+   auto t1 = (control->pending_block_time()+fc::seconds(price_queue_grace_period)).time_since_epoch().count();
+   auto b1 = bm.timestamp_to_evm_block_num(t1)+1;
+   
    auto q = get_price_queue();
    BOOST_CHECK_EQUAL(q.size(), 1);
-   BOOST_CHECK_EQUAL(q[0].time, t1.time_since_epoch().count());
+   BOOST_CHECK_EQUAL(q[0].block, b1);
    BOOST_CHECK_EQUAL(q[0].price, ten_gwei);
 
    produce_blocks(100);
 
    // Queue change of gas_price to 30Gwei
    setfeeparams({.gas_price = 3*ten_gwei});
-   auto t2 = control->pending_block_time()+fc::seconds(price_queue_grace_period);
+   auto t2 = (control->pending_block_time()+fc::seconds(price_queue_grace_period)).time_since_epoch().count();
+   auto b2 = bm.timestamp_to_evm_block_num(t2)+1;
 
    q = get_price_queue();
    BOOST_CHECK_EQUAL(q.size(), 2);
-   BOOST_CHECK_EQUAL(q[0].time, t1.time_since_epoch().count());
+   BOOST_CHECK_EQUAL(q[0].block, b1);
    BOOST_CHECK_EQUAL(q[0].price, ten_gwei);
-   BOOST_CHECK_EQUAL(q[1].time, t2.time_since_epoch().count());
+   BOOST_CHECK_EQUAL(q[1].block, b2);
    BOOST_CHECK_EQUAL(q[1].price, 3*ten_gwei);
 
    // Overwrite queue change (same block) 20Gwei
@@ -350,25 +358,25 @@ try {
 
    q = get_price_queue();
    BOOST_CHECK_EQUAL(q.size(), 2);
-   BOOST_CHECK_EQUAL(q[0].time, t1.time_since_epoch().count());
+   BOOST_CHECK_EQUAL(q[0].block, b1);
    BOOST_CHECK_EQUAL(q[0].price, ten_gwei);
-   BOOST_CHECK_EQUAL(q[1].time, t2.time_since_epoch().count());
+   BOOST_CHECK_EQUAL(q[1].block, b2);
    BOOST_CHECK_EQUAL(q[1].price, 2*ten_gwei);
 
-   while(control->pending_block_time() != t1) {
+   while(bm.timestamp_to_evm_block_num(control->pending_block_time().time_since_epoch().count()) != b1) {
       produce_blocks(1);
    }
    trigger_price_queue_processing();
 
-   auto cfg = get_config();
+   cfg = get_config();
    BOOST_CHECK_EQUAL(cfg.gas_price, ten_gwei);
 
    q = get_price_queue();
    BOOST_CHECK_EQUAL(q.size(), 1);
-   BOOST_CHECK_EQUAL(q[0].time, t2.time_since_epoch().count());
+   BOOST_CHECK_EQUAL(q[0].block, b2);
    BOOST_CHECK_EQUAL(q[0].price, 2*ten_gwei);
 
-   while(control->pending_block_time() != t2) {
+   while(bm.timestamp_to_evm_block_num(control->pending_block_time().time_since_epoch().count()) != b2) {
       produce_blocks(1);
    }
    trigger_price_queue_processing();

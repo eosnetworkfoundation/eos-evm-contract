@@ -79,14 +79,16 @@ void config_wrapper::set_gas_price(uint64_t gas_price) {
 
 void config_wrapper::enqueue_gas_price(uint64_t gas_price) {
     price_queue_table queue(_self, _self.value);
-    auto time = eosio::current_time_point() + eosio::seconds(grace_period_seconds);
-    auto time_us = time.elapsed.count();
+    auto activation_time = get_current_time() + eosio::seconds(grace_period_seconds);
+
+    eosevm::block_mapping bm(get_genesis_time().sec_since_epoch());
+    auto activation_block_num = bm.timestamp_to_evm_block_num(activation_time.time_since_epoch().count()) + 1;
 
     auto it = queue.end();
     if( it != queue.begin()) {
         --it;
-        eosio::check(time_us >= it->time, "internal error");
-        if(it->time == time_us) {
+        eosio::check(activation_block_num >= it->block, "internal error");
+        if(activation_block_num == it->block) {
             queue.modify(*it, eosio::same_payer, [&](auto& el) {
                 el.price = gas_price;
             });
@@ -95,20 +97,23 @@ void config_wrapper::enqueue_gas_price(uint64_t gas_price) {
     }
 
     queue.emplace(_self, [&](auto& el) {
-        el.time = time_us;
+        el.block = activation_block_num;
         el.price = gas_price;
     });
 
 }
 
 void config_wrapper::process_price_queue() {
-    auto now = eosio::current_time_point().elapsed.count();
+    eosevm::block_mapping bm(get_genesis_time().sec_since_epoch());
+    auto current_block_num = bm.timestamp_to_evm_block_num(get_current_time().time_since_epoch().count());
+
     price_queue_table queue(_self, _self.value);
     auto it = queue.begin();
-    while( it != queue.end() && now >= it->time ) {
+    while( it != queue.end() && current_block_num >= it->block ) {
         set_gas_price(it->price);
         it = queue.erase(it);
     }
+
 }
 
 uint32_t config_wrapper::get_miner_cut()const {

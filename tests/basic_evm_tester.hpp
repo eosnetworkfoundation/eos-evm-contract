@@ -201,13 +201,13 @@ struct account_code {
 using bridge_message = std::variant<bridge_message_v0>;
 
 struct price_queue {
-   uint64_t time;
+   uint64_t block;
    uint64_t price;
 };
 
 } // namespace evm_test
 
-FC_REFLECT(evm_test::price_queue, (time)(price))
+FC_REFLECT(evm_test::price_queue, (block)(price))
 FC_REFLECT(evm_test::evm_version_type, (pending_version)(cached_version))
 FC_REFLECT(evm_test::evm_version_type::pending, (version)(time))
 FC_REFLECT(evm_test::config2_table_row,(next_account_id))

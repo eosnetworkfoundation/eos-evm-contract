@@ -339,12 +339,12 @@ struct [[eosio::table]] [[eosio::contract("evm_contract")]] config
 
 struct [[eosio::table]] [[eosio::contract("evm_contract")]] price_queue
 {
-    uint64_t time;
+    uint64_t block;
     uint64_t price;
 
-    uint64_t primary_key()const { return time; }
+    uint64_t primary_key()const { return block; }
 
-    EOSLIB_SERIALIZE(price_queue, (time)(price));
+    EOSLIB_SERIALIZE(price_queue, (block)(price));
 };
 
 typedef eosio::multi_index<"pricequeue"_n, price_queue> price_queue_table;
