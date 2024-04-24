@@ -3,6 +3,8 @@
 using namespace eosio::testing;
 using namespace evm_test;
 
+#include <eosevm/block_mapping.hpp>
+
 BOOST_AUTO_TEST_SUITE(evm_gas_param_tests)
 
 struct gas_param_evm_tester : basic_evm_tester
@@ -111,8 +113,12 @@ BOOST_FIXTURE_TEST_CASE(basic, gas_param_evm_tester) try {
     // Change in the gas parameters now takes effect immediately, but not gas price
     updtgasparam(asset(10'0000, native_symbol), 1'000'000'000, evm_account_name);
 
-    auto t0 = control->pending_block_time() + fc::seconds(price_queue_grace_period);
-    while(control->pending_block_time() != t0) {
+    auto cfg = get_config();
+    eosevm::block_mapping bm(cfg.genesis_time.sec_since_epoch());
+
+    auto t0 = (control->pending_block_time() + fc::seconds(price_queue_grace_period)).time_since_epoch().count();
+    auto b0 = bm.timestamp_to_evm_block_num(t0)+1;
+    while(bm.timestamp_to_evm_block_num(control->pending_block_time().time_since_epoch().count()) != b0) {
         produce_blocks(1);
     }
 
