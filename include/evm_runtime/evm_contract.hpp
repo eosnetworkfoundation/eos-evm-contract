@@ -60,7 +60,7 @@ public:
 
    [[eosio::action]] void exec(const exec_input& input, const std::optional<exec_callback>& callback);
 
-   [[eosio::action]] void pushtx(eosio::name miner, bytes rlptx);
+   [[eosio::action]] void pushtx(eosio::name miner, bytes rlptx, eosio::binary_extension<uint64_t> min_inclusion_price);
 
    [[eosio::action]] void open(eosio::name owner);
 
@@ -148,7 +148,7 @@ private:
 
    using pushtx_action = eosio::action_wrapper<"pushtx"_n, &evm_contract::pushtx>;
 
-   void process_tx(const runtime_config& rc, eosio::name miner, const transaction& tx);
+   void process_tx(const runtime_config& rc, eosio::name miner, const transaction& tx, std::optional<uint64_t> min_inclusion_price);
    void dispatch_tx(const runtime_config& rc, const transaction& tx);
 };
 
