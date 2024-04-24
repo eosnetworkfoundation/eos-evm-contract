@@ -389,4 +389,66 @@ try {
 }
 FC_LOG_AND_RETHROW()
 
+BOOST_FIXTURE_TEST_CASE(miner_cut_calculation_v1, gas_fee_evm_tester)
+try {
+   static constexpr uint64_t base_gas_price = 300'000'000'000;    // 300 gwei
+
+   init();
+
+   auto miner_account = "miner"_n;
+   create_accounts({miner_account});
+   open(miner_account);
+
+   // Set base price
+   setfeeparams({.gas_price=base_gas_price});
+
+   auto config = get_config();
+   BOOST_REQUIRE(config.miner_cut == suggested_miner_cut);
+
+   // Set version 1
+   setversion(1, evm_account_name);
+
+   produce_blocks(3);
+
+   // Fund evm1 address with 10.0000 EOS / trigger version change and sets miner_cut to 0
+   evm_eoa evm1;
+   transfer_token("alice"_n, evm_account_name, make_asset(10'0000), evm1.address_0x());
+
+   config = get_config();
+   BOOST_REQUIRE(config.miner_cut == 0);
+
+   // miner_cut can't be changed when version >= 1
+   BOOST_REQUIRE_EXCEPTION(setfeeparams({.miner_cut=10'0000}),
+                           eosio_assert_message_exception,
+                           [](const eosio_assert_message_exception& e) {return testing::expect_assert_message(e, "assertion failure with message: can't set miner_cut");});
+
+   auto inclusion_price = 50'000'000'000;    // 50 gwei
+
+   evm_eoa evm2;
+   auto tx = generate_tx(evm2.address, 1);
+   tx.type = silkworm::TransactionType::kDynamicFee;
+   tx.max_priority_fee_per_gas = inclusion_price*2;
+   tx.max_fee_per_gas = base_gas_price + inclusion_price;
+
+   BOOST_REQUIRE(vault_balance(miner_account) == (balance_and_dust{make_asset(0), 0ULL}));
+
+   evm1.sign(tx);
+   pushtx(tx, miner_account);
+
+   //21'000 * 50'000'000'000 = 0.00105
+   BOOST_REQUIRE(vault_balance(miner_account) == (balance_and_dust{make_asset(10), 50'000'000'000'000ULL}));
+
+   tx = generate_tx(evm2.address, 1);
+   tx.type = silkworm::TransactionType::kDynamicFee;
+   tx.max_priority_fee_per_gas = 0;
+   tx.max_fee_per_gas = base_gas_price + inclusion_price;
+
+   evm1.sign(tx);
+   pushtx(tx, miner_account);
+
+   //0.00105 + 0
+   BOOST_REQUIRE(vault_balance(miner_account) == (balance_and_dust{make_asset(10), 50'000'000'000'000ULL}));
+}
+FC_LOG_AND_RETHROW()
+
 BOOST_AUTO_TEST_SUITE_END()
