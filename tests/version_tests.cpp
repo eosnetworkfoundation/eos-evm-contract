@@ -506,7 +506,7 @@ BOOST_FIXTURE_TEST_CASE(min_inclusion_price, version_tester) try {
     evm1.sign(txin01);
     BOOST_REQUIRE_EXCEPTION(pushtx(txin01, evm_account_name, 1),
         eosio_assert_message_exception,
-        eosio_assert_message_is("min_inclusion_price must not set"));
+        eosio_assert_message_is("min_inclusion_price requires evm_version >= 1"));
 
     /// change EOS EVM VERSION => 1   ///
     setversion(1, evm_account_name);
@@ -530,7 +530,7 @@ BOOST_FIXTURE_TEST_CASE(min_inclusion_price, version_tester) try {
     evm1.sign(txin1);
     BOOST_REQUIRE_EXCEPTION(pushtx(txin1, evm_account_name, 2),
         eosio_assert_message_exception,
-        eosio_assert_message_is("inclusion price too low"));
+        eosio_assert_message_is("inclusion price must >= min_inclusion_price"));
 
     // gas fee too low: miner expect 11Gwei inclusion fee
 	evm1.next_nonce = old_nonce;
@@ -547,7 +547,7 @@ BOOST_FIXTURE_TEST_CASE(min_inclusion_price, version_tester) try {
     evm1.sign(txin2);
     BOOST_REQUIRE_EXCEPTION(pushtx(txin2, evm_account_name, 11),
         eosio_assert_message_exception,
-        eosio_assert_message_is("inclusion price too low"));
+        eosio_assert_message_is("inclusion price must >= min_inclusion_price"));
 
     // gas fee too low: gas fee < base fee
 	evm1.next_nonce = old_nonce;
