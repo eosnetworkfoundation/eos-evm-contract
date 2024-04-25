@@ -248,11 +248,18 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
     std::optional<intx::uint256> gas_fee_miner_portion;
     if (miner) {
         uint64_t tx_gas_used = receipt.cumulative_gas_used; // Only transaction in the "block" so cumulative_gas_used is the tx gas_used.
-        intx::uint512 gas_fee = intx::uint256(tx_gas_used) * tx.max_fee_per_gas;
-        check(gas_fee < std::numeric_limits<intx::uint256>::max(), "too much gas");
-        gas_fee *= _config->get_miner_cut();
-        gas_fee /= hundred_percent;
-        gas_fee_miner_portion.emplace(static_cast<intx::uint256>(gas_fee));
+        if(_config->get_evm_version() >= 1) {
+            eosio::check(ep.evm().block().header.base_fee_per_gas.has_value(), "no base fee");
+            intx::uint512 gas_fee = intx::uint256(tx_gas_used) * tx.priority_fee_per_gas(ep.evm().block().header.base_fee_per_gas.value());
+            check(gas_fee < std::numeric_limits<intx::uint256>::max(), "too much gas");
+            gas_fee_miner_portion.emplace(static_cast<intx::uint256>(gas_fee));
+        } else {
+            intx::uint512 gas_fee = intx::uint256(tx_gas_used) * tx.max_fee_per_gas;
+            check(gas_fee < std::numeric_limits<intx::uint256>::max(), "too much gas");
+            gas_fee *= _config->get_miner_cut();
+            gas_fee /= hundred_percent;
+            gas_fee_miner_portion.emplace(static_cast<intx::uint256>(gas_fee));
+        }
     }
 
     if (rc.abort_on_failure)
