@@ -32,7 +32,7 @@ struct transaction {
       eosio::check(rlptx_.has_value(), "no rlptx");
       ByteView bv{(const uint8_t*)rlptx_->data(), rlptx_->size()};
       silkworm::Transaction tmp;
-      eosio::check(silkworm::rlp::decode(bv, tmp) && bv.empty(), "unable to decode transaction");
+      eosio::check(silkworm::rlp::decode_transaction(bv, tmp, silkworm::rlp::Eip2718Wrapping::kBoth) && bv.empty(), "unable to decode transaction");
       tx_.emplace(tmp);
     }
     return tx_.value();
