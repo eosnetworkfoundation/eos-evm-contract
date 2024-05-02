@@ -153,7 +153,10 @@ uint64_t config_wrapper::get_evm_version_and_maybe_promote() {
     if(_cached_config.evm_version.has_value()) {
         std::tie(current_version, promoted) = _cached_config.evm_version->get_version_and_maybe_promote(_cached_config.genesis_time, get_current_time());
     }
-    if(promoted) set_dirty();
+    if(promoted) {
+        if(current_version >=1 && _cached_config.miner_cut != 0) _cached_config.miner_cut = 0;
+        set_dirty();
+    }
     return current_version;
 }
 
@@ -180,6 +183,7 @@ void config_wrapper::set_fee_parameters(const fee_parameters& fee_params,
     }
 
     if (fee_params.miner_cut.has_value()) {
+        eosio::check(get_evm_version() == 0, "can't set miner_cut");
         eosio::check(*fee_params.miner_cut <= ninety_percent, "miner_cut must <= 90%");
         _cached_config.miner_cut = *fee_params.miner_cut;
     } else {
@@ -205,7 +209,8 @@ void config_wrapper::update_consensus_parameters(eosio::asset ram_price_mb, uint
     eosio::check(ram_price_mb.symbol == get_token_symbol(), "invalid price symbol");
     eosio::check(gas_price >= one_gwei, "gas_price must >= 1Gwei");
 
-    double gas_per_byte_f = (ram_price_mb.amount / (1024.0 * 1024.0) * get_minimum_natively_representable()) / (gas_price * static_cast<double>(hundred_percent - _cached_config.miner_cut) / hundred_percent);
+    auto miner_cut = get_evm_version() >= 1 ? 0 : _cached_config.miner_cut;
+    double gas_per_byte_f = (ram_price_mb.amount / (1024.0 * 1024.0) * get_minimum_natively_representable()) / (gas_price * static_cast<double>(hundred_percent - miner_cut) / hundred_percent);
 
     constexpr uint64_t account_bytes = 347;
     constexpr uint64_t contract_fixed_bytes = 606;
