@@ -444,7 +444,7 @@ struct evm_runtime_tester : eosio_system_tester, silkworm::State {
                                 mvo()                                  //
                                 ("gas_price", 150'000'000'000)         //
                                 ("miner_cut", 10'000)                  //
-                                ("ingress_bridge_fee", fc::variant())) //
+                                ("ingress_bridge_fee", "0.0000 EOS"))  //
       );
    }
 

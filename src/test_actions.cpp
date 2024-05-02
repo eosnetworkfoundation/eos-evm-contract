@@ -239,7 +239,7 @@ using namespace silkworm;
 
 [[eosio::action]] void evm_contract::testbaldust(const name test) {
     if(test == "basic"_n) {
-        balance_with_dust b;
+        balance_with_dust b{.balance=eosio::asset(0, eosio::symbol("EOS", 4u)), .dust=0};
         //                  ↱minimum EOS
         //              .123456789abcdefghi EEOS
         b +=                      200000000_u256; //adds to dust only
@@ -264,21 +264,21 @@ using namespace silkworm;
         check(b.dust == 95000200009955, "");
     }
     else if(test == "underflow1"_n) {
-        balance_with_dust b;
+        balance_with_dust b{.balance=eosio::asset(0, eosio::symbol("EOS", 4u)), .dust=0};
         //                  ↱minimum EOS
         //              .123456789abcdefghi EEOS
         b -=                             45_u256;
         //should fail with underflow on dust causing an underflow of balance
     }
     else if(test == "underflow2"_n) {
-        balance_with_dust b;
+        balance_with_dust b{.balance=eosio::asset(0, eosio::symbol("EOS", 4u)), .dust=0};
         //                  ↱minimum EOS
         //              .123456789abcdefghi EEOS
         b -=                100000000000000_u256;
         //should fail with underflow on balance
     }
     else if(test == "underflow3"_n) {
-        balance_with_dust b;
+        balance_with_dust b{.balance=eosio::asset(0, eosio::symbol("EOS", 4u)), .dust=0};
         //                  ↱minimum EOS
         //              .123456789abcdefghi EEOS
         b +=                200000000000000_u256;
@@ -286,7 +286,7 @@ using namespace silkworm;
         //should fail with underflow on balance
     }
     else if(test == "underflow4"_n) {
-        balance_with_dust b;
+        balance_with_dust b{.balance=eosio::asset(0, eosio::symbol("EOS", 4u)), .dust=0};
         //                  ↱minimum EOS
         //              .123456789abcdefghi EEOS
         b +=                          50000_u256;
@@ -294,7 +294,7 @@ using namespace silkworm;
         //should fail with underflow on dust causing an underflow of balance
     }
     else if(test == "underflow5"_n) {
-        balance_with_dust b;
+        balance_with_dust b{.balance=eosio::asset(0, eosio::symbol("EOS", 4u)), .dust=0};
         // do a decrement that would overflow an int64_t but not uint64_t (for balance)
         //    ↱int64t max       ↱minimum EOS
         //    9223372036854775807 (2^63)-1
@@ -304,7 +304,7 @@ using namespace silkworm;
         //should fail with underflow
     }
     else if(test == "overflow1"_n) {
-        balance_with_dust b;
+        balance_with_dust b{.balance=eosio::asset(0, eosio::symbol("EOS", 4u)), .dust=0};
         // increment a value that would overflow a int64_t, but not uint64_t
         //    ↱int64t max       ↱minimum EOS
         //    9223372036854775807 (2^63)-1
@@ -313,7 +313,7 @@ using namespace silkworm;
         //should fail with overflow
     }
     else if(test == "overflow2"_n) {
-        balance_with_dust b;
+        balance_with_dust b{.balance=eosio::asset(0, eosio::symbol("EOS", 4u)), .dust=0};
         // increment a value that would overflow a max_asset, but not an int64_t
         //    ↱max_asset max    ↱minimum EOS
         //    4611686018427387903 (2^62)-1
@@ -322,7 +322,7 @@ using namespace silkworm;
         //should fail with overflow
     }
     else if(test == "overflow3"_n || test == "overflow4"_n || test == "overflow5"_n || test == "overflowa"_n || test == "overflowb"_n || test == "overflowc"_n) {
-        balance_with_dust b;
+        balance_with_dust b{.balance=eosio::asset(0, eosio::symbol("EOS", 4u)), .dust=0};
         // start with a value that should be the absolute max allowed
         //    ↱max_asset max    ↱minimum EOS
         //    4611686018427387903 (2^62)-1
@@ -368,7 +368,7 @@ using namespace silkworm;
         }
     }
     if(test == "overflowd"_n) {
-        balance_with_dust b;
+        balance_with_dust b{.balance=eosio::asset(0, eosio::symbol("EOS", 4u)), .dust=0};
         //add something massive
         //            ↱max_asset max    ↱minimum EOS
         //            4611686018427387903 (2^62)-1
