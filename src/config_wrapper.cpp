@@ -13,6 +13,10 @@ config_wrapper::config_wrapper(eosio::name self) : _self(self), _config(self, se
         _cached_config.consensus_parameter = consensus_parameter_type();
         // Don't set dirty because action can be read-only.
     }
+    if (!_cached_config.token_contract.has_value()) {
+        _cached_config.token_contract = default_token_account;
+        // Don't set dirty because action can be read-only.
+    }
 }
 
 config_wrapper::~config_wrapper() {
@@ -183,10 +187,14 @@ void config_wrapper::set_fee_parameters(const fee_parameters& fee_params,
     }
 
     if (fee_params.ingress_bridge_fee.has_value()) {
-        eosio::check(fee_params.ingress_bridge_fee->symbol == token_symbol, "unexpected bridge symbol");
+        if (_cached_config.ingress_bridge_fee.symbol != eosio::symbol()) {
+            eosio::check(fee_params.ingress_bridge_fee->symbol == _cached_config.ingress_bridge_fee.symbol, "bridge symbol can't change");
+        }
         eosio::check(fee_params.ingress_bridge_fee->amount >= 0, "ingress bridge fee cannot be negative");
 
         _cached_config.ingress_bridge_fee = *fee_params.ingress_bridge_fee;
+    } else {
+        eosio::check(allow_any_to_be_unspecified, "All required fee parameters not specified: missing ingress_bridge_fee");
     }
 
     set_dirty();
@@ -194,10 +202,10 @@ void config_wrapper::set_fee_parameters(const fee_parameters& fee_params,
 
 void config_wrapper::update_consensus_parameters(eosio::asset ram_price_mb, uint64_t gas_price) {
 
-    eosio::check(ram_price_mb.symbol == token_symbol, "invalid price symbol");
+    eosio::check(ram_price_mb.symbol == get_token_symbol(), "invalid price symbol");
     eosio::check(gas_price >= one_gwei, "gas_price must >= 1Gwei");
 
-    double gas_per_byte_f = (ram_price_mb.amount / (1024.0 * 1024.0) * minimum_natively_representable_f) / (gas_price * static_cast<double>(hundred_percent - _cached_config.miner_cut) / hundred_percent);
+    double gas_per_byte_f = (ram_price_mb.amount / (1024.0 * 1024.0) * get_minimum_natively_representable()) / (gas_price * static_cast<double>(hundred_percent - _cached_config.miner_cut) / hundred_percent);
 
     constexpr uint64_t account_bytes = 347;
     constexpr uint64_t contract_fixed_bytes = 606;
@@ -281,6 +289,22 @@ time_point config_wrapper::get_current_time()const {
         current_time_point = eosio::current_time_point();
     }
     return current_time_point.value();
+}
+
+void config_wrapper::set_token_contract(eosio::name token_contract) {
+    _cached_config.token_contract = token_contract;
+}
+
+eosio::name config_wrapper::get_token_contract() const {
+    return *_cached_config.token_contract;
+}
+
+eosio::symbol config_wrapper::get_token_symbol() const {
+    return _cached_config.ingress_bridge_fee.symbol;
+}
+
+uint64_t config_wrapper::get_minimum_natively_representable() const {
+    return pow10_const(evm_precision - _cached_config.ingress_bridge_fee.symbol.precision());
 }
 
 } //namespace evm_runtime

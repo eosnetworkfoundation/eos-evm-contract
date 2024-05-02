@@ -279,7 +279,7 @@ void basic_evm_tester::init(const uint64_t chainid,
    if (ingress_bridge_fee.has_value()) {
       fee_params("ingress_bridge_fee", *ingress_bridge_fee);
    } else {
-      fee_params("ingress_bridge_fee", fc::variant());
+      fee_params("ingress_bridge_fee", "0.0000 EOS");
    }
 
    push_action(evm_account_name, "init"_n, evm_account_name, mvo()("chainid", chainid)("fee_params", fee_params));

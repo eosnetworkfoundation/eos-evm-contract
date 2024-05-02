@@ -32,7 +32,7 @@ public:
     * network.
     * @param fee_params See documentation of fee_parameters struct.
     */
-   [[eosio::action]] void init(const uint64_t chainid, const fee_parameters& fee_params);
+   [[eosio::action]] void init(const uint64_t chainid, const fee_parameters& fee_params, eosio::binary_extension<eosio::name> token_contract);
 
    /**
     * @brief Change fee parameter values

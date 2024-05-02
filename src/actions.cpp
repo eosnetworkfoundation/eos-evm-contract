@@ -52,7 +52,7 @@ void evm_contract::assert_unfrozen()
     check((_config->get_status() & static_cast<uint32_t>(status_flags::frozen)) == 0, "contract is frozen");
 }
 
-void evm_contract::init(const uint64_t chainid, const fee_parameters& fee_params)
+void evm_contract::init(const uint64_t chainid, const fee_parameters& fee_params, eosio::binary_extension<eosio::name> token_contract)
 {
    eosio::require_auth(get_self());
 
@@ -72,7 +72,13 @@ void evm_contract::init(const uint64_t chainid, const fee_parameters& fee_params
 
    _config->set_fee_parameters(fee_params, false);  // enforce that all fee parameters are specified
 
-   inevm_singleton(get_self(), get_self().value).get_or_create(get_self());
+   if (token_contract.has_value()) {
+      _config->set_token_contract(*token_contract);
+   }
+   inevm_singleton(get_self(), get_self().value).get_or_create(get_self(), balance_with_dust {
+      .balance = eosio::asset(0, fee_params.ingress_bridge_fee->symbol),
+      .dust = 0
+   });
 
    open_internal_balance(get_self());
 }
@@ -291,13 +297,15 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
                 if(get_code_hash(egress_account) != checksum256())
                     egresslist(get_self(), get_self().value).get(egress_account.value, "non-open accounts containing contract code must be on allow list for egress bridging");
 
+                intx::uint256 minimum_natively_representable = intx::uint256(_config->get_minimum_natively_representable());
+
                 check(reserved_account.balance % minimum_natively_representable == 0_u256, "egress bridging to non-open accounts must not contain dust");
 
                 const bool was_to = tx.to && *tx.to == address;
                 const Bytes exit_memo = {'E', 'V', 'M', ' ', 'e', 'x', 'i', 't'}; //yikes
 
-                token::transfer_bytes_memo_action transfer_act(token_account, {{get_self(), "active"_n}});
-                transfer_act.send(get_self(), egress_account, asset((uint64_t)(reserved_account.balance / minimum_natively_representable), token_symbol), was_to ? tx.data : exit_memo);
+                token::transfer_bytes_memo_action transfer_act(_config->get_token_contract(), {{get_self(), "active"_n}});
+                transfer_act.send(get_self(), egress_account, asset((uint64_t)(reserved_account.balance / minimum_natively_representable), _config->get_token_symbol()), was_to ? tx.data : exit_memo);
 
                 non_open_account_sent = true;
             }
@@ -383,6 +391,7 @@ void evm_contract::process_filtered_messages(const std::vector<silkworm::Filtere
 
     intx::uint256 accumulated_value;
     for(const auto& rawmsg : filtered_messages) {
+
         auto msg = bridge::decode_message(ByteView{rawmsg.data});
         eosio::check(msg.has_value(), "unable to decode bridge message");
 
@@ -398,7 +407,7 @@ void evm_contract::process_filtered_messages(const std::vector<silkworm::Filtere
         eosio::check(msg_v0.force_atomic == false || it->has_flag(message_receiver::FORCE_ATOMIC), "unable to process message");
 
         intx::uint256 min_fee((uint64_t)it->min_fee.amount);
-        min_fee *= minimum_natively_representable;
+        min_fee *= intx::uint256(_config->get_minimum_natively_representable());
 
         auto value = intx::be::unsafe::load<uint256>(rawmsg.value.bytes);
         eosio::check(value >= min_fee, "min_fee not covered");
@@ -564,6 +573,7 @@ void evm_contract::open_internal_balance(eosio::name owner) {
     if(balance_table.find(owner.value) == balance_table.end())
         balance_table.emplace(owner, [&](balance& a) {
             a.owner = owner;
+            a.balance.balance = eosio::asset(0, _config->get_token_symbol());
         });
 
     nextnonces nextnonce_table(get_self(), get_self().value);
@@ -582,7 +592,7 @@ void evm_contract::close(eosio::name owner) {
     balances balance_table(get_self(), get_self().value);
     const balance& owner_account = balance_table.get(owner.value, "account is not open");
 
-    eosio::check(owner_account.balance == balance_with_dust(), "cannot close because balance is not zero");
+    eosio::check(owner_account.balance.is_zero(), "cannot close because balance is not zero");
     balance_table.erase(owner_account);
 
     nextnonces nextnonce_table(get_self(), get_self().value);
@@ -640,7 +650,7 @@ void evm_contract::handle_evm_transfer(eosio::asset quantity, const std::string&
     eosio::check(!!address_bytes, "unable to parse destination address");
 
     intx::uint256 value((uint64_t)quantity.amount);
-    value *= minimum_natively_representable;
+    value *= intx::uint256(_config->get_minimum_natively_representable());
 
     Transaction txn;
     txn.type = TransactionType::kLegacy;
@@ -669,7 +679,7 @@ void evm_contract::transfer(eosio::name from, eosio::name to, eosio::asset quant
     if(to != get_self() || from == get_self())
         return;
 
-    eosio::check(get_code() == token_account && quantity.symbol == token_symbol, "received unexpected token");
+    eosio::check(get_code() == _config->get_token_contract() && quantity.symbol == _config->get_token_symbol(), "received unexpected token");
 
     if(memo.size() == 42 && memo[0] == '0' && memo[1] == 'x')
         handle_evm_transfer(quantity, memo);
@@ -691,7 +701,7 @@ void evm_contract::withdraw(eosio::name owner, eosio::asset quantity, const eosi
         a.balance.balance -= quantity;
     });
 
-    token::transfer_action transfer_act(token_account, {{get_self(), "active"_n}});
+    token::transfer_action transfer_act(_config->get_token_contract(), {{get_self(), "active"_n}});
     transfer_act.send(get_self(), to.has_value() ? *to : owner, quantity, std::string("Withdraw from EVM balance"));
 }
 
@@ -800,7 +810,7 @@ void evm_contract::bridgereg(eosio::name receiver, eosio::name handler, const eo
     require_auth(receiver);
     require_auth(get_self());  // to temporarily prevent registration of unauthorized accounts
 
-    eosio::check(min_fee.symbol == token_symbol, "unexpected symbol");
+    eosio::check(min_fee.symbol == _config->get_token_symbol(), "unexpected symbol");
     eosio::check(min_fee.amount >= 0, "min_fee cannot be negative");
 
     auto update_row = [&](auto& row) {
