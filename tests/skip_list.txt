@@ -60,3 +60,7 @@
 #BlockchainTests/GeneralStateTests/stAttackTest
 #BlockchainTests/GeneralStateTests/stEIP1559
 #BlockchainTests/GeneralStateTests/stMemoryStressTest
+#BlockchainTests/GeneralStateTests/Shanghai
+#BlockchainTests/GeneralStateTests/Shanghai/stEIP3651-warmcoinbase
+#BlockchainTests/GeneralStateTests/Shanghai/stEIP3860-limitmeterinitcode
+#BlockchainTests/GeneralStateTests/Shanghai/stEIP3855-push0

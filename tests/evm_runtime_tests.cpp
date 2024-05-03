@@ -27,6 +27,7 @@
 #include <silkworm/core/types/block.hpp>
 #include <silkworm/core/types/transaction.hpp>
 #include <silkworm/core/rlp/encode.hpp>
+#include <silkworm/core/rlp/decode_vector.hpp>
 
 #include <silkworm/core/state/state.hpp>
 #include <silkworm/core/protocol/blockchain.hpp>
@@ -34,6 +35,8 @@
 #include <nlohmann/json.hpp>
 #include <ethash/keccak.hpp>
 #include <magic_enum.hpp>
+
+#include <functional>
 
 using namespace eosio_system;
 using namespace eosio;
@@ -231,7 +234,8 @@ struct block_info {
    uint64_t gasLimit;
    uint64_t number;
    uint64_t timestamp;
-   //fc::optional<bytes> base_fee_per_gas;
+   std::optional<bytes> base_fee_per_gas;
+   bytes mixhash;
 
    static block_info create(const Block& block) {
       block_info bi;
@@ -240,15 +244,15 @@ struct block_info {
       bi.gasLimit   = block.header.gas_limit;
       bi.number     = block.header.number;
       bi.timestamp  = block.header.timestamp;
+      bi.mixhash    = to_bytes(block.header.prev_randao);
 
-      // if(block.header.base_fee_per_gas.has_value())
-      //    bi.base_fee_per_gas = to_bytes(*block.header.base_fee_per_gas);
+      if(block.header.base_fee_per_gas.has_value())
+         bi.base_fee_per_gas = to_bytes(*block.header.base_fee_per_gas);
       
       return bi;
     }
 };
-//FC_REFLECT(block_info, (coinbase)(difficulty)(gasLimit)(number)(timestamp)(base_fee_per_gas));
-FC_REFLECT(block_info, (coinbase)(difficulty)(gasLimit)(number)(timestamp));
+FC_REFLECT(block_info, (coinbase)(difficulty)(gasLimit)(number)(timestamp)(base_fee_per_gas)(mixhash));
 
 struct account {
    uint64_t    id;
@@ -398,8 +402,42 @@ struct assert_message_check {
    }
 };
 
+namespace silkworm { namespace rlp {
+DecodingResult decode_legacy(ByteView& from, Block& to, Leftover mode=silkworm::rlp::Leftover::kProhibit) noexcept {
+   const auto rlp_head{decode_header(from)};
+   if (!rlp_head) {
+      return tl::unexpected{rlp_head.error()};
+   }
+   if (!rlp_head->list) {
+      return tl::unexpected{DecodingError::kUnexpectedString};
+   }
+   const uint64_t leftover{from.length() - rlp_head->payload_length};
+   if (mode != Leftover::kAllow && leftover) {
+      return tl::unexpected{DecodingError::kInputTooLong};
+   }
+
+   if (DecodingResult res{silkworm::rlp::decode_items(from, to.header, to.transactions, to.ommers)}; !res) {
+      return res;
+   }
+
+   to.withdrawals = std::nullopt;
+   if (from.length() > leftover) {
+      std::vector<Withdrawal> withdrawals;
+      if (DecodingResult res{silkworm::rlp::decode(from, withdrawals, Leftover::kAllow)}; !res) {
+            return res;
+      }
+      to.withdrawals = withdrawals;
+   }
+
+   if (from.length() != leftover) {
+      return tl::unexpected{DecodingError::kUnexpectedListElements};
+   }
+   return {};
+}
+}}
+
 struct evm_runtime_tester : eosio_system_tester, silkworm::State {
-   
+
    abi_serializer evm_runtime_abi;
    std::map< name, private_key> key_map;
    bool is_verbose = false;
@@ -884,7 +922,7 @@ struct evm_runtime_tester : eosio_system_tester, silkworm::State {
 
       Block block;
       ByteView view{*rlp};
-      if (!rlp::decode(view, block) || !view.empty()) {
+      if (!rlp::decode_legacy(view, block) || !view.empty()) {
          if (invalid) {
                dlog("invalid=kPassed 2");
                return Status::kPassed;
@@ -946,6 +984,7 @@ struct evm_runtime_tester : eosio_system_tester, silkworm::State {
    }
 
    bool post_check(const nlohmann::json& expected) {
+
       if (number_of_accounts() != expected.size()) {
          std::cout << "Account number mismatch: " << number_of_accounts() << " != " << expected.size()
                      << std::endl;
@@ -1019,10 +1058,10 @@ struct evm_runtime_tester : eosio_system_tester, silkworm::State {
    RunResults blockchain_test(const std::string& test_name, const nlohmann::json& json_test) {
 
       //mod_exp restriction: exponent bit size cannot exceed bit size of either base or modulus
-      if( test_name == "modexp_d27g0v0_Istanbul" ||
-          test_name == "modexp_d27g1v0_Istanbul" ||
-          test_name == "modexp_d27g2v0_Istanbul" ||
-          test_name == "modexp_d27g3v0_Istanbul" ) {
+      if( test_name == "modexp_d27g0v0_Shanghai" ||
+          test_name == "modexp_d27g1v0_Shanghai" ||
+          test_name == "modexp_d27g2v0_Shanghai" ||
+          test_name == "modexp_d27g3v0_Shanghai" ) {
          return Status::kSkipped;
       }
 
@@ -1069,7 +1108,7 @@ struct evm_runtime_tester : eosio_system_tester, silkworm::State {
          std::string network{json_test["network"].get<std::string>()};
 
          //Only Istanbul
-         if(network != "Istanbul") continue;
+         if(network != "Shanghai") continue;
 
          const RunResults r{(*this.*runner)(test.key(), json_test)};
          total += r;
