@@ -101,6 +101,7 @@ struct config_table_row
    uint32_t status;
    std::optional<evm_version_type> evm_version;
    std::optional<consensus_parameter_type> consensus_parameter;
+   std::optional<uint32_t> queue_front_block;
 };
 
 struct config2_table_row
