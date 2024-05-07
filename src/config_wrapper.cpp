@@ -106,6 +106,7 @@ void config_wrapper::enqueue_gas_price(uint64_t gas_price) {
 
     if( _cached_config.queue_front_block.value() == 0 ) {
         _cached_config.queue_front_block = activation_block_num;
+        set_dirty();
     }
 }
 
