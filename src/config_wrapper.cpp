@@ -105,9 +105,13 @@ void config_wrapper::enqueue_gas_price(uint64_t gas_price) {
     });
 
     if( _cached_config.queue_front_block.value() == 0 ) {
-        _cached_config.queue_front_block = activation_block_num;
-        set_dirty();
+        set_queue_front_block(activation_block_num);
     }
+}
+
+void config_wrapper::set_queue_front_block(uint32_t block_num) {
+    _cached_config.queue_front_block = block_num;
+    set_dirty();
 }
 
 void config_wrapper::process_price_queue() {
@@ -124,7 +128,7 @@ void config_wrapper::process_price_queue() {
     while( it != queue.end() && current_block_num >= it->block ) {
         set_gas_price(it->price);
         it = queue.erase(it);
-        _cached_config.queue_front_block = it != queue.end() ? it->block : 0;
+        set_queue_front_block(it != queue.end() ? it->block : 0);
     }
 }
 

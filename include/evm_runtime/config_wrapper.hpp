@@ -53,6 +53,8 @@ struct config_wrapper {
     std::pair<const consensus_parameter_data_type &, bool> get_consensus_param_and_maybe_promote();
 
 private:
+    void set_queue_front_block(uint32_t block_num);
+    
     bool is_dirty()const;
     void set_dirty();
     void clear_dirty();
