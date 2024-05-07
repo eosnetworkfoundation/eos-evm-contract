@@ -16,10 +16,30 @@ namespace evm_runtime {
    static constexpr uint64_t gas_sset_min = 2900;
    static constexpr uint64_t grace_period_seconds = 180;
 
-   constexpr uint64_t pow10_const(int v) {
-      uint64_t r = 1;
-      while (v-- > 0) r *= 10;
-      return r;
+   inline uint64_t pow10_const(unsigned int v) {
+      constexpr uint64_t table[] = {
+         1UL,
+         10UL,
+         100UL,
+         1'000UL,
+         10'000UL,
+         100'000UL,
+         1'000'000UL,
+         10'000'000UL,
+         100'000'000UL,
+         1'000'000'000UL,
+         10'000'000'000UL,
+         100'000'000'000UL,
+         1'000'000'000'000UL,
+         10'000'000'000'000UL,
+         100'000'000'000'000UL,
+         1'000'000'000'000'000UL,
+         10'000'000'000'000'000UL,
+         100'000'000'000'000'000UL,
+         1'000'000'000'000'000'000UL
+      };
+      eosio::check(v < sizeof(table)/sizeof(table[0]), "internal overflow");
+      return table[v];
    }
 
    constexpr unsigned evm_precision = 18;
