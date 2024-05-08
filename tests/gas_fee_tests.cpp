@@ -64,10 +64,13 @@ try {
       eosio_assert_message_is("All required fee parameters not specified: missing miner_cut"));
 
    // It is acceptable for the ingress_bridge_fee to not be provided during init.
-   push_action(evm_account_name,
+   BOOST_REQUIRE_EXCEPTION(
+      push_action(evm_account_name,
                "init"_n,
                evm_account_name,
-               mvo()("chainid", evm_chain_id)("fee_params", missing_ingress_bridge_fee));
+               mvo()("chainid", evm_chain_id)("fee_params", missing_ingress_bridge_fee)),
+      eosio_assert_message_exception,
+      eosio_assert_message_is("All required fee parameters not specified: missing ingress_bridge_fee"));
 }
 FC_LOG_AND_RETHROW()
 
