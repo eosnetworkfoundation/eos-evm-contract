@@ -36,8 +36,10 @@ class engine : public  silkworm::protocol::IRuleSet {
             miner_reward += block_reward / 32;
 
         }
-        eosio::print("add balance to beneficiary\n");
-        state.add_to_balance(block.header.beneficiary, miner_reward);
+        if(revision < EVMC_PARIS) {
+            eosio::print("add balance to beneficiary\n");
+            state.add_to_balance(block.header.beneficiary, miner_reward);
+        }
     }
 
     //! \brief Performs validation of block body that can be done prior to sender recovery and execution.

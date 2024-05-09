@@ -15,6 +15,13 @@ inline constexpr ChainConfig kTestNetwork{
     ._constantinople_block = 0,
     ._petersburg_block = 0,
     ._istanbul_block = 0,
+    ._muir_glacier_block = 0,
+    ._berlin_block = 0,
+    ._london_block = 0,
+    ._arrow_glacier_block = 0,
+    ._gray_glacier_block = 0,
+    ._terminal_total_difficulty = 0,
+    ._shanghai_time = 0
 };
 
 } //namespace test

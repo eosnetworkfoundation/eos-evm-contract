@@ -16,7 +16,8 @@ struct block_info {
     uint64_t                gasLimit;
     uint64_t                number;
     uint64_t                timestamp;
-    //std::optional<bytes>    base_fee_per_gas;
+    std::optional<bytes>    base_fee_per_gas;
+    bytes                   mixhash;
 
     BlockHeader get_block_header()const {
         address beneficiary;
@@ -30,13 +31,15 @@ struct block_info {
         res.number           = number;
         res.timestamp        = timestamp;
 
-        //if(base_fee_per_gas.has_value()) res.base_fee_per_gas = to_uint256(*base_fee_per_gas);
+        check(mixhash.size() == 32, "invalid mixhash");
+        memcpy(res.prev_randao.bytes, mixhash.data(), mixhash.size());
+
+        if(base_fee_per_gas.has_value()) res.base_fee_per_gas = to_uint256(*base_fee_per_gas);
 
         return res;
     }
 
-    //EOSLIB_SERIALIZE(block_info,(coinbase)(difficulty)(gasLimit)(number)(timestamp)(base_fee_per_gas))
-    EOSLIB_SERIALIZE(block_info,(coinbase)(difficulty)(gasLimit)(number)(timestamp))
+    EOSLIB_SERIALIZE(block_info,(coinbase)(difficulty)(gasLimit)(number)(timestamp)(base_fee_per_gas)(mixhash))
 };
 
 } //namespace test
