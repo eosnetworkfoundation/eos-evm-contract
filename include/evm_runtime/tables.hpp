@@ -110,9 +110,12 @@ struct [[eosio::table]] [[eosio::contract("evm_contract")]] gcstore {
 typedef multi_index< "gcstore"_n, gcstore> gc_store_table;
 
 struct [[eosio::table("inevm")]] [[eosio::contract("evm_contract")]] balance_with_dust {
-    asset balance = asset(0, token_symbol);
+    asset balance;
     uint64_t dust = 0;
 
+    bool is_zero() const { // not checking symbol
+        return dust == 0 && balance.amount == 0;
+    }
     bool operator==(const balance_with_dust& o) const {
         return balance == o.balance && dust == o.dust;
     }
@@ -121,6 +124,11 @@ struct [[eosio::table("inevm")]] [[eosio::contract("evm_contract")]] balance_wit
     }
 
     balance_with_dust& operator+=(const intx::uint256& amount) {
+
+        check(balance.symbol != eosio::symbol(), "symbol can't be empty in balance_with_dust");
+        intx::uint256 minimum_natively_representable = pow10_const(evm_precision - balance.symbol.precision());
+        uint64_t min_asset = minimum_natively_representable[0];
+
         const intx::div_result<intx::uint256> div_result = udivrem(amount, minimum_natively_representable);
 
         //asset::max_amount is conservative at 2^62-1, this means two max_amounts of (2^62-1)+(2^62-1) cannot
@@ -149,6 +157,11 @@ struct [[eosio::table("inevm")]] [[eosio::contract("evm_contract")]] balance_wit
     }
 
     balance_with_dust& operator-=(const intx::uint256& amount) {
+
+        check(balance.symbol != eosio::symbol(), "symbol can't be empty in balance_with_dust");
+        intx::uint256 minimum_natively_representable = pow10_const(evm_precision - balance.symbol.precision());
+        uint64_t min_asset = minimum_natively_representable[0];
+
         const intx::div_result<intx::uint256> div_result = udivrem(amount, minimum_natively_representable);
 
         check(div_result.quot <= balance.amount, "decrementing more than available");
@@ -164,8 +177,6 @@ struct [[eosio::table("inevm")]] [[eosio::contract("evm_contract")]] balance_wit
 
         return *this;
     }
-
-    static constexpr uint64_t min_asset = minimum_natively_representable[0];
 
     EOSLIB_SERIALIZE(balance_with_dust, (balance)(dust));
 };
@@ -327,15 +338,16 @@ struct [[eosio::table]] [[eosio::contract("evm_contract")]] config
     unsigned_int version; // placeholder for future variant index
     uint64_t chainid = 0;
     time_point_sec genesis_time;
-    asset ingress_bridge_fee = asset(0, token_symbol);
+    asset ingress_bridge_fee;
     uint64_t gas_price = 0;
     uint32_t miner_cut = 0;
     uint32_t status = 0; // <- bit mask values from status_flags
     binary_extension<evm_version_type> evm_version;
     binary_extension<consensus_parameter_type> consensus_parameter;
+    binary_extension<eosio::name> token_contract; // <- default(unset) means eosio.token
     binary_extension<uint32_t> queue_front_block;
 
-    EOSLIB_SERIALIZE(config, (version)(chainid)(genesis_time)(ingress_bridge_fee)(gas_price)(miner_cut)(status)(evm_version)(consensus_parameter)(queue_front_block));
+    EOSLIB_SERIALIZE(config, (version)(chainid)(genesis_time)(ingress_bridge_fee)(gas_price)(miner_cut)(status)(evm_version)(consensus_parameter)(token_contract)(queue_front_block));
 };
 
 struct [[eosio::table]] [[eosio::contract("evm_contract")]] price_queue

@@ -52,6 +52,11 @@ struct config_wrapper {
     const consensus_parameter_data_type& get_consensus_param();
     std::pair<const consensus_parameter_data_type &, bool> get_consensus_param_and_maybe_promote();
 
+    void set_token_contract(eosio::name token_contract); // only set during init
+    eosio::name get_token_contract() const;
+    eosio::symbol get_token_symbol() const;
+    uint64_t get_minimum_natively_representable() const;
+
 private:
     void set_queue_front_block(uint32_t block_num);
     

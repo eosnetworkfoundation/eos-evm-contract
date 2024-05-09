@@ -8,8 +8,6 @@
 #include <evmc/evmc.hpp>
 #include <ethash/hash_types.hpp>
 
-#define TOKEN_ACCOUNT_NAME "eosio.token"
-
 namespace evm_runtime {
    using intx::operator""_u256;
    static constexpr uint32_t ninety_percent = 90'000;
@@ -18,18 +16,14 @@ namespace evm_runtime {
    static constexpr uint64_t gas_sset_min = 2900;
    static constexpr uint64_t grace_period_seconds = 180;
 
-   constexpr unsigned evm_precision = 18;
-   constexpr eosio::name token_account(eosio::name(TOKEN_ACCOUNT_NAME));
-   constexpr eosio::symbol token_symbol("EOS", 4u);
-   constexpr intx::uint256 minimum_natively_representable = intx::exp(10_u256, intx::uint256(evm_precision - token_symbol.precision()));
-   static_assert(evm_precision - token_symbol.precision() <= 14, "dust math may overflow a uint64_t");
-
-   constexpr double pow10_const(int v) {
-      double r = 1.0;
-      while (v-- > 0) r *= 10.0;
+   constexpr uint64_t pow10_const(int v) {
+      uint64_t r = 1;
+      while (v-- > 0) r *= 10;
       return r;
    }
-   constexpr double minimum_natively_representable_f = pow10_const(evm_precision - token_symbol.precision());
+
+   constexpr unsigned evm_precision = 18;
+   constexpr eosio::name default_token_account = "eosio.token"_n;
 
    typedef intx::uint<256>         uint256;
    typedef intx::uint<512>         uint512;
