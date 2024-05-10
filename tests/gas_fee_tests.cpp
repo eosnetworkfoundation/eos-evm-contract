@@ -311,6 +311,7 @@ try {
    init();
 
    auto cfg = get_config();
+   BOOST_CHECK_EQUAL(cfg.queue_front_block.value(), 0);
 
    eosevm::block_mapping bm(cfg.genesis_time.sec_since_epoch());
 
@@ -342,6 +343,9 @@ try {
    BOOST_CHECK_EQUAL(q[0].block, b1);
    BOOST_CHECK_EQUAL(q[0].price, ten_gwei);
 
+   cfg = get_config();
+   BOOST_CHECK_EQUAL(cfg.queue_front_block.value(), b1);
+
    produce_blocks(100);
 
    // Queue change of gas_price to 30Gwei
@@ -356,6 +360,9 @@ try {
    BOOST_CHECK_EQUAL(q[1].block, b2);
    BOOST_CHECK_EQUAL(q[1].price, 3*ten_gwei);
 
+   cfg = get_config();
+   BOOST_CHECK_EQUAL(cfg.queue_front_block.value(), b1);
+
    // Overwrite queue change (same block) 20Gwei
    setfeeparams({.gas_price = 2*ten_gwei});
 
@@ -365,6 +372,9 @@ try {
    BOOST_CHECK_EQUAL(q[0].price, ten_gwei);
    BOOST_CHECK_EQUAL(q[1].block, b2);
    BOOST_CHECK_EQUAL(q[1].price, 2*ten_gwei);
+
+   cfg = get_config();
+   BOOST_CHECK_EQUAL(cfg.queue_front_block.value(), b1);
 
    while(bm.timestamp_to_evm_block_num(control->pending_block_time().time_since_epoch().count()) != b1) {
       produce_blocks(1);
@@ -379,6 +389,8 @@ try {
    BOOST_CHECK_EQUAL(q[0].block, b2);
    BOOST_CHECK_EQUAL(q[0].price, 2*ten_gwei);
 
+   BOOST_CHECK_EQUAL(cfg.queue_front_block.value(), b2);
+
    while(bm.timestamp_to_evm_block_num(control->pending_block_time().time_since_epoch().count()) != b2) {
       produce_blocks(1);
    }
@@ -389,6 +401,8 @@ try {
 
    q = get_price_queue();
    BOOST_CHECK_EQUAL(q.size(), 0);
+
+   BOOST_CHECK_EQUAL(cfg.queue_front_block.value(), 0);
 }
 FC_LOG_AND_RETHROW()
 

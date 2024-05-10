@@ -93,6 +93,16 @@ namespace fc { namespace raw {
          fc::raw::unpack(ds, consensus_parameter);
          tmp.consensus_parameter.emplace(consensus_parameter);
       }
+      if(ds.remaining()) {
+         name token_contract;
+         fc::raw::unpack(ds, token_contract);
+         tmp.token_contract.emplace(token_contract);
+      }
+      if(ds.remaining()) {
+         uint32_t queue_front_block;
+         fc::raw::unpack(ds, queue_front_block);
+         tmp.queue_front_block.emplace(queue_front_block);
+      }
     } FC_RETHROW_EXCEPTIONS(warn, "error unpacking partial_account_table_row") }
 }}
 

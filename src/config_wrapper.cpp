@@ -17,6 +17,9 @@ config_wrapper::config_wrapper(eosio::name self) : _self(self), _config(self, se
         _cached_config.token_contract = default_token_account;
         // Don't set dirty because action can be read-only.
     }
+    if (!_cached_config.queue_front_block.has_value()) {
+        _cached_config.queue_front_block = 0;
+    }
 }
 
 config_wrapper::~config_wrapper() {
@@ -105,19 +108,32 @@ void config_wrapper::enqueue_gas_price(uint64_t gas_price) {
         el.price = gas_price;
     });
 
+    if( _cached_config.queue_front_block.value() == 0 ) {
+        set_queue_front_block(activation_block_num);
+    }
+}
+
+void config_wrapper::set_queue_front_block(uint32_t block_num) {
+    _cached_config.queue_front_block = block_num;
+    set_dirty();
 }
 
 void config_wrapper::process_price_queue() {
     eosevm::block_mapping bm(get_genesis_time().sec_since_epoch());
     auto current_block_num = bm.timestamp_to_evm_block_num(get_current_time().time_since_epoch().count());
 
+    auto queue_front_block = _cached_config.queue_front_block.value();
+    if( queue_front_block == 0 || current_block_num < queue_front_block ) {
+        return;
+    }
+
     price_queue_table queue(_self, _self.value);
     auto it = queue.begin();
     while( it != queue.end() && current_block_num >= it->block ) {
         set_gas_price(it->price);
         it = queue.erase(it);
+        set_queue_front_block(it != queue.end() ? it->block : 0);
     }
-
 }
 
 uint32_t config_wrapper::get_miner_cut()const {

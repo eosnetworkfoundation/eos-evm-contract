@@ -58,6 +58,8 @@ struct config_wrapper {
     uint64_t get_minimum_natively_representable() const;
 
 private:
+    void set_queue_front_block(uint32_t block_num);
+    
     bool is_dirty()const;
     void set_dirty();
     void clear_dirty();

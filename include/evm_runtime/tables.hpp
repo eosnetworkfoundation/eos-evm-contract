@@ -344,10 +344,10 @@ struct [[eosio::table]] [[eosio::contract("evm_contract")]] config
     uint32_t status = 0; // <- bit mask values from status_flags
     binary_extension<evm_version_type> evm_version;
     binary_extension<consensus_parameter_type> consensus_parameter;
-
     binary_extension<eosio::name> token_contract; // <- default(unset) means eosio.token
+    binary_extension<uint32_t> queue_front_block;
 
-    EOSLIB_SERIALIZE(config, (version)(chainid)(genesis_time)(ingress_bridge_fee)(gas_price)(miner_cut)(status)(evm_version)(consensus_parameter)(token_contract));
+    EOSLIB_SERIALIZE(config, (version)(chainid)(genesis_time)(ingress_bridge_fee)(gas_price)(miner_cut)(status)(evm_version)(consensus_parameter)(token_contract)(queue_front_block));
 };
 
 struct [[eosio::table]] [[eosio::contract("evm_contract")]] price_queue
