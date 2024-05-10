@@ -354,8 +354,8 @@ BOOST_FIXTURE_TEST_CASE(gas_param_G_txcreate, gas_param_evm_tester) try {
     auto [gas_used2, contract_address2] = deploy_contract_gas(evm1, contract_bytecode);
 
     // Check gas used to deploy the contract (from the tx)
-    BOOST_REQUIRE(gas_used1 == 32000 + 21000 + 13*200 + 364);
-    BOOST_REQUIRE(gas_used2 ==     0 + 21000 + 13*200 + 364);
+    BOOST_REQUIRE(gas_used1 == 32000 + 21000 + 13*200 + 366);
+    BOOST_REQUIRE(gas_used2 ==     0 + 21000 + 13*200 + 366);
 
 } FC_LOG_AND_RETHROW()
 
@@ -388,7 +388,7 @@ BOOST_FIXTURE_TEST_CASE(gas_param_G_codedeposit, gas_param_evm_tester) try {
 
     // code_len = 13
     auto [gas_used1, contract_address1] = deploy_contract_gas(evm1, contract_bytecode);
-    BOOST_REQUIRE(gas_used1 == 32000 + 21000 + 13*200 + 364);
+    BOOST_REQUIRE(gas_used1 == 32000 + 21000 + 13*200 + 366);
 
     // Set gas_codedeposit = 0
     setgasparam(gas_txnewaccount, gas_newaccount, gas_txcreate, 0, gas_sset, evm_account_name);
@@ -396,7 +396,7 @@ BOOST_FIXTURE_TEST_CASE(gas_param_G_codedeposit, gas_param_evm_tester) try {
     produce_block();
 
     auto [gas_used2, contract_address2] = deploy_contract_gas(evm1, contract_bytecode);
-    BOOST_REQUIRE(gas_used2 == 32000 + 21000 + 13*0 + 364);
+    BOOST_REQUIRE(gas_used2 == 32000 + 21000 + 13*0 + 366);
 
 } FC_LOG_AND_RETHROW()
 
