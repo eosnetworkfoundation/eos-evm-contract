@@ -27,7 +27,7 @@ if (WITH_ADMIN_ACTIONS)
 endif()
 
 add_compile_definitions(ANTELOPE)
-add_compile_definitions(PROJECT_VERSION="0.6.0")
+add_compile_definitions(PROJECT_VERSION="1.0.0-rc1")
 
 # ethash
 list(APPEND SOURCES 
