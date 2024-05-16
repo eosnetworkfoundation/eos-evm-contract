@@ -233,10 +233,10 @@ basic_evm_tester::basic_evm_tester(std::string native_symbol_str) :
 
 asset basic_evm_tester::make_asset(int64_t amount) const { return asset(amount, native_symbol); }
 
-transaction_trace_ptr basic_evm_tester::transfer_token(name from, name to, asset quantity, std::string memo)
+transaction_trace_ptr basic_evm_tester::transfer_token(name from, name to, asset quantity, std::string memo, name acct)
 {
    return push_action(
-      token_account_name, "transfer"_n, from, mvo()("from", from)("to", to)("quantity", quantity)("memo", memo));
+      acct, "transfer"_n, from, mvo()("from", from)("to", to)("quantity", quantity)("memo", memo));
 }
 
 action basic_evm_tester::get_action( account_name code, action_name acttype, vector<permission_level> auths,
@@ -281,7 +281,8 @@ void basic_evm_tester::init(const uint64_t chainid,
                             const uint64_t gas_price,
                             const uint32_t miner_cut,
                             const std::optional<asset> ingress_bridge_fee,
-                            const bool also_prepare_self_balance)
+                            const bool also_prepare_self_balance,
+                            const std::optional<name> token_contract)
 {
    mvo fee_params;
    fee_params("gas_price", gas_price)("miner_cut", miner_cut);
@@ -292,7 +293,12 @@ void basic_evm_tester::init(const uint64_t chainid,
       fee_params("ingress_bridge_fee", "0.0000 EOS");
    }
 
-   push_action(evm_account_name, "init"_n, evm_account_name, mvo()("chainid", chainid)("fee_params", fee_params));
+   if(!token_contract.has_value()) {
+      push_action(evm_account_name, "init"_n, evm_account_name, mvo()("chainid", chainid)("fee_params", fee_params));
+   } else {
+      push_action(evm_account_name, "init"_n, evm_account_name, mvo()("chainid", chainid)("fee_params", fee_params)("token_contract", token_contract));
+   }
+
 
    if (also_prepare_self_balance) {
       prepare_self_balance();

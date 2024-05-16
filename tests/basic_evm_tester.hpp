@@ -399,7 +399,7 @@ public:
 
    asset make_asset(int64_t amount) const;
 
-   transaction_trace_ptr transfer_token(name from, name to, asset quantity, std::string memo = "");
+   transaction_trace_ptr transfer_token(name from, name to, asset quantity, std::string memo = "", name acct=token_account_name);
 
    action get_action( account_name code, action_name acttype, vector<permission_level> auths,
                                  const bytes& data )const;
@@ -415,7 +415,8 @@ public:
              const uint64_t gas_price = suggested_gas_price,
              const uint32_t miner_cut = suggested_miner_cut,
              const std::optional<asset> ingress_bridge_fee = std::nullopt,
-             const bool also_prepare_self_balance = true);
+             const bool also_prepare_self_balance = true,
+             const std::optional<name> token_contract = std::nullopt);
 
    template <typename... T>
    void start_block(T... t) {
