@@ -809,4 +809,21 @@ void basic_evm_tester::check_balances() {
    }
 }
 
+silkworm::Transaction basic_evm_tester::get_tx_from_trace(const bytes& v) {
+   auto evmtx_v = fc::raw::unpack<evm_test::evmtx_type>(v.data(), v.size());
+
+   BOOST_REQUIRE(std::holds_alternative<evm_test::evmtx_v0>(evmtx_v));
+
+   const auto& evmtx = std::get<evm_test::evmtx_v0>(evmtx_v);
+   BOOST_REQUIRE(evmtx.eos_evm_version == 1);
+
+   silkworm::Transaction tx;
+   silkworm::ByteView bv{(const uint8_t*)evmtx.rlptx.data(), evmtx.rlptx.size()};
+   silkworm::rlp::decode(bv, tx);
+   BOOST_REQUIRE(bv.empty());
+
+   return tx;
+};
+
+
 } // namespace evm_test

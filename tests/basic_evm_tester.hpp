@@ -509,6 +509,7 @@ public:
    bool scan_price_queue(std::function<bool(evm_test::price_queue)> visitor) const;
 
    intx::uint128 tx_data_cost(const silkworm::Transaction& txn) const;
+   silkworm::Transaction get_tx_from_trace(const bytes& v);
 };
 
 inline constexpr intx::uint256 operator"" _wei(const char* s) { return intx::from_string<intx::uint256>(s); }
