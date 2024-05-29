@@ -659,13 +659,27 @@ void evm_contract::handle_evm_transfer(eosio::asset quantity, const std::string&
     intx::uint256 value((uint64_t)quantity.amount);
     value *= intx::uint256(_config->get_minimum_natively_representable());
 
+    auto calculate_gas_limit = [&](const evmc::address& destination) -> int64_t {
+        int64_t gas_limit = 21000;
+
+        account_table accounts(get_self(), get_self().value);
+        auto inx = accounts.get_index<"by.address"_n>();
+        auto itr = inx.find(make_key(destination));
+
+        if(itr == inx.end()) {
+            gas_limit += std::visit([&](const auto &v) { return v.gas_parameter.gas_txnewaccount; }, _config->get_consensus_param());
+        }
+
+        return gas_limit;
+    };
+
     Transaction txn;
     txn.type = TransactionType::kLegacy;
     txn.nonce = get_and_increment_nonce(get_self());
     txn.max_priority_fee_per_gas = _config->get_gas_price();
     txn.max_fee_per_gas = _config->get_gas_price();
-    txn.gas_limit = 21000;
     txn.to = to_evmc_address(*address_bytes);
+    txn.gas_limit = calculate_gas_limit(*txn.to);
     txn.value = value;
     txn.r = 0u;  // r == 0 is pseudo signature that resolves to reserved address range
     txn.s = get_self().value;
