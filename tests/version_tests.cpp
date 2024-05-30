@@ -221,22 +221,6 @@ BOOST_FIXTURE_TEST_CASE(traces_in_different_eosevm_version, version_tester) try 
     setversion(1, evm_account_name);
     produce_blocks(2);
 
-    auto get_tx_from_trace = [&](const bytes& v) {
-      auto evmtx_v = fc::raw::unpack<evm_test::evmtx_type>(v.data(), v.size());
-
-      BOOST_REQUIRE(std::holds_alternative<evm_test::evmtx_v0>(evmtx_v));
-
-      const auto& evmtx = std::get<evm_test::evmtx_v0>(evmtx_v);
-      BOOST_REQUIRE(evmtx.eos_evm_version == 1);
-
-      silkworm::Transaction tx;
-      silkworm::ByteView bv{(const uint8_t*)evmtx.rlptx.data(), evmtx.rlptx.size()};
-      silkworm::rlp::decode(bv, tx);
-      BOOST_REQUIRE(bv.empty());
-
-      return tx;
-    };
-
     // Test traces of `handle_evm_transfer` (EVM VERSION=1)
     trace = transfer_token("alice"_n, evm_account_name, make_asset(to_bridge), evm1.address_0x());
     BOOST_REQUIRE(trace->action_traces.size() == 4);
