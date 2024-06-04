@@ -440,7 +440,7 @@ transaction_trace_ptr basic_evm_tester::assertnonce(name account, uint64_t next_
 transaction_trace_ptr basic_evm_tester::pushtx(const silkworm::Transaction& trx, name miner, std::optional<uint64_t> min_inclusion_price)
 {
    silkworm::Bytes rlp;
-   silkworm::rlp::encode(rlp, trx);
+   silkworm::rlp::encode(rlp, trx, false);
 
    bytes rlp_bytes;
    rlp_bytes.resize(rlp.size());
