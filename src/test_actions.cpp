@@ -24,7 +24,7 @@ using namespace silkworm;
     if(orlptx) {
         Transaction tx;
         ByteView bv{(const uint8_t*)orlptx->data(), orlptx->size()};
-        eosio::check(rlp::decode_transaction(bv, tx, rlp::Eip2718Wrapping::kNone) && bv.empty(), "unable to decode transaction");
+        eosio::check(rlp::decode_transaction(bv, tx, rlp::Eip2718Wrapping::kString) && bv.empty(), "unable to decode transaction");
 
         runtime_config rc {
             .allow_special_signature = false,
