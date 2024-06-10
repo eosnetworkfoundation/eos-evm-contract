@@ -22,6 +22,7 @@ include_directories(
 )
 
 add_eosio_test_executable( unit_test
+    ${CMAKE_SOURCE_DIR}/rlp_encoding_tests.cpp
     ${CMAKE_SOURCE_DIR}/different_gas_token_tests.cpp
     ${CMAKE_SOURCE_DIR}/version_tests.cpp
     ${CMAKE_SOURCE_DIR}/account_id_tests.cpp
