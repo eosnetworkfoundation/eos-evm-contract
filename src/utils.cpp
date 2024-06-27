@@ -61,4 +61,11 @@ uint256 to_uint256(const bytes& value) {
     return intx::be::load<uint256>(tmp);
 }
 
+uint64_t pow10_const(int v) {
+    eosio::check(v >= 0, "invalid exponent");
+    uint64_t r = 1;
+    while (v-- > 0) r *= 10;
+    return r;
+}
+
 }  // namespace silkworm

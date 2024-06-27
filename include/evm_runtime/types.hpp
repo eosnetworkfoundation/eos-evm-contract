@@ -16,11 +16,7 @@ namespace evm_runtime {
    static constexpr uint64_t gas_sset_min = 2900;
    static constexpr uint64_t grace_period_seconds = 180;
 
-   constexpr uint64_t pow10_const(int v) {
-      uint64_t r = 1;
-      while (v-- > 0) r *= 10;
-      return r;
-   }
+   uint64_t pow10_const(int v);
 
    constexpr unsigned evm_precision = 18;
    constexpr eosio::name default_token_account = "eosio.token"_n;

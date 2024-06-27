@@ -71,6 +71,7 @@ const eosio::asset& config_wrapper::get_ingress_bridge_fee()const {
 }
 
 void config_wrapper::set_ingress_bridge_fee(const eosio::asset& ingress_bridge_fee) {
+    eosio::check(evm_precision >= ingress_bridge_fee.symbol.precision(), "invalid ingress fee precision");
     _cached_config.ingress_bridge_fee = ingress_bridge_fee;
     set_dirty();
 }
@@ -212,7 +213,7 @@ void config_wrapper::set_fee_parameters(const fee_parameters& fee_params,
         }
         eosio::check(fee_params.ingress_bridge_fee->amount >= 0, "ingress bridge fee cannot be negative");
 
-        _cached_config.ingress_bridge_fee = *fee_params.ingress_bridge_fee;
+        set_ingress_bridge_fee(*fee_params.ingress_bridge_fee);
     } else {
         eosio::check(allow_any_to_be_unspecified, "All required fee parameters not specified: missing ingress_bridge_fee");
     }
