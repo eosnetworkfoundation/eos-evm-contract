@@ -94,7 +94,7 @@ BOOST_FIXTURE_TEST_CASE(set_version, version_tester) try {
         eosio_assert_message_exception,
         eosio_assert_message_is("new version must be greater than the active one"));
 
-    BOOST_REQUIRE_EXCEPTION(setversion(3, evm_account_name),
+    BOOST_REQUIRE_EXCEPTION(setversion(2, evm_account_name),
         eosio_assert_message_exception,
         eosio_assert_message_is("Unsupported version"));
 
