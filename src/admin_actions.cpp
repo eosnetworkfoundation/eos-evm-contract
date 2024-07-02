@@ -3,6 +3,39 @@
 #include <evm_runtime/tables.hpp>
 
 namespace evm_runtime {
+
+[[eosio::action]] void evm_contract::rmalldata() {
+    eosio::require_auth(get_self());
+
+    auto rmtable = [](auto &&table) {
+        auto itr = table.begin();
+        while (itr != table.end()) {
+            auto itr2 = itr;
+            ++itr2;
+            table.erase(*itr);
+            itr = itr2;
+        }
+    };
+    rmtable(gc_store_table(get_self(), get_self().value));
+    rmtable(account_table(get_self(), get_self().value));
+    rmtable(account_code_table(get_self(), get_self().value));
+
+    eosio::singleton<"config2"_n, config2> _config2(get_self(), get_self().value);
+    if (_config2.exists()) {
+        uint64_t v = _config2.get().next_account_id;
+        for (uint64_t i = 0; i < v; ++i) {
+            rmtable(storage_table(get_self(), i));
+        }
+    }
+    rmtable(balances(get_self(), get_self().value));
+    rmtable(nextnonces(get_self(), get_self().value));
+    rmtable(message_receiver_table(get_self(), get_self().value));
+
+    inevm_singleton(get_self(), get_self().value).remove();
+    eosio::singleton<"config"_n, config>(get_self(), get_self().value).remove();
+    _config2.remove();
+}
+
 [[eosio::action]] void evm_contract::rmgcstore(uint64_t id) {
     eosio::require_auth(get_self());
     gc_store_table gc(get_self(), get_self().value);
