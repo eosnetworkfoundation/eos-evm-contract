@@ -60,7 +60,13 @@ struct evmtx_v0 {
    uint64_t  base_fee_per_gas;
 };
 
-using evmtx_type = std::variant<evmtx_v0>;
+struct evmtx_v1 : evmtx_v0 {
+   uint64_t overhead_price;
+   uint64_t storage_price;
+};
+
+
+using evmtx_type = std::variant<evmtx_v0, evmtx_v1>;
 
 struct evm_version_type {
    struct pending {
@@ -227,6 +233,7 @@ FC_REFLECT(evm_test::bridge_message_v0, (receiver)(sender)(timestamp)(value)(dat
 FC_REFLECT(evm_test::gcstore, (id)(storage_id));
 FC_REFLECT(evm_test::account_code, (id)(ref_count)(code)(code_hash));
 FC_REFLECT(evm_test::evmtx_v0, (eos_evm_version)(rlptx)(base_fee_per_gas));
+FC_REFLECT_DERIVED(evm_test::evmtx_v1, (evm_test::evmtx_v0), (overhead_price)(storage_price));
 
 FC_REFLECT(evm_test::consensus_parameter_type, (current)(pending));
 FC_REFLECT(evm_test::pending_consensus_parameter_data_type, (data)(pending_time));
@@ -459,6 +466,8 @@ public:
    transaction_trace_ptr addevmbal(uint64_t id, const intx::uint256& delta, bool subtract, name actor=evm_account_name);
    transaction_trace_ptr addopenbal(name account, const intx::uint256& delta, bool subtract, name actor=evm_account_name);
 
+   transaction_trace_ptr setgasprices(uint64_t storage_price, uint64_t overhead_price, name actor=evm_account_name);
+
    void open(name owner);
    void close(name owner);
    void withdraw(name owner, asset quantity);
@@ -509,7 +518,15 @@ public:
    bool scan_price_queue(std::function<bool(evm_test::price_queue)> visitor) const;
 
    intx::uint128 tx_data_cost(const silkworm::Transaction& txn) const;
+
    silkworm::Transaction get_tx_from_trace(const bytes& v);
+
+   template <typename T>
+   T get_event_from_trace(const bytes& v) {
+      auto evmtx_v = fc::raw::unpack<evm_test::evmtx_type>(v.data(), v.size());
+      BOOST_REQUIRE(std::holds_alternative<T>(evmtx_v));
+      return std::get<T>(evmtx_v);
+   }
 };
 
 inline constexpr intx::uint256 operator"" _wei(const char* s) { return intx::from_string<intx::uint256>(s); }

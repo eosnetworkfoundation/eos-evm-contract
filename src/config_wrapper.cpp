@@ -20,6 +20,12 @@ config_wrapper::config_wrapper(eosio::name self) : _self(self), _config(self, se
     if (!_cached_config.queue_front_block.has_value()) {
         _cached_config.queue_front_block = 0;
     }
+    if (!_cached_config.overhead_price.has_value()) {
+        _cached_config.overhead_price = 0;
+    }
+    if (!_cached_config.storage_price.has_value()) {
+        _cached_config.storage_price = 0;
+    }
 }
 
 config_wrapper::~config_wrapper() {
@@ -82,6 +88,24 @@ uint64_t config_wrapper::get_gas_price()const {
 
 void config_wrapper::set_gas_price(uint64_t gas_price) {
     _cached_config.gas_price = gas_price;
+    set_dirty();
+}
+
+uint64_t config_wrapper::get_overhead_price()const {
+    return *_cached_config.overhead_price;
+}
+
+void config_wrapper::set_overhead_price(uint64_t price) {
+    _cached_config.overhead_price = price;
+    set_dirty();
+}
+
+uint64_t config_wrapper::get_storage_price()const {
+    return *_cached_config.storage_price;
+}
+
+void config_wrapper::set_storage_price(uint64_t price) {
+    _cached_config.storage_price = price;
     set_dirty();
 }
 

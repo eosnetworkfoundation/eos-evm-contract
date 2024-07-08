@@ -88,6 +88,8 @@ public:
    [[eosio::action]] void updtgasparam(eosio::asset ram_price_mb, uint64_t gas_price);
    [[eosio::action]] void setgasparam(uint64_t gas_txnewaccount, uint64_t gas_newaccount, uint64_t gas_txcreate, uint64_t gas_codedeposit, uint64_t gas_sset);
 
+   [[eosio::action]] void setgasprices(uint64_t storage_price, uint64_t overhead_price);
+
    // Events
    [[eosio::action]] void evmtx(eosio::ignore<evm_runtime::evmtx_type> event){
       eosio::check(get_sender() == get_self(), "forbidden to call");

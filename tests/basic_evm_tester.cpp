@@ -508,6 +508,11 @@ transaction_trace_ptr basic_evm_tester::addopenbal(name account, const intx::uin
       mvo()("account", account)("delta",d)("subtract",subtract));
 }
 
+transaction_trace_ptr basic_evm_tester::setgasprices(uint64_t storage_price, uint64_t overhead_price, name actor) {
+   return basic_evm_tester::push_action(evm_account_name, "setgasprices"_n, actor,
+      mvo()("storage_price", storage_price)("overhead_price",overhead_price));
+}
+
 evmc::address basic_evm_tester::deploy_contract(evm_eoa& eoa, evmc::bytes bytecode)
 {
    uint64_t nonce = eoa.next_nonce;
@@ -810,11 +815,7 @@ void basic_evm_tester::check_balances() {
 }
 
 silkworm::Transaction basic_evm_tester::get_tx_from_trace(const bytes& v) {
-   auto evmtx_v = fc::raw::unpack<evm_test::evmtx_type>(v.data(), v.size());
-
-   BOOST_REQUIRE(std::holds_alternative<evm_test::evmtx_v0>(evmtx_v));
-
-   const auto& evmtx = std::get<evm_test::evmtx_v0>(evmtx_v);
+   auto evmtx = get_event_from_trace<evm_test::evmtx_v0>(v);
    BOOST_REQUIRE(evmtx.eos_evm_version == 1);
 
    silkworm::Transaction tx;

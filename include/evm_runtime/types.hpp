@@ -86,7 +86,13 @@ namespace evm_runtime {
       EOSLIB_SERIALIZE(evmtx_v0, (eos_evm_version)(rlptx)(base_fee_per_gas));
    };
 
-   using evmtx_type = std::variant<evmtx_v0>;
+   struct evmtx_v1 : evmtx_v0 {
+      uint64_t overhead_price;
+      uint64_t storage_price;
+      EOSLIB_SERIALIZE_DERIVED(evmtx_v1, evmtx_v0, (overhead_price)(storage_price));
+   };
+
+   using evmtx_type = std::variant<evmtx_v0, evmtx_v1>;
 
    struct fee_parameters
    {

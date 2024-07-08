@@ -522,10 +522,12 @@ void evm_contract::process_tx(const runtime_config& rc, eosio::name miner, const
         act.send(gas_param_pair.first);
     }
 
-    if (current_version >= 1) {
+    if(current_version >= 3) {
+        auto event = evmtx_type{evmtx_v1{current_version, txn.get_rlptx(), *base_fee_per_gas, _config->get_overhead_price(), _config->get_storage_price()}};
+        action(std::vector<permission_level>{}, get_self(), "evmtx"_n, event).send();
+    } else if (current_version >= 1) {
         auto event = evmtx_type{evmtx_v0{current_version, txn.get_rlptx(), *base_fee_per_gas}};
-        action(std::vector<permission_level>{}, get_self(), "evmtx"_n, event)
-            .send();
+        action(std::vector<permission_level>{}, get_self(), "evmtx"_n, event).send();
     }
     LOGTIME("EVM END");
 }
@@ -897,6 +899,12 @@ void evm_contract::setgasparam(uint64_t gas_txnewaccount,
                                 gas_txcreate,
                                 gas_codedeposit,
                                 gas_sset);
+}
+
+void evm_contract::setgasprices(uint64_t storage_price, uint64_t overhead_price) {
+    require_auth(get_self());
+    _config->set_storage_price(storage_price);
+    _config->set_overhead_price(overhead_price);
 }
 
 } //evm_runtime
