@@ -80,7 +80,7 @@ jobs:
         run: .github/workflows/build-contract-test.sh
 
       - name: Upload Artifacts
-        if: ${{ matrix.DWITH_TEST_ACTIONS }} == 'on' || ${{ matrix.DWITH_TEST_ACTIONS }} == 'true'
+        if: ${{ matrix.DWITH_TEST_ACTIONS == 'on' }}
         uses: actions/upload-artifact@v4
         with:
           name: contract-test.tar.gz
