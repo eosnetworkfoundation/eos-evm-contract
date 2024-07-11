@@ -93,8 +93,8 @@ struct pending_consensus_parameter_data_type {
    fc::time_point pending_time;
 };
 struct consensus_parameter_type {
-   consensus_parameter_data_type current;
    std::optional<pending_consensus_parameter_data_type> pending;
+   consensus_parameter_data_type current;
 };
 struct config_table_row
 {
@@ -109,6 +109,9 @@ struct config_table_row
    std::optional<consensus_parameter_type> consensus_parameter;
    std::optional<name> token_contract;
    std::optional<uint32_t> queue_front_block;
+   std::optional<uint64_t> overhead_price;
+   std::optional<uint64_t> storage_price;
+
 };
 
 struct config2_table_row
@@ -235,7 +238,7 @@ FC_REFLECT(evm_test::account_code, (id)(ref_count)(code)(code_hash));
 FC_REFLECT(evm_test::evmtx_v0, (eos_evm_version)(rlptx)(base_fee_per_gas));
 FC_REFLECT_DERIVED(evm_test::evmtx_v1, (evm_test::evmtx_v0), (overhead_price)(storage_price));
 
-FC_REFLECT(evm_test::consensus_parameter_type, (current)(pending));
+FC_REFLECT(evm_test::consensus_parameter_type, (pending)(current));
 FC_REFLECT(evm_test::pending_consensus_parameter_data_type, (data)(pending_time));
 FC_REFLECT(evm_test::consensus_parameter_data_v0, (gas_parameter));
 FC_REFLECT(evm_test::gas_parameter_type, (gas_txnewaccount)(gas_newaccount)(gas_txcreate)(gas_codedeposit)(gas_sset));

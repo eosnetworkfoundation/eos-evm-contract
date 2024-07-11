@@ -103,6 +103,17 @@ namespace fc { namespace raw {
          fc::raw::unpack(ds, queue_front_block);
          tmp.queue_front_block.emplace(queue_front_block);
       }
+      if(ds.remaining()) {
+         uint32_t overhead_price;
+         fc::raw::unpack(ds, overhead_price);
+         tmp.overhead_price.emplace(overhead_price);
+      }
+      if(ds.remaining()) {
+         uint32_t storage_price;
+         fc::raw::unpack(ds, storage_price);
+         tmp.storage_price.emplace(storage_price);
+      }
+
     } FC_RETHROW_EXCEPTIONS(warn, "error unpacking partial_account_table_row") }
 }}
 
@@ -317,6 +328,7 @@ config_table_row basic_evm_tester::get_config() const
    static constexpr eosio::chain::name config_singleton_name = "config"_n;
    const vector<char> d =
       get_row_by_account(evm_account_name, evm_account_name, config_singleton_name, config_singleton_name);
+
    return fc::raw::unpack<config_table_row>(d);
 }
 

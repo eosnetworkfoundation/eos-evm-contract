@@ -9,8 +9,12 @@ config_wrapper::config_wrapper(eosio::name self) : _self(self), _config(self, se
     if(_exists) {
         _cached_config = _config.get();
     }
+    if (!_cached_config.evm_version.has_value()) {
+        _cached_config.evm_version = value_promoter<uint64_t>{};
+        // Don't set dirty because action can be read-only.
+    }
     if (!_cached_config.consensus_parameter.has_value()) {
-        _cached_config.consensus_parameter = consensus_parameter_type();
+        _cached_config.consensus_parameter = value_promoter<consensus_parameter_data_type>{};
         // Don't set dirty because action can be read-only.
     }
     if (!_cached_config.token_contract.has_value()) {
@@ -21,10 +25,10 @@ config_wrapper::config_wrapper(eosio::name self) : _self(self), _config(self, se
         _cached_config.queue_front_block = 0;
     }
     if (!_cached_config.overhead_price.has_value()) {
-        _cached_config.overhead_price = 0;
+        _cached_config.overhead_price = value_promoter<uint64_t>{};
     }
     if (!_cached_config.storage_price.has_value()) {
-        _cached_config.storage_price = 0;
+        _cached_config.storage_price = value_promoter<uint64_t>{};
     }
 }
 
@@ -92,20 +96,28 @@ void config_wrapper::set_gas_price(uint64_t gas_price) {
 }
 
 uint64_t config_wrapper::get_overhead_price()const {
-    return *_cached_config.overhead_price;
+    // should not happen
+    eosio::check(_cached_config.overhead_price.has_value(), "overhead_price not exist");
+    return _cached_config.overhead_price->get_value(_cached_config.genesis_time, get_current_time());
 }
 
 void config_wrapper::set_overhead_price(uint64_t price) {
-    _cached_config.overhead_price = price;
+    _cached_config.overhead_price->update([&](auto& v) {
+        v = price;
+    }, _cached_config.genesis_time, get_current_time());
     set_dirty();
 }
 
 uint64_t config_wrapper::get_storage_price()const {
-    return *_cached_config.storage_price;
+    // should not happen
+    eosio::check(_cached_config.storage_price.has_value(), "storage_price not exist");
+    return _cached_config.storage_price->get_value(_cached_config.genesis_time, get_current_time());
 }
 
 void config_wrapper::set_storage_price(uint64_t price) {
-    _cached_config.storage_price = price;
+    _cached_config.storage_price->update([&](auto& v) {
+        v = price;
+    }, _cached_config.genesis_time, get_current_time());
     set_dirty();
 }
 
@@ -181,18 +193,16 @@ void config_wrapper::set_status(uint32_t status) {
 }
 
 uint64_t config_wrapper::get_evm_version()const {
-    uint64_t current_version = 0;
-    if(_cached_config.evm_version.has_value()) {
-        current_version = _cached_config.evm_version->get_version(_cached_config.genesis_time, get_current_time());
-    }
-    return current_version;
+    // should not happen
+    eosio::check(_cached_config.evm_version.has_value(), "evm_version not exist");
+    return _cached_config.evm_version->get_value(_cached_config.genesis_time, get_current_time());
 }
 
 uint64_t config_wrapper::get_evm_version_and_maybe_promote() {
     uint64_t current_version = 0;
     bool promoted = false;
     if(_cached_config.evm_version.has_value()) {
-        std::tie(current_version, promoted) = _cached_config.evm_version->get_version_and_maybe_promote(_cached_config.genesis_time, get_current_time());
+        std::tie(current_version, promoted) = _cached_config.evm_version->get_value_and_maybe_promote(_cached_config.genesis_time, get_current_time());
     }
     if(promoted) {
         if(current_version >=1 && _cached_config.miner_cut != 0) _cached_config.miner_cut = 0;
@@ -205,7 +215,9 @@ void config_wrapper::set_evm_version(uint64_t new_version) {
     eosio::check(new_version <= eosevm::max_eos_evm_version, "Unsupported version");
     auto current_version = get_evm_version_and_maybe_promote();
     eosio::check(new_version > current_version, "new version must be greater than the active one");
-    _cached_config.evm_version.emplace(evm_version_type{evm_version_type::pending{new_version, get_current_time()}, current_version});
+    _cached_config.evm_version->update([&](auto& v) {
+        v = new_version;
+    }, _cached_config.genesis_time, get_current_time());
     set_dirty();
 }
 
@@ -285,16 +297,18 @@ void config_wrapper::update_consensus_parameters2(std::optional<uint64_t> gas_tx
     // should not happen
     eosio::check(_cached_config.consensus_parameter.has_value(), "consensus_parameter not exist");
 
-    _cached_config.consensus_parameter->update_consensus_param([&](auto & v) {
-        if (gas_txnewaccount.has_value()) v.gas_parameter.gas_txnewaccount = *gas_txnewaccount;
-        if (gas_newaccount.has_value()) v.gas_parameter.gas_newaccount = *gas_newaccount;
-        if (gas_txcreate.has_value()) v.gas_parameter.gas_txcreate = *gas_txcreate;
-        if (gas_codedeposit.has_value()) v.gas_parameter.gas_codedeposit = *gas_codedeposit;
-        if (gas_sset.has_value()) {
-            eosio::check(*gas_sset >= gas_sset_min, "gas_sset too small");
-            v.gas_parameter.gas_sset = *gas_sset;
-        }
-    }, get_current_time());
+    _cached_config.consensus_parameter->update([&](auto& p) {
+        std::visit([&](auto& v){
+            if (gas_txnewaccount.has_value()) v.gas_parameter.gas_txnewaccount = *gas_txnewaccount;
+            if (gas_newaccount.has_value()) v.gas_parameter.gas_newaccount = *gas_newaccount;
+            if (gas_txcreate.has_value()) v.gas_parameter.gas_txcreate = *gas_txcreate;
+            if (gas_codedeposit.has_value()) v.gas_parameter.gas_codedeposit = *gas_codedeposit;
+            if (gas_sset.has_value()) {
+                eosio::check(*gas_sset >= gas_sset_min, "gas_sset too small");
+                v.gas_parameter.gas_sset = *gas_sset;
+            }
+        }, p);
+    }, _cached_config.genesis_time, get_current_time());
 
     set_dirty();
 }
@@ -302,7 +316,7 @@ void config_wrapper::update_consensus_parameters2(std::optional<uint64_t> gas_tx
 const consensus_parameter_data_type& config_wrapper::get_consensus_param() {
     // should not happen
     eosio::check(_cached_config.consensus_parameter.has_value(), "consensus_parameter not exist");
-    return _cached_config.consensus_parameter->get_consensus_param(_cached_config.genesis_time, get_current_time());
+    return _cached_config.consensus_parameter->get_value(_cached_config.genesis_time, get_current_time());
 }
 
 std::pair<const consensus_parameter_data_type &, bool> config_wrapper::get_consensus_param_and_maybe_promote() {
@@ -310,7 +324,7 @@ std::pair<const consensus_parameter_data_type &, bool> config_wrapper::get_conse
     // should not happen
     eosio::check(_cached_config.consensus_parameter.has_value(), "consensus_parameter not exist");
 
-    auto pair = _cached_config.consensus_parameter->get_consensus_param_and_maybe_promote(_cached_config.genesis_time, get_current_time());
+    auto pair = _cached_config.consensus_parameter->get_value_and_maybe_promote(_cached_config.genesis_time, get_current_time());
     if (pair.second) {
         set_dirty();
     }
