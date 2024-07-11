@@ -39,11 +39,11 @@ jobs:
           submodules: 'recursive'
 
       - name: Download CDT
-        uses: AntelopeIO/asset-artifact-download-action@v3
+        uses: AntelopeIO/asset-artifact-download-action@v4
         with:
           owner: AntelopeIO
           repo: cdt
-          target: 'v3.1.0'
+          target: 'v4.0.1'
           prereleases: false
           file: 'cdt_.*amd64.deb'
 
@@ -63,7 +63,7 @@ jobs:
           if-no-files-found: error
 
       - name: Download Leap - dev binary
-        uses: AntelopeIO/asset-artifact-download-action@v3
+        uses: AntelopeIO/asset-artifact-download-action@v4
         with:
           owner: AntelopeIO
           repo: leap
