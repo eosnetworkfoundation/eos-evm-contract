@@ -56,7 +56,7 @@ jobs:
           DWITH_TEST_ACTIONS: ${{ matrix.DWITH_TEST_ACTIONS }}
 
       - name: Upload Artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: contract.test-actions-${{ matrix.DWITH_TEST_ACTIONS }}.tar.gz
           path: contract.tar.gz
@@ -80,7 +80,8 @@ jobs:
         run: .github/workflows/build-contract-test.sh
 
       - name: Upload Artifacts
-        uses: actions/upload-artifact@v3
+        if: ${{ matrix.DWITH_TEST_ACTIONS == 'on' }}
+        uses: actions/upload-artifact@v4
         with:
           name: contract-test.tar.gz
           path: contract-test.tar.gz
@@ -92,8 +93,8 @@ jobs:
           DWITH_TEST_ACTIONS: ${{ matrix.DWITH_TEST_ACTIONS }}
 
       - name: Upload Test Metrics
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: test-results.xml
+          name: test-results-test-actions-${{ matrix.DWITH_TEST_ACTIONS }}.xml
           path: test-results.xml
           if-no-files-found: error

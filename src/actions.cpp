@@ -339,7 +339,7 @@ void evm_contract::exec(const exec_input& input, const std::optional<exec_callba
     assert_unfrozen();
 
     std::optional<std::pair<const std::string, const ChainConfig*>> found_chain_config = lookup_known_chain(_config->get_chainid());
-    check( found_chain_config.has_value(), "failed to find expected chain config" );
+    check( found_chain_config.has_value(), "unknown chainid" );
 
     eosevm::block_mapping bm(_config->get_genesis_time().sec_since_epoch());
 
@@ -465,7 +465,7 @@ void evm_contract::process_tx(const runtime_config& rc, eosio::name miner, const
     }
 
     std::optional<std::pair<const std::string, const ChainConfig*>> found_chain_config = lookup_known_chain(_config->get_chainid());
-    check( found_chain_config.has_value(), "failed to find expected chain config" );
+    check( found_chain_config.has_value(), "unknown chainid" );
 
     eosevm::block_mapping bm(_config->get_genesis_time().sec_since_epoch());
 

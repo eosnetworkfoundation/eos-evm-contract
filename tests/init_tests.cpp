@@ -64,7 +64,7 @@ BOOST_FIXTURE_TEST_CASE(check_init, basic_evm_tester) try {
                            eosio_assert_message_exception,
                            [](const eosio_assert_message_exception& e) {return testing::expect_assert_message(e, "assertion failure with message: contract not initialized");});
 
-   BOOST_REQUIRE_EXCEPTION(init(42),
+   BOOST_REQUIRE_EXCEPTION(init(0),
                            eosio_assert_message_exception,
                            [](const eosio_assert_message_exception& e) {return testing::expect_assert_message(e, "assertion failure with message: unknown chainid");});
    init(15555);
