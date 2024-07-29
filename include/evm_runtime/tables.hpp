@@ -1,4 +1,5 @@
 #pragma once
+#include <evm_runtime/value_promoter.hpp>
 
 #include <eosio/eosio.hpp>
 #include <eosio/fixed_bytes.hpp>
@@ -8,9 +9,11 @@
 
 #include <evm_runtime/types.hpp>
 #include <evm_runtime/runtime_config.hpp>
+
 #include <eosevm/block_mapping.hpp>
 
 #include <silkworm/core/common/base.hpp>
+
 namespace evm_runtime {
 
 using namespace eosio;
@@ -243,58 +246,14 @@ struct [[eosio::table]] [[eosio::contract("evm_contract")]] config2
     EOSLIB_SERIALIZE(config2, (next_account_id));
 };
 
-template <typename T>
-struct value_promoter {
-    struct pending {
-        T value;
-        time_point time;
-
-        bool is_active(time_point_sec genesis_time, time_point current_time)const {
-            eosevm::block_mapping bm(genesis_time.sec_since_epoch());
-            auto current_block_num = bm.timestamp_to_evm_block_num(current_time.time_since_epoch().count());
-            auto pending_block_num = bm.timestamp_to_evm_block_num(time.time_since_epoch().count());
-            return current_block_num > pending_block_num;
-        }
-    };
-
-    T get_value(time_point_sec genesis_time, time_point current_time)const {
-        T current_value = cached_value;
-        if(pending_value.has_value() && pending_value->is_active(genesis_time, current_time)) {
-            current_value = pending_value->value;
-        }
-        return current_value;
-    }
-
-    std::pair<T, bool> get_value_and_maybe_promote(time_point_sec genesis_time, time_point current_time) {
-        T current_value = cached_value;
-        bool promoted = false;
-        if(pending_value.has_value() && pending_value->is_active(genesis_time, current_time)) {
-            current_value = pending_value->value;
-            promote_pending();
-            promoted = true;
-        }
-        return std::make_pair(current_value, promoted);
-    }
-
-    template <typename Visitor>
-    void update(Visitor&& visitor_fn, time_point_sec genesis_time, time_point current_time) {
-        auto value = get_value_and_maybe_promote(genesis_time, current_time);
-        visitor_fn(value.first);
-        pending_value.emplace(pending{
-            .value = value.first,
-            .time = current_time
-        });
-    }
-
-    void promote_pending() {
-        eosio::check(pending_value.has_value(), "no pending value");
-        cached_value = pending_value.value().value;
-        pending_value.reset();
-    }
-
-    std::optional<pending> pending_value;
-    T cached_value=T{};
+struct gas_prices {
+    uint64_t overhead_price{0};
+    uint64_t storage_price{0};
 };
+
+VALUE_PROMOTER(uint64_t);
+VALUE_PROMOTER_REV(consensus_parameter_data_type);
+VALUE_PROMOTER(gas_prices);
 
 struct [[eosio::table]] [[eosio::contract("evm_contract")]] config
 {
@@ -305,14 +264,13 @@ struct [[eosio::table]] [[eosio::contract("evm_contract")]] config
     uint64_t gas_price = 0;
     uint32_t miner_cut = 0;
     uint32_t status = 0; // <- bit mask values from status_flags
-    binary_extension<value_promoter<uint64_t>> evm_version;
-    binary_extension<value_promoter<consensus_parameter_data_type>> consensus_parameter;
+    binary_extension<value_promoter_uint64_t> evm_version;
+    binary_extension<value_promoter_consensus_parameter_data_type> consensus_parameter;
     binary_extension<eosio::name> token_contract; // <- default(unset) means eosio.token
     binary_extension<uint32_t> queue_front_block;
-    binary_extension<value_promoter<uint64_t>> overhead_price;
-    binary_extension<value_promoter<uint64_t>> storage_price;
+    binary_extension<value_promoter_gas_prices> gas_prices;
 
-    EOSLIB_SERIALIZE(config, (version)(chainid)(genesis_time)(ingress_bridge_fee)(gas_price)(miner_cut)(status)(evm_version)(consensus_parameter)(token_contract)(queue_front_block)(overhead_price)(storage_price));
+    EOSLIB_SERIALIZE(config, (version)(chainid)(genesis_time)(ingress_bridge_fee)(gas_price)(miner_cut)(status)(evm_version)(consensus_parameter)(token_contract)(queue_front_block)(gas_prices));
 };
 
 struct [[eosio::table]] [[eosio::contract("evm_contract")]] price_queue

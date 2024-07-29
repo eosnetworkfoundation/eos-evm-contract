@@ -1,9 +1,9 @@
 #pragma once
-#include <eosio/eosio.hpp>
+
+#include <evm_runtime/tables.hpp>
 #include <eosio/asset.hpp>
 #include <eosio/time.hpp>
 #include <eosio/singleton.hpp>
-#include <evm_runtime/tables.hpp>
 namespace evm_runtime {
 
 struct fee_parameters;
@@ -27,11 +27,9 @@ struct config_wrapper {
     const eosio::asset& get_ingress_bridge_fee()const;
     void set_ingress_bridge_fee(const eosio::asset& ingress_bridge_fee);
 
-    uint64_t get_overhead_price()const;
-    void set_overhead_price(uint64_t price);
-
-    uint64_t get_storage_price()const;
-    void set_storage_price(uint64_t price);
+    gas_prices get_gas_prices()const;
+    gas_prices get_gas_prices_and_maybe_promote();
+    void set_gas_prices(const gas_prices& price);
 
     uint64_t get_gas_price()const;
     void set_gas_price(uint64_t gas_price);

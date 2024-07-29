@@ -155,9 +155,9 @@ BOOST_FIXTURE_TEST_CASE(set_version, version_tester) try {
 
     auto evmtx_v = fc::raw::unpack<evm_test::evmtx_type>(
         trace->action_traces[3].act.data.data(), trace->action_traces[3].act.data.size());
-    BOOST_REQUIRE(std::holds_alternative<evm_test::evmtx_v0>(evmtx_v));
+    BOOST_REQUIRE(std::holds_alternative<evm_test::evmtx_v1>(evmtx_v));
 
-    const auto &evmtx = std::get<evm_test::evmtx_v0>(evmtx_v);
+    const auto &evmtx = std::get<evm_test::evmtx_v1>(evmtx_v);
     BOOST_CHECK_EQUAL(evmtx.eos_evm_version, 1);
     BOOST_CHECK_EQUAL(evmtx.base_fee_per_gas, config.gas_price);
 
@@ -301,7 +301,7 @@ BOOST_FIXTURE_TEST_CASE(traces_in_different_eosevm_version, version_tester) try 
     /// change EOS EVM VERSION => 3   ///
     /////////////////////////////////////
 
-    setgasprices(5, 6);
+    setgasprices(gas_prices_t{.overhead_price=5, .storage_price=6});
     setversion(3, evm_account_name);
     produce_blocks(2);
 
@@ -317,10 +317,16 @@ BOOST_FIXTURE_TEST_CASE(traces_in_different_eosevm_version, version_tester) try 
     BOOST_REQUIRE(trace->action_traces[3].act.account == evm_account_name);
     BOOST_REQUIRE(trace->action_traces[3].act.name == "evmtx"_n);
 
-    auto event_v1 = get_event_from_trace<evm_test::evmtx_v1>(trace->action_traces[3].act.data);
-    BOOST_REQUIRE(event_v1.eos_evm_version == 3);
-    BOOST_REQUIRE(event_v1.storage_price == 5);
-    BOOST_REQUIRE(event_v1.overhead_price == 6);
+    auto event_v3 = get_event_from_trace<evm_test::evmtx_v3>(trace->action_traces[3].act.data);
+    BOOST_REQUIRE(event_v3.eos_evm_version == 3);
+    BOOST_REQUIRE(event_v3.overhead_price == 5);
+    BOOST_REQUIRE(event_v3.storage_price == 6);
+
+    config = get_config();
+    BOOST_REQUIRE(config.gas_prices.has_value());
+    BOOST_REQUIRE(!config.gas_prices->pending_value.has_value());
+    BOOST_REQUIRE(config.gas_prices->cached_value.overhead_price == 5);
+    BOOST_REQUIRE(config.gas_prices->cached_value.storage_price == 6);
 
 } FC_LOG_AND_RETHROW()
 

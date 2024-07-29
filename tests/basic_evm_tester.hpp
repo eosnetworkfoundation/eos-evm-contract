@@ -54,19 +54,22 @@ void to_variant(const evmc::address& o, fc::variant& v);
 
 namespace evm_test {
 
-struct evmtx_v0 {
+struct evmtx_base {
    uint64_t  eos_evm_version;
    bytes     rlptx;
-   uint64_t  base_fee_per_gas;
 };
 
-struct evmtx_v1 : evmtx_v0 {
+struct evmtx_v1 : evmtx_base {
+   uint64_t base_fee_per_gas;
+};
+
+struct evmtx_v3 : evmtx_base {
    uint64_t overhead_price;
    uint64_t storage_price;
 };
 
 
-using evmtx_type = std::variant<evmtx_v0, evmtx_v1>;
+using evmtx_type = std::variant<evmtx_v1, evmtx_v3>;
 
 struct evm_version_type {
    struct pending {
@@ -96,6 +99,22 @@ struct consensus_parameter_type {
    std::optional<pending_consensus_parameter_data_type> pending;
    consensus_parameter_data_type current;
 };
+
+struct gas_prices_t {
+    uint64_t overhead_price{0};
+    uint64_t storage_price{0};
+};
+
+struct gas_prices_type {
+   struct pending {
+      gas_prices_t value;
+      fc::time_point time;
+   };
+
+   std::optional<pending> pending_value;
+   gas_prices_t cached_value{};
+};
+
 struct config_table_row
 {
    unsigned_int version;
@@ -109,9 +128,7 @@ struct config_table_row
    std::optional<consensus_parameter_type> consensus_parameter;
    std::optional<name> token_contract;
    std::optional<uint32_t> queue_front_block;
-   std::optional<uint64_t> overhead_price;
-   std::optional<uint64_t> storage_price;
-
+   std::optional<gas_prices_type> gas_prices;
 };
 
 struct config2_table_row
@@ -221,6 +238,9 @@ struct price_queue {
 FC_REFLECT(evm_test::price_queue, (block)(price))
 FC_REFLECT(evm_test::evm_version_type, (pending_version)(cached_version))
 FC_REFLECT(evm_test::evm_version_type::pending, (version)(time))
+FC_REFLECT(evm_test::gas_prices_t, (overhead_price)(storage_price))
+FC_REFLECT(evm_test::gas_prices_type, (pending_value)(cached_value))
+FC_REFLECT(evm_test::gas_prices_type::pending, (value)(time))
 FC_REFLECT(evm_test::config2_table_row,(next_account_id))
 FC_REFLECT(evm_test::balance_and_dust, (balance)(dust));
 FC_REFLECT(evm_test::account_object, (id)(address)(nonce)(balance))
@@ -235,10 +255,11 @@ FC_REFLECT(evm_test::message_receiver, (account)(handler)(min_fee)(flags));
 FC_REFLECT(evm_test::bridge_message_v0, (receiver)(sender)(timestamp)(value)(data));
 FC_REFLECT(evm_test::gcstore, (id)(storage_id));
 FC_REFLECT(evm_test::account_code, (id)(ref_count)(code)(code_hash));
-FC_REFLECT(evm_test::evmtx_v0, (eos_evm_version)(rlptx)(base_fee_per_gas));
-FC_REFLECT_DERIVED(evm_test::evmtx_v1, (evm_test::evmtx_v0), (overhead_price)(storage_price));
+FC_REFLECT(evm_test::evmtx_base, (eos_evm_version)(rlptx));
+FC_REFLECT_DERIVED(evm_test::evmtx_v1, (evm_test::evmtx_base), (base_fee_per_gas));
+FC_REFLECT_DERIVED(evm_test::evmtx_v3, (evm_test::evmtx_base), (overhead_price)(storage_price));
 
-FC_REFLECT(evm_test::consensus_parameter_type, (pending)(current));
+FC_REFLECT(evm_test::consensus_parameter_type, (current)(pending));
 FC_REFLECT(evm_test::pending_consensus_parameter_data_type, (data)(pending_time));
 FC_REFLECT(evm_test::consensus_parameter_data_v0, (gas_parameter));
 FC_REFLECT(evm_test::gas_parameter_type, (gas_txnewaccount)(gas_newaccount)(gas_txcreate)(gas_codedeposit)(gas_sset));
@@ -469,7 +490,7 @@ public:
    transaction_trace_ptr addevmbal(uint64_t id, const intx::uint256& delta, bool subtract, name actor=evm_account_name);
    transaction_trace_ptr addopenbal(name account, const intx::uint256& delta, bool subtract, name actor=evm_account_name);
 
-   transaction_trace_ptr setgasprices(uint64_t storage_price, uint64_t overhead_price, name actor=evm_account_name);
+   transaction_trace_ptr setgasprices(const gas_prices_t& prices, name actor=evm_account_name);
 
    void open(name owner);
    void close(name owner);

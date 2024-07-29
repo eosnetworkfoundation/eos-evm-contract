@@ -104,14 +104,9 @@ namespace fc { namespace raw {
          tmp.queue_front_block.emplace(queue_front_block);
       }
       if(ds.remaining()) {
-         uint32_t overhead_price;
-         fc::raw::unpack(ds, overhead_price);
-         tmp.overhead_price.emplace(overhead_price);
-      }
-      if(ds.remaining()) {
-         uint32_t storage_price;
-         fc::raw::unpack(ds, storage_price);
-         tmp.storage_price.emplace(storage_price);
+         evm_test::gas_prices_type prices;
+         fc::raw::unpack(ds, prices);
+         tmp.gas_prices.emplace(prices);
       }
 
     } FC_RETHROW_EXCEPTIONS(warn, "error unpacking partial_account_table_row") }
@@ -520,9 +515,9 @@ transaction_trace_ptr basic_evm_tester::addopenbal(name account, const intx::uin
       mvo()("account", account)("delta",d)("subtract",subtract));
 }
 
-transaction_trace_ptr basic_evm_tester::setgasprices(uint64_t storage_price, uint64_t overhead_price, name actor) {
+transaction_trace_ptr basic_evm_tester::setgasprices(const gas_prices_t& prices, name actor) {
    return basic_evm_tester::push_action(evm_account_name, "setgasprices"_n, actor,
-      mvo()("storage_price", storage_price)("overhead_price",overhead_price));
+      mvo()("prices", prices));
 }
 
 evmc::address basic_evm_tester::deploy_contract(evm_eoa& eoa, evmc::bytes bytecode)
@@ -827,7 +822,7 @@ void basic_evm_tester::check_balances() {
 }
 
 silkworm::Transaction basic_evm_tester::get_tx_from_trace(const bytes& v) {
-   auto evmtx = get_event_from_trace<evm_test::evmtx_v0>(v);
+   auto evmtx = get_event_from_trace<evm_test::evmtx_v1>(v);
    BOOST_REQUIRE(evmtx.eos_evm_version == 1);
 
    silkworm::Transaction tx;

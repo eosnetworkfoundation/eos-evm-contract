@@ -78,21 +78,24 @@ namespace evm_runtime {
 
    using bridge_message = std::variant<bridge_message_v0>;
 
-   struct evmtx_v0 {
+   struct evmtx_base {
       uint64_t  eos_evm_version;
       bytes     rlptx;
-      uint64_t  base_fee_per_gas;
-      
-      EOSLIB_SERIALIZE(evmtx_v0, (eos_evm_version)(rlptx)(base_fee_per_gas));
+      EOSLIB_SERIALIZE(evmtx_base, (eos_evm_version)(rlptx));
    };
 
-   struct evmtx_v1 : evmtx_v0 {
+   struct evmtx_v1 : evmtx_base {
+      uint64_t  base_fee_per_gas;
+      EOSLIB_SERIALIZE_DERIVED(evmtx_v1, evmtx_base, (base_fee_per_gas));
+   };
+
+   struct evmtx_v3 : evmtx_base {
       uint64_t overhead_price;
       uint64_t storage_price;
-      EOSLIB_SERIALIZE_DERIVED(evmtx_v1, evmtx_v0, (overhead_price)(storage_price));
+      EOSLIB_SERIALIZE_DERIVED(evmtx_v3, evmtx_base, (overhead_price)(storage_price));
    };
 
-   using evmtx_type = std::variant<evmtx_v0, evmtx_v1>;
+   using evmtx_type = std::variant<evmtx_v1, evmtx_v3>;
 
    struct fee_parameters
    {

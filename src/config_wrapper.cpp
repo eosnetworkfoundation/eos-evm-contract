@@ -1,6 +1,5 @@
-#pragma once
-#include <evm_runtime/config_wrapper.hpp>
 #include <evm_runtime/tables.hpp>
+#include <evm_runtime/config_wrapper.hpp>
 
 namespace evm_runtime {
 
@@ -10,11 +9,11 @@ config_wrapper::config_wrapper(eosio::name self) : _self(self), _config(self, se
         _cached_config = _config.get();
     }
     if (!_cached_config.evm_version.has_value()) {
-        _cached_config.evm_version = value_promoter<uint64_t>{};
+        _cached_config.evm_version = value_promoter_uint64_t{};
         // Don't set dirty because action can be read-only.
     }
     if (!_cached_config.consensus_parameter.has_value()) {
-        _cached_config.consensus_parameter = value_promoter<consensus_parameter_data_type>{};
+        _cached_config.consensus_parameter = value_promoter_consensus_parameter_data_type{};
         // Don't set dirty because action can be read-only.
     }
     if (!_cached_config.token_contract.has_value()) {
@@ -24,11 +23,8 @@ config_wrapper::config_wrapper(eosio::name self) : _self(self), _config(self, se
     if (!_cached_config.queue_front_block.has_value()) {
         _cached_config.queue_front_block = 0;
     }
-    if (!_cached_config.overhead_price.has_value()) {
-        _cached_config.overhead_price = value_promoter<uint64_t>{};
-    }
-    if (!_cached_config.storage_price.has_value()) {
-        _cached_config.storage_price = value_promoter<uint64_t>{};
+    if (!_cached_config.gas_prices.has_value()) {
+        _cached_config.gas_prices = value_promoter_gas_prices{};
     }
 }
 
@@ -95,28 +91,25 @@ void config_wrapper::set_gas_price(uint64_t gas_price) {
     set_dirty();
 }
 
-uint64_t config_wrapper::get_overhead_price()const {
+gas_prices config_wrapper::get_gas_prices()const {
     // should not happen
-    eosio::check(_cached_config.overhead_price.has_value(), "overhead_price not exist");
-    return _cached_config.overhead_price->get_value(_cached_config.genesis_time, get_current_time());
+    eosio::check(_cached_config.gas_prices.has_value(), "gas_prices not exist");
+    return _cached_config.gas_prices->get_value(_cached_config.genesis_time, get_current_time());
 }
 
-void config_wrapper::set_overhead_price(uint64_t price) {
-    _cached_config.overhead_price->update([&](auto& v) {
-        v = price;
-    }, _cached_config.genesis_time, get_current_time());
-    set_dirty();
-}
-
-uint64_t config_wrapper::get_storage_price()const {
+gas_prices config_wrapper::get_gas_prices_and_maybe_promote() {
     // should not happen
-    eosio::check(_cached_config.storage_price.has_value(), "storage_price not exist");
-    return _cached_config.storage_price->get_value(_cached_config.genesis_time, get_current_time());
+    eosio::check(_cached_config.gas_prices.has_value(), "gas_prices not exist");
+    auto pair = _cached_config.gas_prices->get_value_and_maybe_promote(_cached_config.genesis_time, get_current_time());
+    if (pair.second) {
+        set_dirty();
+    }
+    return pair.first;
 }
 
-void config_wrapper::set_storage_price(uint64_t price) {
-    _cached_config.storage_price->update([&](auto& v) {
-        v = price;
+void config_wrapper::set_gas_prices(const gas_prices& prices) {
+    _cached_config.gas_prices->update([&](gas_prices& v) {
+        v = prices;
     }, _cached_config.genesis_time, get_current_time());
     set_dirty();
 }
