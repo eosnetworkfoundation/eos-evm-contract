@@ -17,7 +17,7 @@ using namespace eosio;
 
 namespace evm_runtime {
 
-struct gas_prices;
+struct gas_prices_type;
 
 class [[eosio::contract]] evm_contract : public contract
 {
@@ -89,7 +89,7 @@ public:
    [[eosio::action]] void updtgasparam(eosio::asset ram_price_mb, uint64_t gas_price);
    [[eosio::action]] void setgasparam(uint64_t gas_txnewaccount, uint64_t gas_newaccount, uint64_t gas_txcreate, uint64_t gas_codedeposit, uint64_t gas_sset);
 
-   [[eosio::action]] void setgasprices(const gas_prices& prices);
+   [[eosio::action]] void setgasprices(const gas_prices_type& prices);
 
    // Events
    [[eosio::action]] void evmtx(eosio::ignore<evm_runtime::evmtx_type> event){

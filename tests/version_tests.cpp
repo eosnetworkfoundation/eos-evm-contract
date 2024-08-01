@@ -301,12 +301,13 @@ BOOST_FIXTURE_TEST_CASE(traces_in_different_eosevm_version, version_tester) try 
     /// change EOS EVM VERSION => 3   ///
     /////////////////////////////////////
 
-    setgasprices(gas_prices_t{.overhead_price=5, .storage_price=6});
+    setgasprices({.overhead_price=5, .storage_price=6});
     setversion(3, evm_account_name);
-    produce_blocks(2);
+    produce_blocks(2*180);
 
     // Test traces of `handle_evm_transfer` (EVM VERSION=3)
     trace = transfer_token("alice"_n, evm_account_name, make_asset(to_bridge), evm1.address_0x());
+
     BOOST_REQUIRE(trace->action_traces.size() == 4);
     BOOST_REQUIRE(trace->action_traces[0].act.account == token_account_name);
     BOOST_REQUIRE(trace->action_traces[0].act.name == "transfer"_n);
@@ -324,9 +325,8 @@ BOOST_FIXTURE_TEST_CASE(traces_in_different_eosevm_version, version_tester) try 
 
     config = get_config();
     BOOST_REQUIRE(config.gas_prices.has_value());
-    BOOST_REQUIRE(!config.gas_prices->pending_value.has_value());
-    BOOST_REQUIRE(config.gas_prices->cached_value.overhead_price == 5);
-    BOOST_REQUIRE(config.gas_prices->cached_value.storage_price == 6);
+    BOOST_REQUIRE(config.gas_prices->overhead_price == 5);
+    BOOST_REQUIRE(config.gas_prices->storage_price == 6);
 
 } FC_LOG_AND_RETHROW()
 

@@ -246,14 +246,15 @@ struct [[eosio::table]] [[eosio::contract("evm_contract")]] config2
     EOSLIB_SERIALIZE(config2, (next_account_id));
 };
 
-struct gas_prices {
+struct gas_prices_type {
     uint64_t overhead_price{0};
     uint64_t storage_price{0};
 };
 
-VALUE_PROMOTER(uint64_t);
+using evm_version_type = uint64_t;
+
+VALUE_PROMOTER(evm_version_type);
 VALUE_PROMOTER_REV(consensus_parameter_data_type);
-VALUE_PROMOTER(gas_prices);
 
 struct [[eosio::table]] [[eosio::contract("evm_contract")]] config
 {
@@ -264,11 +265,11 @@ struct [[eosio::table]] [[eosio::contract("evm_contract")]] config
     uint64_t gas_price = 0;
     uint32_t miner_cut = 0;
     uint32_t status = 0; // <- bit mask values from status_flags
-    binary_extension<value_promoter_uint64_t> evm_version;
+    binary_extension<value_promoter_evm_version_type> evm_version;
     binary_extension<value_promoter_consensus_parameter_data_type> consensus_parameter;
     binary_extension<eosio::name> token_contract; // <- default(unset) means eosio.token
     binary_extension<uint32_t> queue_front_block;
-    binary_extension<value_promoter_gas_prices> gas_prices;
+    binary_extension<gas_prices_type> gas_prices;
 
     EOSLIB_SERIALIZE(config, (version)(chainid)(genesis_time)(ingress_bridge_fee)(gas_price)(miner_cut)(status)(evm_version)(consensus_parameter)(token_contract)(queue_front_block)(gas_prices));
 };
@@ -282,7 +283,17 @@ struct [[eosio::table]] [[eosio::contract("evm_contract")]] price_queue
 
     EOSLIB_SERIALIZE(price_queue, (block)(price));
 };
-
 typedef eosio::multi_index<"pricequeue"_n, price_queue> price_queue_table;
+
+struct [[eosio::table]] [[eosio::contract("evm_contract")]] prices_queue
+{
+    uint64_t block;
+    gas_prices_type prices;
+
+    uint64_t primary_key()const { return block; }
+
+    EOSLIB_SERIALIZE(prices_queue, (block)(prices));
+};
+typedef eosio::multi_index<"pricesqueue"_n, prices_queue> prices_queue_table;
 
 } //namespace evm_runtime

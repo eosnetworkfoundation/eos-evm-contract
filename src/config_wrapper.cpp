@@ -9,7 +9,7 @@ config_wrapper::config_wrapper(eosio::name self) : _self(self), _config(self, se
         _cached_config = _config.get();
     }
     if (!_cached_config.evm_version.has_value()) {
-        _cached_config.evm_version = value_promoter_uint64_t{};
+        _cached_config.evm_version = value_promoter_evm_version_type{};
         // Don't set dirty because action can be read-only.
     }
     if (!_cached_config.consensus_parameter.has_value()) {
@@ -24,7 +24,7 @@ config_wrapper::config_wrapper(eosio::name self) : _self(self), _config(self, se
         _cached_config.queue_front_block = 0;
     }
     if (!_cached_config.gas_prices.has_value()) {
-        _cached_config.gas_prices = value_promoter_gas_prices{};
+        _cached_config.gas_prices = gas_prices_type{};
     }
 }
 
@@ -91,31 +91,18 @@ void config_wrapper::set_gas_price(uint64_t gas_price) {
     set_dirty();
 }
 
-gas_prices config_wrapper::get_gas_prices()const {
-    // should not happen
-    eosio::check(_cached_config.gas_prices.has_value(), "gas_prices not exist");
-    return _cached_config.gas_prices->get_value(_cached_config.genesis_time, get_current_time());
+gas_prices_type config_wrapper::get_gas_prices()const {
+    return *_cached_config.gas_prices;
 }
 
-gas_prices config_wrapper::get_gas_prices_and_maybe_promote() {
-    // should not happen
-    eosio::check(_cached_config.gas_prices.has_value(), "gas_prices not exist");
-    auto pair = _cached_config.gas_prices->get_value_and_maybe_promote(_cached_config.genesis_time, get_current_time());
-    if (pair.second) {
-        set_dirty();
-    }
-    return pair.first;
-}
-
-void config_wrapper::set_gas_prices(const gas_prices& prices) {
-    _cached_config.gas_prices->update([&](gas_prices& v) {
-        v = prices;
-    }, _cached_config.genesis_time, get_current_time());
+void config_wrapper::set_gas_prices(const gas_prices_type& prices) {
+    _cached_config.gas_prices = prices;
     set_dirty();
 }
 
-void config_wrapper::enqueue_gas_price(uint64_t gas_price) {
-    price_queue_table queue(_self, _self.value);
+template <typename Q, typename Func>
+void config_wrapper::enqueue(Func&& update_fnc) {
+    Q queue(_self, _self.value);
     auto activation_time = get_current_time() + eosio::seconds(grace_period_seconds);
 
     eosevm::block_mapping bm(get_genesis_time().sec_since_epoch());
@@ -127,7 +114,7 @@ void config_wrapper::enqueue_gas_price(uint64_t gas_price) {
         eosio::check(activation_block_num >= it->block, "internal error");
         if(activation_block_num == it->block) {
             queue.modify(*it, eosio::same_payer, [&](auto& el) {
-                el.price = gas_price;
+                update_fnc(el);
             });
             return;
         }
@@ -135,7 +122,7 @@ void config_wrapper::enqueue_gas_price(uint64_t gas_price) {
 
     queue.emplace(_self, [&](auto& el) {
         el.block = activation_block_num;
-        el.price = gas_price;
+        update_fnc(el);
     });
 
     if( _cached_config.queue_front_block.value() == 0 ) {
@@ -143,12 +130,38 @@ void config_wrapper::enqueue_gas_price(uint64_t gas_price) {
     }
 }
 
+void config_wrapper::enqueue_gas_price(uint64_t gas_price) {
+    enqueue<price_queue_table>([&](auto& el){
+        el.price = gas_price;
+    });
+}
+
+void config_wrapper::enqueue_gas_prices(const gas_prices_type& prices) {
+    enqueue<prices_queue_table>([&](auto& el){
+        el.prices = prices;
+    });
+}
+
 void config_wrapper::set_queue_front_block(uint32_t block_num) {
     _cached_config.queue_front_block = block_num;
     set_dirty();
 }
 
+
 void config_wrapper::process_price_queue() {
+    if( get_evm_version() >= 3) {
+        process_queue<prices_queue_table>([&](const auto& row){
+            set_gas_prices(row.prices);
+        });
+    } else {
+        process_queue<price_queue_table>([&](const auto& row){
+            set_gas_price(row.price);
+        });
+    }
+}
+
+template <typename Q, typename Func>
+void config_wrapper::process_queue(Func&& update_func) {
     eosevm::block_mapping bm(get_genesis_time().sec_since_epoch());
     auto current_block_num = bm.timestamp_to_evm_block_num(get_current_time().time_since_epoch().count());
 
@@ -157,10 +170,10 @@ void config_wrapper::process_price_queue() {
         return;
     }
 
-    price_queue_table queue(_self, _self.value);
+    Q queue(_self, _self.value);
     auto it = queue.begin();
     while( it != queue.end() && current_block_num >= it->block ) {
-        set_gas_price(it->price);
+        update_func(*it);
         it = queue.erase(it);
         set_queue_front_block(it != queue.end() ? it->block : 0);
     }
@@ -219,7 +232,9 @@ void config_wrapper::set_fee_parameters(const fee_parameters& fee_params,
 {
     if (fee_params.gas_price.has_value()) {
         eosio::check(*fee_params.gas_price >= one_gwei, "gas_price must >= 1Gwei");
-        if(get_evm_version() >= 1) {
+        auto current_version = get_evm_version_and_maybe_promote();
+        if( current_version >= 1 ) {
+            eosio::check(current_version < 3, "can't set gas_price");
             enqueue_gas_price(*fee_params.gas_price);
         } else {
             set_gas_price(*fee_params.gas_price);
@@ -251,7 +266,9 @@ void config_wrapper::set_fee_parameters(const fee_parameters& fee_params,
 }
 
 void config_wrapper::update_consensus_parameters(eosio::asset ram_price_mb, uint64_t gas_price) {
+    eosio::check(get_evm_version() < 3, "unable to set params");
 
+    //TODO: should we allow to call this when version>=3
     eosio::check(ram_price_mb.symbol == get_token_symbol(), "invalid price symbol");
     eosio::check(gas_price >= one_gwei, "gas_price must >= 1Gwei");
 

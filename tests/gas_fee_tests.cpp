@@ -406,6 +406,115 @@ try {
 }
 FC_LOG_AND_RETHROW()
 
+BOOST_FIXTURE_TEST_CASE(set_gas_prices_queue, gas_fee_evm_tester)
+try {
+   init();
+
+   auto cfg = get_config();
+   BOOST_CHECK_EQUAL(cfg.queue_front_block.value(), 0);
+
+   eosevm::block_mapping bm(cfg.genesis_time.sec_since_epoch());
+
+   setversion(3, evm_account_name);
+   produce_blocks(2);
+
+   const auto one_gwei =  1'000'000'000ull;
+   const auto ten_gwei = 10'000'000'000ull;
+
+   auto get_prices_queue = [&]() -> std::vector<prices_queue> {
+      std::vector<prices_queue> queue;
+      scan_prices_queue([&](prices_queue&& row) -> bool {
+         queue.push_back(row);
+         return false;
+      });
+      return queue;
+   };
+
+   auto trigger_prices_queue_processing = [&](){
+      transfer_token("alice"_n, evm_account_name, make_asset(1), evm_account_name.to_string());
+   };
+
+   // Queue change of gas_prices to overhead_price=10Gwei storage_price=1Gwei
+   setgasprices({.overhead_price = ten_gwei, .storage_price = one_gwei});
+   auto t1 = (control->pending_block_time()+fc::seconds(prices_queue_grace_period)).time_since_epoch().count();
+   auto b1 = bm.timestamp_to_evm_block_num(t1)+1;
+   
+   auto q = get_prices_queue();
+   BOOST_CHECK_EQUAL(q.size(), 1);
+   BOOST_CHECK_EQUAL(q[0].block, b1);
+   BOOST_CHECK_EQUAL(q[0].prices.overhead_price, ten_gwei);
+   BOOST_CHECK_EQUAL(q[0].prices.storage_price, one_gwei);
+
+   cfg = get_config();
+   BOOST_CHECK_EQUAL(cfg.queue_front_block.value(), b1);
+
+   produce_blocks(100);
+
+   // Queue change of gas_price to overhead_price=30Gwei storage_price=10Gwei
+   setgasprices({.overhead_price = 3*ten_gwei, .storage_price=ten_gwei});
+   auto t2 = (control->pending_block_time()+fc::seconds(prices_queue_grace_period)).time_since_epoch().count();
+   auto b2 = bm.timestamp_to_evm_block_num(t2)+1;
+
+   q = get_prices_queue();
+   BOOST_CHECK_EQUAL(q.size(), 2);
+   BOOST_CHECK_EQUAL(q[0].block, b1);
+   BOOST_CHECK_EQUAL(q[0].prices.overhead_price, ten_gwei);
+   BOOST_CHECK_EQUAL(q[0].prices.storage_price, one_gwei);
+   BOOST_CHECK_EQUAL(q[1].block, b2);
+   BOOST_CHECK_EQUAL(q[1].prices.overhead_price, 3*ten_gwei);
+   BOOST_CHECK_EQUAL(q[1].prices.storage_price, ten_gwei);
+
+   cfg = get_config();
+   BOOST_CHECK_EQUAL(cfg.queue_front_block.value(), b1);
+
+   // Overwrite queue change (same block) overhead_price=20Gwei, storage_price=5Gwei
+   setgasprices({.overhead_price = 2*ten_gwei, .storage_price=5*one_gwei});
+
+   q = get_prices_queue();
+   BOOST_CHECK_EQUAL(q.size(), 2);
+   BOOST_CHECK_EQUAL(q[0].block, b1);
+   BOOST_CHECK_EQUAL(q[0].prices.overhead_price, ten_gwei);
+   BOOST_CHECK_EQUAL(q[0].prices.storage_price, one_gwei);
+   BOOST_CHECK_EQUAL(q[1].block, b2);
+   BOOST_CHECK_EQUAL(q[1].prices.overhead_price, 2*ten_gwei);
+   BOOST_CHECK_EQUAL(q[1].prices.storage_price, 5*one_gwei);
+
+   cfg = get_config();
+   BOOST_CHECK_EQUAL(cfg.queue_front_block.value(), b1);
+
+   while(bm.timestamp_to_evm_block_num(control->pending_block_time().time_since_epoch().count()) != b1) {
+      produce_blocks(1);
+   }
+   trigger_prices_queue_processing();
+
+   cfg = get_config();
+   BOOST_CHECK_EQUAL(cfg.gas_prices->overhead_price, ten_gwei);
+   BOOST_CHECK_EQUAL(cfg.gas_prices->storage_price, one_gwei);
+
+   q = get_prices_queue();
+   BOOST_CHECK_EQUAL(q.size(), 1);
+   BOOST_CHECK_EQUAL(q[0].block, b2);
+   BOOST_CHECK_EQUAL(q[0].prices.overhead_price, 2*ten_gwei);
+   BOOST_CHECK_EQUAL(q[0].prices.storage_price, 5*one_gwei);
+
+   BOOST_CHECK_EQUAL(cfg.queue_front_block.value(), b2);
+
+   while(bm.timestamp_to_evm_block_num(control->pending_block_time().time_since_epoch().count()) != b2) {
+      produce_blocks(1);
+   }
+   trigger_prices_queue_processing();
+
+   cfg = get_config();
+   BOOST_CHECK_EQUAL(cfg.gas_prices->overhead_price, 2*ten_gwei);
+   BOOST_CHECK_EQUAL(cfg.gas_prices->storage_price, 5*one_gwei);
+
+   q = get_prices_queue();
+   BOOST_CHECK_EQUAL(q.size(), 0);
+
+   BOOST_CHECK_EQUAL(cfg.queue_front_block.value(), 0);
+}
+FC_LOG_AND_RETHROW()
+
 BOOST_FIXTURE_TEST_CASE(miner_cut_calculation_v1, gas_fee_evm_tester)
 try {
    static constexpr uint64_t base_gas_price = 300'000'000'000;    // 300 gwei

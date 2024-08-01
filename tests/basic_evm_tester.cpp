@@ -515,7 +515,7 @@ transaction_trace_ptr basic_evm_tester::addopenbal(name account, const intx::uin
       mvo()("account", account)("delta",d)("subtract",subtract));
 }
 
-transaction_trace_ptr basic_evm_tester::setgasprices(const gas_prices_t& prices, name actor) {
+transaction_trace_ptr basic_evm_tester::setgasprices(const gas_prices_type& prices, name actor) {
    return basic_evm_tester::push_action(evm_account_name, "setgasprices"_n, actor,
       mvo()("prices", prices));
 }
@@ -785,6 +785,17 @@ bool basic_evm_tester::scan_price_queue(std::function<bool(price_queue)> visitor
 
    scan_table<price_queue>(
       price_queue_table_name, evm_account_name, [&visitor](price_queue&& row) { return visitor(row); }
+   );
+
+   return true;
+}
+
+bool basic_evm_tester::scan_prices_queue(std::function<bool(prices_queue)> visitor) const
+{
+   static constexpr eosio::chain::name prices_queue_table_name = "pricesqueue"_n;
+
+   scan_table<prices_queue>(
+      prices_queue_table_name, evm_account_name, [&visitor](prices_queue&& row) { return visitor(row); }
    );
 
    return true;

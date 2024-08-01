@@ -457,7 +457,6 @@ void evm_contract::process_tx(const runtime_config& rc, eosio::name miner, const
                  "unexpected error: EVM contract generated inline pushtx without setting itself as the miner");
 
     auto current_version = _config->get_evm_version_and_maybe_promote();
-    auto gas_prices = _config->get_gas_prices_and_maybe_promote();
 
     std::pair<const consensus_parameter_data_type &, bool> gas_param_pair = _config->get_consensus_param_and_maybe_promote();
     if (gas_param_pair.second) {
@@ -473,8 +472,13 @@ void evm_contract::process_tx(const runtime_config& rc, eosio::name miner, const
     Block block;
 
     std::optional<uint64_t> base_fee_per_gas;
+    auto gas_prices = _config->get_gas_prices();
     if (current_version >= 1) {
-        base_fee_per_gas = _config->get_gas_price();
+        if( current_version >= 3) {
+            //base_fee_per_gas = f(gas_prices, min_inclusion_price)
+        } else {
+            base_fee_per_gas = _config->get_gas_price();
+        }
     }
 
     eosevm::prepare_block_header(block.header, bm, get_self().value,
@@ -902,9 +906,14 @@ void evm_contract::setgasparam(uint64_t gas_txnewaccount,
                                 gas_sset);
 }
 
-void evm_contract::setgasprices(const gas_prices& prices) {
+void evm_contract::setgasprices(const gas_prices_type& prices) {
     require_auth(get_self());
-    _config->set_gas_prices(prices);
+    auto current_version = _config->get_evm_version_and_maybe_promote();
+    if(current_version >= 3) {
+        _config->enqueue_gas_prices(prices);
+    } else {
+        _config->set_gas_prices(prices);
+    }
 }
 
 } //evm_runtime

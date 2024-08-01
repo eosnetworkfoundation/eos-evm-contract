@@ -100,19 +100,9 @@ struct consensus_parameter_type {
    consensus_parameter_data_type current;
 };
 
-struct gas_prices_t {
+struct gas_prices_type {
     uint64_t overhead_price{0};
     uint64_t storage_price{0};
-};
-
-struct gas_prices_type {
-   struct pending {
-      gas_prices_t value;
-      fc::time_point time;
-   };
-
-   std::optional<pending> pending_value;
-   gas_prices_t cached_value{};
 };
 
 struct config_table_row
@@ -233,14 +223,18 @@ struct price_queue {
    uint64_t price;
 };
 
+struct prices_queue {
+    uint64_t block;
+    gas_prices_type prices;
+};
+
 } // namespace evm_test
 
 FC_REFLECT(evm_test::price_queue, (block)(price))
+FC_REFLECT(evm_test::prices_queue, (block)(prices))
+FC_REFLECT(evm_test::gas_prices_type, (overhead_price)(storage_price))
 FC_REFLECT(evm_test::evm_version_type, (pending_version)(cached_version))
 FC_REFLECT(evm_test::evm_version_type::pending, (version)(time))
-FC_REFLECT(evm_test::gas_prices_t, (overhead_price)(storage_price))
-FC_REFLECT(evm_test::gas_prices_type, (pending_value)(cached_value))
-FC_REFLECT(evm_test::gas_prices_type::pending, (value)(time))
 FC_REFLECT(evm_test::config2_table_row,(next_account_id))
 FC_REFLECT(evm_test::balance_and_dust, (balance)(dust));
 FC_REFLECT(evm_test::account_object, (id)(address)(nonce)(balance))
@@ -420,6 +414,7 @@ public:
    static constexpr uint32_t suggested_miner_cut = 10'000;             // 10%
    static constexpr uint64_t suggested_ingress_bridge_fee_amount = 70; // 0.0070 EOS
    static constexpr uint64_t price_queue_grace_period = 180;           // 180 seconds
+   static constexpr uint64_t prices_queue_grace_period = 180;           // 180 seconds
 
    const symbol native_symbol;
 
@@ -490,7 +485,7 @@ public:
    transaction_trace_ptr addevmbal(uint64_t id, const intx::uint256& delta, bool subtract, name actor=evm_account_name);
    transaction_trace_ptr addopenbal(name account, const intx::uint256& delta, bool subtract, name actor=evm_account_name);
 
-   transaction_trace_ptr setgasprices(const gas_prices_t& prices, name actor=evm_account_name);
+   transaction_trace_ptr setgasprices(const gas_prices_type& prices, name actor=evm_account_name);
 
    void open(name owner);
    void close(name owner);
@@ -540,6 +535,7 @@ public:
    bool scan_account_code(std::function<bool(account_code)> visitor) const;
    void scan_balances(std::function<bool(evm_test::vault_balance_row)> visitor) const;
    bool scan_price_queue(std::function<bool(evm_test::price_queue)> visitor) const;
+   bool scan_prices_queue(std::function<bool(evm_test::prices_queue)> visitor) const;
 
    intx::uint128 tx_data_cost(const silkworm::Transaction& txn) const;
 
