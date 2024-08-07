@@ -219,6 +219,7 @@ uint64_t config_wrapper::get_evm_version_and_maybe_promote() {
 
 void config_wrapper::set_evm_version(uint64_t new_version) {
     eosio::check(new_version <= eosevm::max_eos_evm_version, "Unsupported version");
+    eosio::check(new_version != 3 || _cached_config.queue_front_block.value() == 0, "price queue must be empty");
     auto current_version = get_evm_version_and_maybe_promote();
     eosio::check(new_version > current_version, "new version must be greater than the active one");
     _cached_config.evm_version->update([&](auto& v) {

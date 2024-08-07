@@ -413,11 +413,6 @@ try {
    auto cfg = get_config();
    BOOST_CHECK_EQUAL(cfg.queue_front_block.value(), 0);
 
-   eosevm::block_mapping bm(cfg.genesis_time.sec_since_epoch());
-
-   setversion(3, evm_account_name);
-   produce_blocks(2);
-
    const auto one_gwei =  1'000'000'000ull;
    const auto ten_gwei = 10'000'000'000ull;
 
@@ -433,6 +428,24 @@ try {
    auto trigger_prices_queue_processing = [&](){
       transfer_token("alice"_n, evm_account_name, make_asset(1), evm_account_name.to_string());
    };
+
+   eosevm::block_mapping bm(cfg.genesis_time.sec_since_epoch());
+
+   setversion(2, evm_account_name);
+   produce_blocks(2);
+
+   // Price queue must be empty before switching to v3
+   setfeeparams({.gas_price = ten_gwei});
+   BOOST_REQUIRE_EXCEPTION(setversion(3, evm_account_name),
+                           eosio_assert_message_exception,
+                           eosio_assert_message_is("price queue must be empty"));
+   produce_blocks(400);
+   trigger_prices_queue_processing();
+   cfg = get_config();
+   BOOST_CHECK_EQUAL(cfg.queue_front_block.value(), 0);
+
+   setversion(3, evm_account_name);
+   produce_blocks(2);
 
    // Queue change of gas_prices to overhead_price=10Gwei storage_price=1Gwei
    setgasprices({.overhead_price = ten_gwei, .storage_price = one_gwei});
