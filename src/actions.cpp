@@ -472,8 +472,13 @@ void evm_contract::process_tx(const runtime_config& rc, eosio::name miner, const
     Block block;
 
     std::optional<uint64_t> base_fee_per_gas;
+    auto gas_prices = _config->get_gas_prices();
     if (current_version >= 1) {
-        base_fee_per_gas = _config->get_gas_price();
+        if( current_version >= 3) {
+            //base_fee_per_gas = f(gas_prices, min_inclusion_price)
+        } else {
+            base_fee_per_gas = _config->get_gas_price();
+        }
     }
 
     eosevm::prepare_block_header(block.header, bm, get_self().value,
@@ -493,8 +498,6 @@ void evm_contract::process_tx(const runtime_config& rc, eosio::name miner, const
         );
     }, gas_param_pair.first);
 
-    silkworm::ExecutionProcessor ep{block, engine, state, *found_chain_config->second, gas_params};
-
     if (current_version >= 1) {
         auto inclusion_price = std::min(tx.max_priority_fee_per_gas, tx.max_fee_per_gas - *base_fee_per_gas);
         eosio::check(inclusion_price >= (min_inclusion_price.has_value() ? *min_inclusion_price : 0), "inclusion price must >= min_inclusion_price");
@@ -502,6 +505,8 @@ void evm_contract::process_tx(const runtime_config& rc, eosio::name miner, const
         check(tx.max_priority_fee_per_gas == tx.max_fee_per_gas, "max_priority_fee_per_gas must be equal to max_fee_per_gas");
         check(tx.max_fee_per_gas >= _config->get_gas_price(), "gas price is too low");
     }
+
+    silkworm::ExecutionProcessor ep{block, engine, state, *found_chain_config->second, gas_params};
 
     // Filter EVM messages (with data) that are sent to the reserved address
     // corresponding to the EOS account holding the contract (self)
@@ -522,10 +527,12 @@ void evm_contract::process_tx(const runtime_config& rc, eosio::name miner, const
         act.send(gas_param_pair.first);
     }
 
-    if (current_version >= 1) {
-        auto event = evmtx_type{evmtx_v0{current_version, txn.get_rlptx(), *base_fee_per_gas}};
-        action(std::vector<permission_level>{}, get_self(), "evmtx"_n, event)
-            .send();
+    if(current_version >= 3) {
+        auto event = evmtx_type{evmtx_v3{current_version, txn.get_rlptx(), gas_prices.overhead_price, gas_prices.storage_price}};
+        action(std::vector<permission_level>{}, get_self(), "evmtx"_n, event).send();
+    } else if (current_version >= 1) {
+        auto event = evmtx_type{evmtx_v1{current_version, txn.get_rlptx(), *base_fee_per_gas}};
+        action(std::vector<permission_level>{}, get_self(), "evmtx"_n, event).send();
     }
     LOGTIME("EVM END");
 }
@@ -897,6 +904,16 @@ void evm_contract::setgasparam(uint64_t gas_txnewaccount,
                                 gas_txcreate,
                                 gas_codedeposit,
                                 gas_sset);
+}
+
+void evm_contract::setgasprices(const gas_prices_type& prices) {
+    require_auth(get_self());
+    auto current_version = _config->get_evm_version_and_maybe_promote();
+    if(current_version >= 3) {
+        _config->enqueue_gas_prices(prices);
+    } else {
+        _config->set_gas_prices(prices);
+    }
 }
 
 } //evm_runtime

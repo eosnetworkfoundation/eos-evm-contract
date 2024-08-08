@@ -54,13 +54,22 @@ void to_variant(const evmc::address& o, fc::variant& v);
 
 namespace evm_test {
 
-struct evmtx_v0 {
+struct evmtx_base {
    uint64_t  eos_evm_version;
    bytes     rlptx;
-   uint64_t  base_fee_per_gas;
 };
 
-using evmtx_type = std::variant<evmtx_v0>;
+struct evmtx_v1 : evmtx_base {
+   uint64_t base_fee_per_gas;
+};
+
+struct evmtx_v3 : evmtx_base {
+   uint64_t overhead_price;
+   uint64_t storage_price;
+};
+
+
+using evmtx_type = std::variant<evmtx_v1, evmtx_v3>;
 
 struct evm_version_type {
    struct pending {
@@ -87,9 +96,15 @@ struct pending_consensus_parameter_data_type {
    fc::time_point pending_time;
 };
 struct consensus_parameter_type {
-   consensus_parameter_data_type current;
    std::optional<pending_consensus_parameter_data_type> pending;
+   consensus_parameter_data_type current;
 };
+
+struct gas_prices_type {
+    uint64_t overhead_price{0};
+    uint64_t storage_price{0};
+};
+
 struct config_table_row
 {
    unsigned_int version;
@@ -103,6 +118,7 @@ struct config_table_row
    std::optional<consensus_parameter_type> consensus_parameter;
    std::optional<name> token_contract;
    std::optional<uint32_t> queue_front_block;
+   std::optional<gas_prices_type> gas_prices;
 };
 
 struct config2_table_row
@@ -207,9 +223,16 @@ struct price_queue {
    uint64_t price;
 };
 
+struct prices_queue {
+    uint64_t block;
+    gas_prices_type prices;
+};
+
 } // namespace evm_test
 
 FC_REFLECT(evm_test::price_queue, (block)(price))
+FC_REFLECT(evm_test::prices_queue, (block)(prices))
+FC_REFLECT(evm_test::gas_prices_type, (overhead_price)(storage_price))
 FC_REFLECT(evm_test::evm_version_type, (pending_version)(cached_version))
 FC_REFLECT(evm_test::evm_version_type::pending, (version)(time))
 FC_REFLECT(evm_test::config2_table_row,(next_account_id))
@@ -226,7 +249,9 @@ FC_REFLECT(evm_test::message_receiver, (account)(handler)(min_fee)(flags));
 FC_REFLECT(evm_test::bridge_message_v0, (receiver)(sender)(timestamp)(value)(data));
 FC_REFLECT(evm_test::gcstore, (id)(storage_id));
 FC_REFLECT(evm_test::account_code, (id)(ref_count)(code)(code_hash));
-FC_REFLECT(evm_test::evmtx_v0, (eos_evm_version)(rlptx)(base_fee_per_gas));
+FC_REFLECT(evm_test::evmtx_base, (eos_evm_version)(rlptx));
+FC_REFLECT_DERIVED(evm_test::evmtx_v1, (evm_test::evmtx_base), (base_fee_per_gas));
+FC_REFLECT_DERIVED(evm_test::evmtx_v3, (evm_test::evmtx_base), (overhead_price)(storage_price));
 
 FC_REFLECT(evm_test::consensus_parameter_type, (current)(pending));
 FC_REFLECT(evm_test::pending_consensus_parameter_data_type, (data)(pending_time));
@@ -389,6 +414,7 @@ public:
    static constexpr uint32_t suggested_miner_cut = 10'000;             // 10%
    static constexpr uint64_t suggested_ingress_bridge_fee_amount = 70; // 0.0070 EOS
    static constexpr uint64_t price_queue_grace_period = 180;           // 180 seconds
+   static constexpr uint64_t prices_queue_grace_period = 180;           // 180 seconds
 
    const symbol native_symbol;
 
@@ -459,6 +485,8 @@ public:
    transaction_trace_ptr addevmbal(uint64_t id, const intx::uint256& delta, bool subtract, name actor=evm_account_name);
    transaction_trace_ptr addopenbal(name account, const intx::uint256& delta, bool subtract, name actor=evm_account_name);
 
+   transaction_trace_ptr setgasprices(const gas_prices_type& prices, name actor=evm_account_name);
+
    void open(name owner);
    void close(name owner);
    void withdraw(name owner, asset quantity);
@@ -507,9 +535,18 @@ public:
    bool scan_account_code(std::function<bool(account_code)> visitor) const;
    void scan_balances(std::function<bool(evm_test::vault_balance_row)> visitor) const;
    bool scan_price_queue(std::function<bool(evm_test::price_queue)> visitor) const;
+   bool scan_prices_queue(std::function<bool(evm_test::prices_queue)> visitor) const;
 
    intx::uint128 tx_data_cost(const silkworm::Transaction& txn) const;
+
    silkworm::Transaction get_tx_from_trace(const bytes& v);
+
+   template <typename T>
+   T get_event_from_trace(const bytes& v) {
+      auto evmtx_v = fc::raw::unpack<evm_test::evmtx_type>(v.data(), v.size());
+      BOOST_REQUIRE(std::holds_alternative<T>(evmtx_v));
+      return std::get<T>(evmtx_v);
+   }
 };
 
 inline constexpr intx::uint256 operator"" _wei(const char* s) { return intx::from_string<intx::uint256>(s); }

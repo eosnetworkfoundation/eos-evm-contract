@@ -1,4 +1,5 @@
 #pragma once
+#include <evm_runtime/value_promoter.hpp>
 
 #include <eosio/eosio.hpp>
 #include <eosio/fixed_bytes.hpp>
@@ -8,9 +9,11 @@
 
 #include <evm_runtime/types.hpp>
 #include <evm_runtime/runtime_config.hpp>
+
 #include <eosevm/block_mapping.hpp>
 
 #include <silkworm/core/common/base.hpp>
+
 namespace evm_runtime {
 
 using namespace eosio;
@@ -243,95 +246,15 @@ struct [[eosio::table]] [[eosio::contract("evm_contract")]] config2
     EOSLIB_SERIALIZE(config2, (next_account_id));
 };
 
-struct evm_version_type {
-    struct pending {
-        uint64_t version;
-        time_point time;
-
-        bool is_active(time_point_sec genesis_time, time_point current_time)const {
-            eosevm::block_mapping bm(genesis_time.sec_since_epoch());
-            auto current_block_num = bm.timestamp_to_evm_block_num(current_time.time_since_epoch().count());
-            auto pending_block_num = bm.timestamp_to_evm_block_num(time.time_since_epoch().count());
-            return current_block_num > pending_block_num;
-        }
-    };
-
-    uint64_t get_version(time_point_sec genesis_time, time_point current_time)const {
-        uint64_t current_version = cached_version;
-        if(pending_version.has_value() && pending_version->is_active(genesis_time, current_time)) {
-            current_version = pending_version->version;
-        }
-        return current_version;
-    }
-
-    std::pair<uint64_t, bool> get_version_and_maybe_promote(time_point_sec genesis_time, time_point current_time) {
-        uint64_t current_version = cached_version;
-        bool promoted = false;
-        if(pending_version.has_value() && pending_version->is_active(genesis_time, current_time)) {
-            current_version = pending_version->version;
-            promote_pending();
-            promoted = true;
-        }
-        return std::make_pair(current_version, promoted);
-    }
-
-    void promote_pending() {
-        eosio::check(pending_version.has_value(), "no pending version");
-        cached_version = pending_version.value().version;
-        pending_version.reset();
-    }
-
-    std::optional<pending> pending_version;
-    uint64_t               cached_version=0;
+struct gas_prices_type {
+    uint64_t overhead_price{0};
+    uint64_t storage_price{0};
 };
 
-struct pending_consensus_parameter_data_type {
-    consensus_parameter_data_type  data;
-    time_point                     pending_time;
-};
-struct consensus_parameter_type {
+using evm_version_type = uint64_t;
 
-    consensus_parameter_data_type                          current;
-    std::optional<pending_consensus_parameter_data_type>   pending;
-
-    bool is_pending_active(time_point_sec genesis_time, time_point current_time)const {
-        if (!pending.has_value()) return false;
-        eosevm::block_mapping bm(genesis_time.sec_since_epoch());
-        auto current_block_num = bm.timestamp_to_evm_block_num(current_time.time_since_epoch().count());
-        auto pending_block_num = bm.timestamp_to_evm_block_num(pending->pending_time.time_since_epoch().count());
-        return current_block_num > pending_block_num;
-    }
-
-    // Reference invalidated by get_consensus_param_and_maybe_promote and update_consensus_param.
-    const consensus_parameter_data_type& get_consensus_param(
-        time_point_sec genesis_time, time_point current_time) const {
-        if (is_pending_active(genesis_time, current_time)) {
-            return pending->data;
-        }
-        return current;
-    }
-
-    std::pair<const consensus_parameter_data_type &, bool> get_consensus_param_and_maybe_promote(
-        time_point_sec genesis_time, time_point current_time) {
-        if (is_pending_active(genesis_time, current_time)) {
-            current = pending->data;
-            pending.reset();
-            // don't use make_pair as it create ref to temp objects
-            return std::pair<const consensus_parameter_data_type &, bool>(current, true);
-        }
-        return std::pair<const consensus_parameter_data_type &, bool>(current, false);
-    }
-
-    template <typename Visitor>
-    void update_consensus_param(Visitor visitor_fn, time_point current_time) {
-        consensus_parameter_data_type new_pending = (pending.has_value() ? pending->data : current);
-        std::visit(visitor_fn, new_pending);
-        pending = pending_consensus_parameter_data_type{
-            .data = new_pending, 
-            .pending_time = current_time
-        };
-    }
-};
+VALUE_PROMOTER(evm_version_type);
+VALUE_PROMOTER_REV(consensus_parameter_data_type);
 
 struct [[eosio::table]] [[eosio::contract("evm_contract")]] config
 {
@@ -342,12 +265,13 @@ struct [[eosio::table]] [[eosio::contract("evm_contract")]] config
     uint64_t gas_price = 0;
     uint32_t miner_cut = 0;
     uint32_t status = 0; // <- bit mask values from status_flags
-    binary_extension<evm_version_type> evm_version;
-    binary_extension<consensus_parameter_type> consensus_parameter;
+    binary_extension<value_promoter_evm_version_type> evm_version;
+    binary_extension<value_promoter_consensus_parameter_data_type> consensus_parameter;
     binary_extension<eosio::name> token_contract; // <- default(unset) means eosio.token
     binary_extension<uint32_t> queue_front_block;
+    binary_extension<gas_prices_type> gas_prices;
 
-    EOSLIB_SERIALIZE(config, (version)(chainid)(genesis_time)(ingress_bridge_fee)(gas_price)(miner_cut)(status)(evm_version)(consensus_parameter)(token_contract)(queue_front_block));
+    EOSLIB_SERIALIZE(config, (version)(chainid)(genesis_time)(ingress_bridge_fee)(gas_price)(miner_cut)(status)(evm_version)(consensus_parameter)(token_contract)(queue_front_block)(gas_prices));
 };
 
 struct [[eosio::table]] [[eosio::contract("evm_contract")]] price_queue
@@ -359,7 +283,17 @@ struct [[eosio::table]] [[eosio::contract("evm_contract")]] price_queue
 
     EOSLIB_SERIALIZE(price_queue, (block)(price));
 };
-
 typedef eosio::multi_index<"pricequeue"_n, price_queue> price_queue_table;
+
+struct [[eosio::table]] [[eosio::contract("evm_contract")]] prices_queue
+{
+    uint64_t block;
+    gas_prices_type prices;
+
+    uint64_t primary_key()const { return block; }
+
+    EOSLIB_SERIALIZE(prices_queue, (block)(prices));
+};
+typedef eosio::multi_index<"pricesqueue"_n, prices_queue> prices_queue_table;
 
 } //namespace evm_runtime

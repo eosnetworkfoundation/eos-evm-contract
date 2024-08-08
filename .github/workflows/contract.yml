@@ -43,12 +43,14 @@ jobs:
         with:
           owner: AntelopeIO
           repo: cdt
-          target: 'v3.1.0'
+          target: 'v4.0.1'
           prereleases: false
           file: 'cdt_.*amd64.deb'
 
       - name: Install CDT
-        run: sudo apt-get install -y ./cdt*.deb
+        run: |
+          sudo apt-get update && sudo apt-get upgrade -y
+          sudo apt-get install -y ./cdt*.deb
 
       - name: Build EOS EVM Contract
         run: .github/workflows/build-contract.sh
@@ -74,7 +76,9 @@ jobs:
           artifact-name: leap-dev-ubuntu22-amd64
 
       - name: Install Leap
-        run: sudo apt-get install -y ./leap*.deb
+        run: |
+          sudo apt-get update && sudo apt-get upgrade -y
+          sudo apt-get install -y ./leap*.deb
 
       - name: Build EOS EVM Contract Tests
         run: .github/workflows/build-contract-test.sh
