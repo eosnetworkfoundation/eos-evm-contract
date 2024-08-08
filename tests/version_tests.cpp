@@ -94,7 +94,7 @@ BOOST_FIXTURE_TEST_CASE(set_version, version_tester) try {
         eosio_assert_message_exception,
         eosio_assert_message_is("new version must be greater than the active one"));
 
-    BOOST_REQUIRE_EXCEPTION(setversion(3, evm_account_name),
+    BOOST_REQUIRE_EXCEPTION(setversion(4, evm_account_name),
         eosio_assert_message_exception,
         eosio_assert_message_is("Unsupported version"));
 
@@ -155,9 +155,9 @@ BOOST_FIXTURE_TEST_CASE(set_version, version_tester) try {
 
     auto evmtx_v = fc::raw::unpack<evm_test::evmtx_type>(
         trace->action_traces[3].act.data.data(), trace->action_traces[3].act.data.size());
-    BOOST_REQUIRE(std::holds_alternative<evm_test::evmtx_v0>(evmtx_v));
+    BOOST_REQUIRE(std::holds_alternative<evm_test::evmtx_v1>(evmtx_v));
 
-    const auto &evmtx = std::get<evm_test::evmtx_v0>(evmtx_v);
+    const auto &evmtx = std::get<evm_test::evmtx_v1>(evmtx_v);
     BOOST_CHECK_EQUAL(evmtx.eos_evm_version, 1);
     BOOST_CHECK_EQUAL(evmtx.base_fee_per_gas, config.gas_price);
 
@@ -296,6 +296,37 @@ BOOST_FIXTURE_TEST_CASE(traces_in_different_eosevm_version, version_tester) try 
 
     // Check 4 times call to `increment` from alice_addr
     BOOST_REQUIRE(retrieve(contract_address, alice_addr) == intx::uint256(4));
+
+    /////////////////////////////////////
+    /// change EOS EVM VERSION => 3   ///
+    /////////////////////////////////////
+
+    setgasprices({.overhead_price=5, .storage_price=6});
+    setversion(3, evm_account_name);
+    produce_blocks(2*180);
+
+    // Test traces of `handle_evm_transfer` (EVM VERSION=3)
+    trace = transfer_token("alice"_n, evm_account_name, make_asset(to_bridge), evm1.address_0x());
+
+    BOOST_REQUIRE(trace->action_traces.size() == 4);
+    BOOST_REQUIRE(trace->action_traces[0].act.account == token_account_name);
+    BOOST_REQUIRE(trace->action_traces[0].act.name == "transfer"_n);
+    BOOST_REQUIRE(trace->action_traces[1].act.account == token_account_name);
+    BOOST_REQUIRE(trace->action_traces[1].act.name == "transfer"_n);
+    BOOST_REQUIRE(trace->action_traces[2].act.account == token_account_name);
+    BOOST_REQUIRE(trace->action_traces[2].act.name == "transfer"_n);
+    BOOST_REQUIRE(trace->action_traces[3].act.account == evm_account_name);
+    BOOST_REQUIRE(trace->action_traces[3].act.name == "evmtx"_n);
+
+    auto event_v3 = get_event_from_trace<evm_test::evmtx_v3>(trace->action_traces[3].act.data);
+    BOOST_REQUIRE(event_v3.eos_evm_version == 3);
+    BOOST_REQUIRE(event_v3.overhead_price == 5);
+    BOOST_REQUIRE(event_v3.storage_price == 6);
+
+    config = get_config();
+    BOOST_REQUIRE(config.gas_prices.has_value());
+    BOOST_REQUIRE(config.gas_prices->overhead_price == 5);
+    BOOST_REQUIRE(config.gas_prices->storage_price == 6);
 
 } FC_LOG_AND_RETHROW()
 

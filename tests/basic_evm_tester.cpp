@@ -103,6 +103,12 @@ namespace fc { namespace raw {
          fc::raw::unpack(ds, queue_front_block);
          tmp.queue_front_block.emplace(queue_front_block);
       }
+      if(ds.remaining()) {
+         evm_test::gas_prices_type prices;
+         fc::raw::unpack(ds, prices);
+         tmp.gas_prices.emplace(prices);
+      }
+
     } FC_RETHROW_EXCEPTIONS(warn, "error unpacking partial_account_table_row") }
 }}
 
@@ -317,6 +323,7 @@ config_table_row basic_evm_tester::get_config() const
    static constexpr eosio::chain::name config_singleton_name = "config"_n;
    const vector<char> d =
       get_row_by_account(evm_account_name, evm_account_name, config_singleton_name, config_singleton_name);
+
    return fc::raw::unpack<config_table_row>(d);
 }
 
@@ -506,6 +513,11 @@ transaction_trace_ptr basic_evm_tester::addopenbal(name account, const intx::uin
    auto d = to_bytes(delta);
    return basic_evm_tester::push_action(evm_account_name, "addopenbal"_n, actor,
       mvo()("account", account)("delta",d)("subtract",subtract));
+}
+
+transaction_trace_ptr basic_evm_tester::setgasprices(const gas_prices_type& prices, name actor) {
+   return basic_evm_tester::push_action(evm_account_name, "setgasprices"_n, actor,
+      mvo()("prices", prices));
 }
 
 evmc::address basic_evm_tester::deploy_contract(evm_eoa& eoa, evmc::bytes bytecode)
@@ -778,6 +790,17 @@ bool basic_evm_tester::scan_price_queue(std::function<bool(price_queue)> visitor
    return true;
 }
 
+bool basic_evm_tester::scan_prices_queue(std::function<bool(prices_queue)> visitor) const
+{
+   static constexpr eosio::chain::name prices_queue_table_name = "pricesqueue"_n;
+
+   scan_table<prices_queue>(
+      prices_queue_table_name, evm_account_name, [&visitor](prices_queue&& row) { return visitor(row); }
+   );
+
+   return true;
+}
+
 asset basic_evm_tester::get_eos_balance( const account_name& act ) {
    vector<char> data = get_row_by_account( "eosio.token"_n, act, "accounts"_n, name(native_symbol.to_symbol_code().value) );
    return data.empty() ? asset(0, native_symbol) : fc::raw::unpack<asset>(data);
@@ -810,11 +833,7 @@ void basic_evm_tester::check_balances() {
 }
 
 silkworm::Transaction basic_evm_tester::get_tx_from_trace(const bytes& v) {
-   auto evmtx_v = fc::raw::unpack<evm_test::evmtx_type>(v.data(), v.size());
-
-   BOOST_REQUIRE(std::holds_alternative<evm_test::evmtx_v0>(evmtx_v));
-
-   const auto& evmtx = std::get<evm_test::evmtx_v0>(evmtx_v);
+   auto evmtx = get_event_from_trace<evm_test::evmtx_v1>(v);
    BOOST_REQUIRE(evmtx.eos_evm_version == 1);
 
    silkworm::Transaction tx;
