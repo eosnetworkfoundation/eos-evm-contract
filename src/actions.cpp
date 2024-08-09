@@ -458,7 +458,7 @@ void evm_contract::process_tx(const runtime_config& rc, eosio::name miner, const
 
     auto current_version = _config->get_evm_version_and_maybe_promote();
 
-    std::pair<const consensus_parameter_data_type &, bool> gas_param_pair = _config->get_consensus_param_and_maybe_promote();
+    auto gas_param_pair = _config->get_consensus_param_and_maybe_promote();
     if (gas_param_pair.second) {
         // should not happen
         eosio::check(current_version >= 1, "gas param change requires evm_version >= 1");
