@@ -64,21 +64,19 @@ jobs:
           path: contract.tar.gz
           if-no-files-found: error
 
-      - name: Download Leap - dev binary
+      - name: Download antelope-spring-dev
         uses: AntelopeIO/asset-artifact-download-action@v3
         with:
           owner: AntelopeIO
-          repo: leap
-          target: '^5.0.1'
+          repo: spring
+          file: 'antelope-spring-dev.*ubuntu22\.04_amd64.deb'
+          target: 'main'
           prereleases: false
-          file: 'leap-dev.*ubuntu22\.04_amd64.deb'
-          container-package: experimental-binaries
-          artifact-name: leap-dev-ubuntu22-amd64
+          artifact-name: antelope-spring-dev-ubuntu22-amd64
+          container-package: antelope-spring-experimental-binaries
 
-      - name: Install Leap
-        run: |
-          sudo apt-get update && sudo apt-get upgrade -y
-          sudo apt-get install -y ./leap*.deb
+      - name: Install packages
+        run: sudo apt-get install -y ./*.deb
 
       - name: Build EOS EVM Contract Tests
         run: .github/workflows/build-contract-test.sh
