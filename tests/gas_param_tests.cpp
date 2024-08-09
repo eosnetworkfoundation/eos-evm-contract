@@ -189,6 +189,38 @@ BOOST_FIXTURE_TEST_CASE(basic, gas_param_evm_tester) try {
 
 } FC_LOG_AND_RETHROW()
 
+BOOST_FIXTURE_TEST_CASE(gas_param_traces, gas_param_evm_tester) try {
+
+    init();
+
+    setversion(3, evm_account_name);
+    produce_blocks(2);
+
+    setgasparam(1, 2, 3, 4, 2900, evm_account_name);
+    produce_blocks(3);
+
+    evm_eoa evm1;
+    auto trace = transfer_token("alice"_n, evm_account_name, make_asset(1), evm1.address_0x());
+
+    BOOST_REQUIRE_EQUAL(trace->action_traces.size(), 5);
+    BOOST_ASSERT(trace->action_traces[0].act.name == "transfer"_n);
+    BOOST_ASSERT(trace->action_traces[1].act.name == "transfer"_n);
+    BOOST_ASSERT(trace->action_traces[2].act.name == "transfer"_n);
+    BOOST_ASSERT(trace->action_traces[3].act.name == "configchange"_n);
+    BOOST_ASSERT(trace->action_traces[4].act.name == "evmtx"_n);
+
+    auto cp = fc::raw::unpack<consensus_parameter_data_type>(trace->action_traces[3].act.data);
+
+    std::visit([&](auto& v){
+        BOOST_REQUIRE_EQUAL(v.gas_parameter.gas_txnewaccount, 1);
+        BOOST_REQUIRE_EQUAL(v.gas_parameter.gas_newaccount, 2);
+        BOOST_REQUIRE_EQUAL(v.gas_parameter.gas_txcreate, 3);
+        BOOST_REQUIRE_EQUAL(v.gas_parameter.gas_codedeposit, 4);
+        BOOST_REQUIRE_EQUAL(v.gas_parameter.gas_sset, 2900);
+    }, cp);
+
+} FC_LOG_AND_RETHROW()
+
 BOOST_FIXTURE_TEST_CASE(gas_param_G_txnewaccount, gas_param_evm_tester) try {
 
     uint64_t suggested_gas_price = 150'000'000'000ull;
