@@ -324,13 +324,13 @@ void config_wrapper::update_consensus_parameters2(std::optional<uint64_t> gas_tx
     set_dirty();
 }
 
-consensus_parameter_data_type config_wrapper::get_consensus_param() {
+const consensus_parameter_data_type& config_wrapper::get_consensus_param() {
     // should not happen
     eosio::check(_cached_config.consensus_parameter.has_value(), "consensus_parameter not exist");
     return _cached_config.consensus_parameter->get_value(_cached_config.genesis_time, get_current_time());
 }
 
-std::pair<consensus_parameter_data_type, bool> config_wrapper::get_consensus_param_and_maybe_promote() {
+std::pair<const consensus_parameter_data_type&, bool> config_wrapper::get_consensus_param_and_maybe_promote() {
 
     // should not happen
     eosio::check(_cached_config.consensus_parameter.has_value(), "consensus_parameter not exist");
