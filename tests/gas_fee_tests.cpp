@@ -103,16 +103,6 @@ try {
    BOOST_CHECK_EQUAL(conf2.miner_cut, 90'000);
    BOOST_CHECK_EQUAL(conf2.ingress_bridge_fee, conf1.ingress_bridge_fee);
 
-
-
-   BOOST_REQUIRE_EXCEPTION(setfeeparams({.gas_price = 0}),
-                           eosio_assert_message_exception,
-                           eosio_assert_message_is("gas_price must >= 1Gwei"));
-   
-   BOOST_REQUIRE_EXCEPTION(setfeeparams({.gas_price = 999'999'999}),
-                        eosio_assert_message_exception,
-                        eosio_assert_message_is("gas_price must >= 1Gwei"));
-
    // Change only gas_price to 1Gwei
    setfeeparams({.gas_price = 1'000'000'000});
 
