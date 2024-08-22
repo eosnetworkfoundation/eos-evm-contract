@@ -78,12 +78,22 @@ BOOST_FIXTURE_TEST_CASE(max_limit, stack_limit_tester) try {
 
    int64_t level = 0;
 
-   // At least 1024
+   // At least 1024. It would cost too much time to test all values up to 1024. So we directly test 1024
    call_test(1024, evm1, true);
 
-   // At least 11
-   call_test(11, evm1, false);
+   // At least 11. We will try every value until it fails just in case.
+   try {
+      for (level = 0; level < 256; ++level) {
+         call_test(level, evm1, false);
+      }
+   }
+   catch (...) {
 
+   }
+
+   // We check it will fail at exactly 12 so that the test can fail if we optimize the code to support more levels.
+   // In this way, the test can keep itself updated to guard against latest limits.
+   BOOST_REQUIRE_EQUAL(level, 12);
 
 } FC_LOG_AND_RETHROW()
 
