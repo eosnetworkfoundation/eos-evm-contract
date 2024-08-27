@@ -77,6 +77,7 @@ BOOST_FIXTURE_TEST_CASE(max_limit_internal, stack_limit_tester) try {
    deploy_simple_contract(evm1);
 
    // At least 1024 for internal calls. It would cost too much time to test all values up to 1024. So we directly test 1024
+   // The number 1024 is from the spec of ethereum.
    call_test(1024, evm1, true);
 
 } FC_LOG_AND_RETHROW()
@@ -95,10 +96,6 @@ BOOST_FIXTURE_TEST_CASE(max_limit_external, stack_limit_tester) try {
    int64_t level = 0;
    try {
       for (level = 0; level < 256; ++level) {
-         // We have some problems in test framework that will sometimes raise low level access violation if we go beyond limit here.
-         // So we have to limit the loop at external_limit and do not test if it will go beyond limit at external_limit + 1.
-         if (level > external_limit)
-            break;
          call_test(level, evm1, false);
       }
    }
@@ -108,11 +105,6 @@ BOOST_FIXTURE_TEST_CASE(max_limit_external, stack_limit_tester) try {
 
    // We check it will fail at exactly external_limit + 1 so that the test can fail evem the actual supported level goes up.
    // In this way, the test can keep itself updated to guard against limit changes from optimizations.
-   // !!! NOTE !!!
-   // We have some problems in test framework that will sometimes raise low level access violation if we go beyond limit here.
-   // So we imposed some extra limit above to make sure the loop always ends at external_limit + 1.
-   // Therefore the check here will only work if the actual level go below defined external_limit. 
-   // The feature for guarding against optimizations is not working for now.
    BOOST_REQUIRE_EQUAL(level, external_limit + 1);
 
 } FC_LOG_AND_RETHROW()
