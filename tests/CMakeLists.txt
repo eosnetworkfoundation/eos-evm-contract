@@ -1,5 +1,5 @@
-project(evm_runtime_tests)
 cmake_minimum_required(VERSION 3.12)
+project(evm_runtime_tests)
 
 find_package(eosio)
 
