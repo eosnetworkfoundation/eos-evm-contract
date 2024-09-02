@@ -63,6 +63,18 @@ BOOST_FIXTURE_TEST_CASE(basic, gas_param_evm_tester) try {
         eosio_assert_message_exception,
         eosio_assert_message_is("evm_version must >= 1"));
 
+    // zero gas price
+    BOOST_REQUIRE_EXCEPTION(
+        updtgasparam(asset(10'0000, native_symbol), 0, evm_account_name),
+        eosio_assert_message_exception,
+        eosio_assert_message_is("zero gas price is not allowed"));
+    
+     // fee too high
+    BOOST_REQUIRE_EXCEPTION(
+        updtgasparam(asset((1ull << 62) - 1, native_symbol), 1'000'000'000, evm_account_name),
+        eosio_assert_message_exception,
+        eosio_assert_message_is("gas_per_byte too big"));
+
     setversion(1, evm_account_name);
 
     produce_block();
@@ -87,12 +99,6 @@ BOOST_FIXTURE_TEST_CASE(basic, gas_param_evm_tester) try {
         BOOST_ASSERT(trace->action_traces.size() >= 2 && trace->action_traces[0].act.name == "pushtx"_n);
         BOOST_ASSERT(trace->action_traces.size() >= 2 && trace->action_traces[1].act.name == "evmtx"_n);
     }
-
-    // require miniumum gas at least 1 gwei
-    BOOST_REQUIRE_EXCEPTION(
-        updtgasparam(asset(10'0000, native_symbol), 999'999'999, evm_account_name),
-        eosio_assert_message_exception,
-        eosio_assert_message_is("gas_price must >= 1Gwei"));
 
     // invalid symbol in ram_price_mb paramerter
     BOOST_REQUIRE_EXCEPTION(
