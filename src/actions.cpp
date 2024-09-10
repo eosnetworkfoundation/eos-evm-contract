@@ -510,7 +510,9 @@ void evm_contract::process_tx(const runtime_config& rc, eosio::name miner, const
         return message.recipient == me && message.input_size > 0;
     });
 
+    printf("tx gas limit %lld, ", (long long int)tx.gas_limit);
     auto receipt = execute_tx(rc, miner, block, txn, ep);
+    printf("receipt.cumulative_gas_used %lld, ", (long long int)receipt.cumulative_gas_used);
 
     process_filtered_messages(ep.state().filtered_messages());
 

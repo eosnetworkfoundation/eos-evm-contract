@@ -35,8 +35,11 @@ std::optional<Account> state::read_account(const evmc::address& address) const n
     } else {
         code_hash = silkworm::kEmptyHash;
     }
+    
+    std::optional<Account> acc = Account{itr->nonce, intx::be::load<uint256>(itr->get_balance()), code_hash, 0};
 
-    return Account{itr->nonce, intx::be::load<uint256>(itr->get_balance()), code_hash, 0};
+    printf("state::read_account bal %s,", intx::to_string(acc->balance).c_str());
+    return acc;
 }
 
 ByteView state::read_code(const evmc::bytes32& code_hash) const noexcept {
