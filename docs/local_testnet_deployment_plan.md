@@ -13,11 +13,13 @@ This document describes how to set up a local Antelope test environment with EVM
 
 - Operating System: Ubuntu 20.04 or 22.04
 
-Make sure you have the following binaries built from https://github.com/AntelopeIO/leap:
+Make sure you have the following binaries built from https://github.com/AntelopeIO/spring:
 
 - nodeos: the main process of an Antelope node
 - cleos: the command line interface for queries and transaction
 - keosd: the key and wallet manager
+
+you can either compile the above binaries or download the binaries from the official releases.
 
 Have the following binaries built from https://github.com/AntelopeIO/cdt:
 
@@ -32,14 +34,14 @@ List of compiled system contracts from https://github.com/eosnetworkfoundation/e
 - eosio.token.wasm (optional, if you want to test token economy)
 - eosio.system.wasm (optional, if you want to test resources: RAM, NET, CPU)
 
-Compiled EVM contracts in DEBUG mode, from this repo, see https://github.com/eosnetworkfoundation/eos-evm/blob/main/docs/compilation_and_testing_guide.md for details.
-
-The compilation result should be these two files:
+Follow the instruction in https://github.com/eosnetworkfoundation/eos-evm-contract to compile the EOS-EVM contracts, you should get the following files: 
 
 - evm_runtime.wasm
 - evm_runtime.abi
 
-Compiled binaries from this repo:
+(Alternatively, but not recommended, you can download these contract from EOS mainnet account "eosio.evm")
+
+Follow the instruction in https://github.com/eosnetworkfoundation/eos-evm-node to compile the eos-evm-node, you should get the following binaries
 
 - eos-evm-node: silkworm node process that receive data from the main Antelope chain and convert to the EVM chain
 - eos-evm-rpc: silkworm rpc server that provide service for view actions and other read operations
@@ -51,9 +53,9 @@ In order to run an EOS EVM service, and thus have setup the Antelope blockchain 
 1. [Run A Local Antelope Node](#1-run-a-local-antelope-node)
 2. [Blockchain Bootstrap And Initialization](#2-blockchain-bootstrap-and-initialization)
 3. [Deploy And Initialize EVM Contract](#3-deploy-and-initialize-evm-contract)
-4. [Setup The Transaction Wrapper Service](#4-setup-the-transaction-wrapper-service)
-5. [Start eos-evm-node (a.k.a. Silkworm Node)](#5-start-eos-evm-node-aka-silkworm-node)
-6. [Start eos-evm-rpc (a.k.a. Silkworm RPC)](#6-start-eos-evm-rpc-aka-silkworm-rpc)
+4. [Setup The eos-evm-miner Service](#4-setup-the-eos-evm-miner-service)
+5. [Start eos-evm-node](#5-start-eos-evm-node-aka-silkworm-node)
+6. [Start eos-evm-rpc](#6-start-eos-evm-rpc-aka-silkworm-rpc)
 7. [Setup The Flask Proxy](#7-setup-the-flask-proxy)
 
 ### 1. Run A Local Antelope Node
@@ -160,7 +162,7 @@ private-key = ["EOS5sUpxhaC5V231cAVxGVH9RXtN9n4KDxZG6ZUwHRgYoEpTBUidU","5JK68f7P
 
 # state-history
 trace-history = true
-chain-state-history = true
+chain-state-history = false
 
 state-history-endpoint = 127.0.0.1:8999
 
@@ -204,7 +206,7 @@ If you want to start with the previous blockchain data, but encounter the "dirty
 
 ### 2. Blockchain Bootstrap And Initialization
 
-You will use `cleos` command line tool from here onward, you can find the command line interface [here](https://docs.eosnetwork.com/leap/3.2-rc1/cleos/command-reference/) or you can run `./build/programs/cleos/cleos` so try the following command now:
+You will use `cleos` command line tool from here onward, you can find the command line interface [here](https://docs.eosnetwork.com/spring/3.2-rc1/cleos/command-reference/) or you can run `./build/programs/cleos/cleos` so try the following command now:
 
 ```shell
 ./cleos get info
@@ -267,8 +269,7 @@ Your wallet password is saved into w123.key
 Import one or more private keys into wallet w123:
 
 ```shell
-./cleos wallet import -n w123 --private-key 5KQwrPbwdL6PhXujxW37FSSQZ1JiwsST4cqQzDeyXtP79zkvFD3
-./cleos wallet import -n w123 --private-key 5JURSKS1BrJ1TagNBw1uVSzTQL2m9eHGkjknWeZkjSt33Awtior
+./cleos wallet import -n w123 --private-key YOUR_PRIVATE_KEY
 ```
 
 Once you have done everything with the wallet, it is fine to bootstrap the blockchain.
@@ -298,7 +299,7 @@ Run below command to deploy the boot contract:
 Output:
 
 ```txt
-Reading WASM from /home/kayan-u20/workspaces/leap/../eos-system-contracts/build/contracts/eosio.boot/eosio.boot.wasm...
+Reading WASM from /home/kayan-u20/workspaces/spring/../eos-system-contracts/build/contracts/eosio.boot/eosio.boot.wasm...
 Setting Code...
 executed transaction: acaf5ed70a7ce271627532cf76b6303ebab8d24656f57c69b03cfe8103f6f457  2120 bytes  531 us
 #         eosio <= eosio::setcode               {"account":"eosio","vmtype":0,"vmversion":0,"code":"0061736d0100000001480e60000060027f7f0060017e0060...
@@ -342,6 +343,48 @@ Activate the other protocol features:
 ./cleos push action eosio activate '["1a99a59d87e06e09ec5b028a9cbb7749b4a5ad8819004365d02dc4379a8b7241"]' -p eosio
 ```
 
+#### create system accounts:
+```shell
+./cleos create account eosio exchange EOS8kE63z4NcZatvVWY4jxYdtLg6UEA123raMGwS6QDKwpQ69eGcP EOS8kE63z4NcZatvVWY4jxYdtLg6UEA123raMGwS6QDKwpQ69eGcP
+./cleos create account eosio eosio.msig EOS8kE63z4NcZatvVWY4jxYdtLg6UEA123raMGwS6QDKwpQ69eGcP EOS8kE63z4NcZatvVWY4jxYdtLg6UEA123raMGwS6QDKwpQ69eGcP
+./cleos create account eosio eosio.token EOS8kE63z4NcZatvVWY4jxYdtLg6UEA123raMGwS6QDKwpQ69eGcP EOS8kE63z4NcZatvVWY4jxYdtLg6UEA123raMGwS6QDKwpQ69eGcP
+./cleos create account eosio eosio.bpay EOS8kE63z4NcZatvVWY4jxYdtLg6UEA123raMGwS6QDKwpQ69eGcP EOS8kE63z4NcZatvVWY4jxYdtLg6UEA123raMGwS6QDKwpQ69eGcP
+./cleos create account eosio eosio.names EOS8kE63z4NcZatvVWY4jxYdtLg6UEA123raMGwS6QDKwpQ69eGcP EOS8kE63z4NcZatvVWY4jxYdtLg6UEA123raMGwS6QDKwpQ69eGcP
+./cleos create account eosio eosio.ram EOS8kE63z4NcZatvVWY4jxYdtLg6UEA123raMGwS6QDKwpQ69eGcP EOS8kE63z4NcZatvVWY4jxYdtLg6UEA123raMGwS6QDKwpQ69eGcP
+./cleos create account eosio eosio.ramfee EOS8kE63z4NcZatvVWY4jxYdtLg6UEA123raMGwS6QDKwpQ69eGcP EOS8kE63z4NcZatvVWY4jxYdtLg6UEA123raMGwS6QDKwpQ69eGcP
+./cleos create account eosio eosio.saving EOS8kE63z4NcZatvVWY4jxYdtLg6UEA123raMGwS6QDKwpQ69eGcP EOS8kE63z4NcZatvVWY4jxYdtLg6UEA123raMGwS6QDKwpQ69eGcP
+./cleos create account eosio eosio.stake EOS8kE63z4NcZatvVWY4jxYdtLg6UEA123raMGwS6QDKwpQ69eGcP EOS8kE63z4NcZatvVWY4jxYdtLg6UEA123raMGwS6QDKwpQ69eGcP
+./cleos create account eosio eosio.upay EOS8kE63z4NcZatvVWY4jxYdtLg6UEA123raMGwS6QDKwpQ69eGcP EOS8kE63z4NcZatvVWY4jxYdtLg6UEA123raMGwS6QDKwpQ69eGcP
+./cleos create account eosio eosio.rex EOS8kE63z4NcZatvVWY4jxYdtLg6UEA123raMGwS6QDKwpQ69eGcP EOS8kE63z4NcZatvVWY4jxYdtLg6UEA123raMGwS6QDKwpQ69eGcP
+./cleos create account eosio eosio.fees EOS8kE63z4NcZatvVWY4jxYdtLg6UEA123raMGwS6QDKwpQ69eGcP EOS8kE63z4NcZatvVWY4jxYdtLg6UEA123raMGwS6QDKwpQ69eGcP
+./cleos create account eosio eosio.grants EOS8kE63z4NcZatvVWY4jxYdtLg6UEA123raMGwS6QDKwpQ69eGcP EOS8kE63z4NcZatvVWY4jxYdtLg6UEA123raMGwS6QDKwpQ69eGcP
+```
+
+#### create other test accounts
+```shell
+./cleos create account eosio a123 EOS8kE63z4NcZatvVWY4jxYdtLg6UEA123raMGwS6QDKwpQ69eGcP EOS8kE63z4NcZatvVWY4jxYdtLg6UEA123raMGwS6QDKwpQ69eGcP
+```
+
+#### deploy token contract
+```shell
+echo "=== set contract to eosio.token ==="
+./cleos set code eosio.token ./eosio.token.wasm
+./cleos set abi eosio.token ./eosio.token.abi
+```
+
+#### create, issue & transfer tokens
+```shell
+./cleos push action eosio.token create '{"issuer":"eosio", "maximum_supply":"1000000000.0000 SYS", "can_freeze":0, "can_recall":0, "can_whitelist":0}' -p eosio.token@active
+./cleos push action eosio.token create '{"issuer":"eosio", "maximum_supply":"1000000000.0000 EOS", "can_freeze":0, "can_recall":0, "can_whitelist":0}' -p eosio.token@active
+
+./cleos push action eosio.token issue '{"to":"eosio", "quantity":"1000000000.0000 SYS", "memo":"hi"}' -p eosio@active
+./cleos push action eosio.token issue '{"to":"eosio", "quantity":"1000000000.0000 EOS", "memo":"hi"}' -p eosio@active
+
+./cleos push action eosio.token transfer '{"from":"eosio", "to":"a123", "quantity":"5000000.0000 SYS", "memo":""}' -p eosio@active
+./cleos push action eosio.token transfer '{"from":"eosio", "to":"a123", "quantity":"5000000.0000 EOS", "memo":""}' -p eosio@active
+```
+
+
 ### 3. Deploy And Initialize EVM Contract
 
 Create account evmevmevmevm with key pair EOS8kE63z4NcZatvVWY4jxYdtLg6UEA123raMGwS6QDKwpQ69eGcP 5JURSKS1BrJ1TagNBw1uVSzTQL2m9eHGkjknWeZkjSt33Awtior:
@@ -353,14 +396,14 @@ Create account evmevmevmevm with key pair EOS8kE63z4NcZatvVWY4jxYdtLg6UEA123raMG
 Deploy evm_runtime contract, wasm and abi file, to account evmevmevmevm:
 
 ```shell
-./cleos set code evmevmevmevm ../eos-evm/contract/build/evm_runtime/evm_runtime.wasm
-./cleos set abi evmevmevmevm ../eos-evm/contract/build/evm_runtime/evm_runtime.abi
+./cleos set code evmevmevmevm ./evm_runtime.wasm
+./cleos set abi evmevmevmevm ./evm_runtime.abi
 ```
 
 Set chain ID & native token configuration (in this example, gas price is 150 Gwei, miner_cut is 10%)
 ```
 ./cleos push action evmevmevmevm init "{\"chainid\":15555,\"fee_params\":{\"gas_price\":150000000000,\"miner_cut\":10000,\"ingress_bridge_fee\":\"0.0100 EOS
-\"}}" -p evmevmevmevm
+\"},\"token_contract\":\"eosio.token\"}" -p evmevmevmevm
 ```
 
 Add eosio.code to active permission
@@ -408,24 +451,23 @@ Example output:
 
 Notice that the value `0000000000000000000000000000000100000000000000000000000000000000` is in hexadecimal form and must be exactly 64 characters long (256-bit integer value).
 
-### 4. Setup The Transaction Wrapper Service
+#### [Optional] Update the eos evm to version 2
 
-Setup the transaction wrapper service to wrap EVM transactions into Antelope transactions. This is also required in mainnet for service providers who want to be EVM transaction miners and get miner rewards in EOS.
-
-#### Install The Necessary nodejs Tools
-
-```shell
-sudo apt install nodejs
-sudo apt install npm
-npm install eosjs
-npm install ethereumjs-util
+EOS-EVM version 2 will be compatible to EVM Shanghai version, which supports EIP-1559 & PUSH0 opcode:
+```
+./cleos push action evmevmevmevm setversion '[2]' -p evmevmevmevm
+```
+wait for some seconds, and do another EVM transfer to kick off eos evm version upgrade:
+```
+./cleos transfer eosio evmevmevmevm "1.0000 EOS" "0x2787b98fc4e731d0456b3941f0b3fe2e01439961"
 ```
 
-#### Create Sender Antelope Account (miner account)
 
-Create an additional Antelope account, a.k.a. the sender account, as the wrapper account for signing wrapped Antelope transactions.
+### 4. Setup the eos-evm-miner service:
 
-We use `a123` for example (public key EOS8kE63z4NcZatvVWY4jxYdtLg6UEA123raMGwS6QDKwpQ69eGcP, private key 5JURSKS1BrJ1TagNBw1uVSzTQL2m9eHGkjknWeZkjSt33Awtior). Note, you may need to unlock your Antelope wallet again if it was already timed out.
+We need the eos-evm-miner (transaction wrapper) to wrap EVM contracts to Antelope transactions.
+
+Use `a123` for example (public key EOS8kE63z4NcZatvVWY4jxYdtLg6UEA123raMGwS6QDKwpQ69eGcP, private key 5JURSKS1BrJ1TagNBw1uVSzTQL2m9eHGkjknWeZkjSt33Awtior). Note, you may need to unlock your Antelope wallet again if it was already timed out.
 
 ```shell
 ./cleos create account eosio a123 EOS8kE63z4NcZatvVWY4jxYdtLg6UEA123raMGwS6QDKwpQ69eGcP EOS8kE63z4NcZatvVWY4jxYdtLg6UEA123raMGwS6QDKwpQ69eGcP
@@ -434,6 +476,13 @@ We use `a123` for example (public key EOS8kE63z4NcZatvVWY4jxYdtLg6UEA123raMGwS6Q
 run the open action on evm contract to open the account balance row:
 ```
 ./cleos push action evmevmevmevm open '{"owner":"a123"}' -p a123
+```
+
+Follow the instructions in https://github.com/eosnetworkfoundation/eos-evm-miner to setup the eos-evm-miner service.
+
+```
+git clone https://github.com/eosnetworkfoundation/eos-evm-miner.git
+cd eos-evm-miner
 ```
 
 #### Prepare The .env File
@@ -453,17 +502,14 @@ EXPIRE_SEC=60
 
 In the above environment settings, Tx Wrapper will listen to 127.0.0.1:18888, use `5JURSKS1BrJ1TagNBw1uVSzTQL2m9eHGkjknWeZkjSt33Awtior` to wrap and sign the in-coming ETH trasnactions into Antelope transactions (contract=evmevmevmevm, action_name=pushtx, with expire second set to 60 and using permission a123@active), and then push them into the Antelope RPC endpoint http://127.0.0.1:8888. If the endpoint http://127.0.0.1:8888 is unavailable, it will try the next endpoint http://192.168.1.100:8888.
 
-#### Start Tx Wrapper Service
-
-Start the Tx Wrapper service and use the `index.js` from https://github.com/eosnetworkfoundation/eos-evm/tree/main/peripherals/tx_wrapper:
+#### Start eos-evm-miner
 
 ```shell
-node index.js
+yarn
+yarn start
 ```
 
-#### Check Tx Wrapper Status
-
-Check if Tx Wrapper is running:
+#### verify eos-evm-miner
 
 ```shell
 curl http://127.0.0.1:18888 -X POST -H "Accept: application/json" -H "Content-Type: application/json" --data '{"method":"eth_gasPrice","params":[],"id":1,"jsonrpc":"2.0"}'
@@ -538,7 +584,7 @@ Enter private key for 2787b98fc4e731d0456b3941f0b3fe2e01439961:
 Eth signed raw transaction is f86680843b9aca00830f4240942787b98fc4e731d0456b3941f0b3fe2e0143996101808279aaa00c028e3a5086d2ed6c4fdd8e1612691d6dd715386d35c4764726ad0f9f281fb3a0652f0fbdf0f13b3492ff0e30468efc98bef8774ea15374b64a0a13da24ba8879
 ```
 
-#### Push AN Ethereum Raw Transaction Via Tx Wrapper
+#### Push an ETH raw transaction via eos-evm-miner
 
 For example:
 
@@ -760,7 +806,7 @@ Once you get the raw trasnaction, then we can push into Tx Wrapper to sign as th
 curl http://127.0.0.1:18888 -X POST -H "Accept: application/json" -H "Content-Type: application/json" --data '{"method":"eth_sendRawTransaction","params":["0xf88a02843b9aca00830f42409451a97d86ae7c83f050056f03ebbe45100104676480a46057361d000000000000000000000000000000000000000000000000000000000000007b8279a9a0a2fc71e4beebd9cd1a3d9a55da213f126641f7ed0bb708a3882fa2b85dd6c30ea0164a5d8a8b9b37950091665194f07b5c4e8f6d1b0d6ef162b0e0a1f9bf10c7a7"],"id":1,"jsonrpc":"2.0"}'
 ```
 
-You'll get a response in Tx Wrapper:
+You'll get a response in eos-evm-miner:
 
 ```txt
 {"method":"eth_sendRawTransaction","params":["0xf88a02843b9aca00830f42409451a97d86ae7c83f050056f03ebbe45100104676480a46057361d000000000000000000000000000000000000000000000000000000000000007b8279a9a0a2fc71e4beebd9cd1a3d9a55da213f126641f7ed0bb708a3882fa2b85dd6c30ea0164a5d8a8b9b37950091665194f07b5c4e8f6d1b0d6ef162b0e0a1f9bf10c7a7"],"id":1,"jsonrpc":"2.0"}
@@ -867,7 +913,7 @@ Example output:
 }
 ```
 
-### 5. Start eos-evm-node (a.k.a. Silkworm Node)
+### 5. Start eos-evm-node 
 
 A eos-evm-node is a node process of the virtual ethereum blockchain that validates virtual ethereum blocks and serves the read requests coming from eos-evm-rpc. It will not produce blocks. However, it will consume blocks from Antelope node and convert Antelope blocks into Virutal Ethereum blocks in a deterministic way.
 
@@ -951,7 +997,7 @@ Set the "mixHash" field to be "0x + Antelope starting block id", e.g.  "0x000000
 
 Set the "nonce" field to be the hex encoding of the value of the Antelope name of the account on which the EVM contract is deployed. So if the `evmevmevmevm` account name is used, then set the nonce to "0x56e4adc95b92b720". If the `eosio.evm` account name is used, then set the nonce to "0x5530ea015b900000".
 
-The function `convert_name_to_value` from https://github.com/eosnetworkfoundation/eos-evm/blob/main/tests/leap/antelope_name.py can be used to get the appropriate nonce value using Python:
+The function `convert_name_to_value` from https://github.com/eosnetworkfoundation/eos-evm/blob/main/tests/spring/antelope_name.py can be used to get the appropriate nonce value using Python:
 
 ```shell
 >>> from antelope_name import convert_name_to_value
@@ -1003,7 +1049,7 @@ mkdir ./chain-data
 ./eos-evm-node --chain-data ./chain-data --plugin block_conversion_plugin --plugin blockchain_plugin --nocolor 1 --verbosity=5 --genesis-json=./genesis.json
 ```
 
-### 6. Start eos-evm-rpc (a.k.a. Silkworm RPC)
+### 6. Start eos-evm-rpc
 
 The eos-evm-rpc process provides Ethereum compatible RPC service for clients. It queries state (including blocks, accounts, storage) from eos-evm-node, and it can also run view actions requested by clients.
 
@@ -1081,10 +1127,10 @@ The proxy program will separate Ethereum's write requests (such as eth_sendRawTr
 
 In order to get it working, docker is required. To install docker in Linux, see https://docs.docker.com/engine/install/ubuntu/
 
-You can find the proxy tool here: eos-evm/peripherals/proxy
+You can find the proxy tool here: https://github.com/eosnetworkfoundation/eos-evm-node/tree/main/peripherals/proxy
 
 ```shell
-cd eos-evm/peripherals/proxy/
+cd eos-evm-node/peripherals/proxy/
 ```
 
 - Edit the file `nginx.conf`, find the follow settings:
