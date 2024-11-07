@@ -347,4 +347,13 @@ bool config_wrapper::check_gas_overflow(uint64_t gas_txcreate, uint64_t gas_code
     return true;
 }
 
+void config_wrapper::set_ingress_gas_limit(uint64_t gas_limit) {
+    _cached_config.ingress_gas_limit = gas_limit;
+    set_dirty();
+}
+
+uint64_t config_wrapper::get_ingress_gas_limit() const {
+    return *_cached_config.ingress_gas_limit;
+}
+
 } //namespace evm_runtime

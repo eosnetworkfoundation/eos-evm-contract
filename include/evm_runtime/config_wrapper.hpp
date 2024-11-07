@@ -57,6 +57,9 @@ struct config_wrapper {
     eosio::symbol get_token_symbol() const;
     uint64_t get_minimum_natively_representable() const;
 
+    void set_ingress_gas_limit(uint64_t gas_limit);
+    uint64_t get_ingress_gas_limit() const;
+
 private:
     void set_queue_front_block(uint32_t block_num);
     
