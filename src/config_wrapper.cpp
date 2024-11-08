@@ -21,6 +21,9 @@ config_wrapper::config_wrapper(eosio::name self) : _self(self), _config(self, se
     if (!_cached_config.queue_front_block.has_value()) {
         _cached_config.queue_front_block = 0;
     }
+    if (!_cached_config.ingress_gas_limit.has_value()) {
+        _cached_config.ingress_gas_limit = 21000;
+    }
 }
 
 config_wrapper::~config_wrapper() {
