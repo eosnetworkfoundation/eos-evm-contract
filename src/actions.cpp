@@ -660,7 +660,7 @@ void evm_contract::handle_evm_transfer(eosio::asset quantity, const std::string&
     value *= intx::uint256(_config->get_minimum_natively_representable());
 
     auto calculate_gas_limit = [&](const evmc::address& destination) -> int64_t {
-        int64_t gas_limit = 21000;
+        int64_t gas_limit = _config->get_ingress_gas_limit();
 
         account_table accounts(get_self(), get_self().value);
         auto inx = accounts.get_index<"by.address"_n>();
@@ -897,6 +897,10 @@ void evm_contract::setgasparam(uint64_t gas_txnewaccount,
                                 gas_txcreate,
                                 gas_codedeposit,
                                 gas_sset);
+}
+
+void evm_contract::setgaslimit(uint64_t ingress_gas_limit) {
+    _config->set_ingress_gas_limit(ingress_gas_limit);
 }
 
 } //evm_runtime
