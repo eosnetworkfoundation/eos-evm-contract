@@ -15,6 +15,8 @@
 
 using namespace eosio;
 
+constexpr eosio::name uos_pool_account{"uos.pool"};
+
 namespace evm_runtime {
 
 struct gas_prices_type;

@@ -1,3 +1,5 @@
 build
 tests/build
 .vscode
+lib
+node_modules

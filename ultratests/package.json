@@ -1,0 +1,23 @@
+{
+    "name": "tests",
+    "version": "1.0.0",
+    "files": [],
+    "scripts": {
+        "build": "tsc"
+    },
+    "dependencies": {
+        "@ultraos/ultratest": "../../ultratest2/src",
+        "tsx": "4.7.1",
+        "ultratest-genesis-plugin": "../../ultratest2/src/plugins/native/genesis",
+        "ultratest-system-plugin": "../../ultratest2/src/plugins/native/system",
+        "ultratest-ultra-contracts-plugin": "../../ultratest2/src/plugins/native/ultraContracts",
+        "ultratest-ultra-startup-plugin": "../../ultratest2/src/plugins/native/ultraStartup",
+        "web3": "^4.15.0"
+    },
+    "ultratestPlugins": {
+        "ultratest-genesis-plugin": "native",
+        "ultratest-system-plugin": "native",
+        "ultratest-ultra-contracts-plugin": "native",
+        "ultratest-ultra-startup-plugin": "native"
+    }
+}
