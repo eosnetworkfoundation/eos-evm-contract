@@ -225,62 +225,65 @@ export default class Test extends UltraTest {
         const evmAPI = new EvmHelper(ultra, ultraAPI);
 
         return {
-            // 'set up eos evm':async() => {
-            //     assert((<SignerLibTransactResponse>(await ultra.api.activateFeature("fd28b9886c4469f34062a419232f4d5b8007d790b81ccc6d675fec941e7d80bb"))).status, "failed to activate action return value feature");
-            //     assert((<SignerLibTransactResponse>(await ultra.api.activateFeature("1a5b44765728146d71b9169dce52a31d5fac2143b61b008b7ca9328fdd8bac45"))).status, "failed to activate get code hash feature");
-
-
-            //     await ultra.api.activateFeature("1a5b44765728146d71b9169dce52a31d5fac2143b61b008b7ca9328fdd8bac45");
-
-            //     // diable KYC
-            //     assert(await cleos(`push action eosio.kyc togglekyc '[]' -p ultra.kyc`), "Failed to addcode to evm contract",  {swallow:hide_action_log});
-
-            //     // activate get hash protocol feature
-            //     assert(await activate_feature("fd28b9886c4469f34062a419232f4d5b8007d790b81ccc6d675fec941e7d80bb"), `failed to activate action return value feature`);
-            //     assert(await activate_feature("1a5b44765728146d71b9169dce52a31d5fac2143b61b008b7ca9328fdd8bac45"), `failed to activate get code hash feature`);
-            //     //assert(await activate_feature("cb79d449f8194bf6b403e40fda319a1e2f9d2b2108f7b6cb981662e6393ed6b9"), `failed to activate crypto primitives feature`);
-
-            //     await sleep(3000);
-
-            //     assert(await cleos(`set contract evmevmevmevm ${__dirname}/../build/evm_runtime evm_runtime.wasm evm_runtime.abi -p evmevmevmevm@active`), "Failed to publish evm contract",  {swallow:hide_action_log});
-                
-            //     // assert(await cleos(`push action evmevmevmevm init "{\"chainid\":15555,\"fee_params\":{\"gas_price\":150000000000,\"miner_cut\":10000,\"ingress_bridge_fee\":\"0.01000000 UOS\"}}" -p evmevmevmevm`), "Failed to init evm contract",  {swallow:hide_action_log});
-            //     assert(await cleos(`push action evmevmevmevm init '[15555,[150000000000,10000,"0.01000000 UOS"]]' -p evmevmevmevm`), "Failed to init evm contract",  {swallow:hide_action_log});
-            
-            //     assert(await cleos(`set account permission evmevmevmevm active --add-code -p evmevmevmevm@owner`), "Failed to addcode to evm contract",  {swallow:hide_action_log});
-
-            //     // 1 UOS to evm contract
-            //     assert(await cleos(`transfer eosio evmevmevmevm "1.00000000 UOS" "evmevmevmevm"`), "Failed to transfer to evmevmevmevm",  {swallow:hide_action_log});
-            //     // bridge 1000 UOS to "0x2787b98fc4e731d0456b3941f0b3fe2e01439961"
-            //     assert(await cleos(`transfer eosio evmevmevmevm "1000.00000000 UOS" "0x2787b98fc4e731d0456b3941f0b3fe2e01439961"`), "Failed to transfer to evmevmevmevm",  {swallow:hide_action_log});
-            //      // bridge 1 UOS to "0x3787b98fc4e731d0456b3941f0b3fe2e01439961"
-            //     assert(await cleos(`transfer eosio evmevmevmevm "1.00000000 UOS" "0x3787b98fc4e731d0456b3941f0b3fe2e01439961"`), "Failed to transfer to evmevmevmevm",  {swallow:hide_action_log});
-            
-            //     // open account balance for evmminer account
-            //     assert(await cleos(`push action evmevmevmevm open '{"owner":"evmminer"}' -p evmminer`), "Failed to transfer to evmevmevmevm",  {swallow:hide_action_log});
-            // },
             'Initialize evm contract': async () => {
                 await assertAsync(evmAPI.init(15555, {gas_price: 150000000000, miner_cut: 10000, ingress_bridge_fee: "0.01000000 UOS"}), "failed to initialize evm");
-                console.log(await evmAPI.getConfig());
+                const config = await evmAPI.getConfig();
+                assert(config.chainid === 15555);
+                assert(config.miner_cut === 10000);
+                assert(config.gas_price == 150000000000);
             },
             'Perform a transfer and check balances': async () => {
-                console.log(await evmAPI.getAllBalances());
-                console.log(await evmAPI.getBalanceWithDust());
+                let accounts = await evmAPI.getAllAccounts();
+                let balances = await evmAPI.getAllBalances();
+                let balanceWithDust = await evmAPI.getBalanceWithDust();
+                assert(accounts.length == 0, "wrong accounts length");
+                assert(balances.length == 2, "wrong balances length");
+                assert(balances[0].owner == EVM_CONTRACT, "wrong balance[0] owner");
+                assert(balances[0].balance.balance == '0.00000000 UOS', "wrong balance[0] balance");
+                assert(balances[1].owner == 'uos.pool', "wrong balance[1] owner");
+                assert(balances[1].balance.balance == '0.00000000 UOS', "wrong balance[1] balance");
+                assert(balanceWithDust?.balance == '0.00000000 UOS', "wrong balance with dust");
+                
                 await ultraAPI.transferTokens("ultra.eosio", EVM_CONTRACT, 1, EVM_CONTRACT);
                 await ultraAPI.transferTokens("ultra.eosio", EVM_CONTRACT, 1, 'uos.pool');
-                console.log(await evmAPI.getAllBalances());
-                console.log(await evmAPI.getBalanceWithDust());
+                balances = await evmAPI.getAllBalances();
+                assert(balances.length == 2, "wrong balances length after transfer");
+                assert(balances[0].owner == EVM_CONTRACT, "wrong balance[0] owner after transfer");
+                assert(balances[0].balance.balance == '1.00000000 UOS', "wrong balance[0] balance after transfer");
+                assert(balances[1].owner == 'uos.pool', "wrong balance[1] owner after transfer");
+                assert(balances[1].balance.balance == '1.00000000 UOS', "wrong balance[1] balance after transfer");
+                
                 await ultraAPI.transferTokens("ultra.eosio", EVM_CONTRACT, 1000, "0x14dC79964da2C08b23698B3D3cc7Ca32193d9955");
-                console.log(await evmAPI.getAllBalances());
-                console.log(await evmAPI.getBalanceWithDust());
+                accounts = await evmAPI.getAllAccounts();
+                balances = await evmAPI.getAllBalances();
+                balanceWithDust = await evmAPI.getBalanceWithDust();
+                assert(accounts.length == 1, "wrong accounts length after evm address transfer");
+                assert(accounts[0].eth_address == '14dc79964da2c08b23698b3d3cc7ca32193d9955', "wrong ethereum account address");
+                assert(Number('0x' + accounts[0].balance) == 999990000000000000000, "wrong ethereum account balance");
+                assert(balances.length == 2, "wrong balances length after evm address transfer");
+                assert(balances[0].owner == EVM_CONTRACT, "wrong balance[0] owner after evm address transfer");
+                assert(balances[0].balance.balance == '1.00000000 UOS', "wrong balance[0] balance after evm address transfer");
+                assert(balances[1].owner == 'uos.pool', "wrong balance[1] owner after evm address transfer");
+                assert(balances[1].balance.balance == '1.01000000 UOS', "wrong balance[1] balance after evm address transfer");
+                assert(balanceWithDust?.balance == '999.99000000 UOS', "wrong balance with dust after evm address transfer");
+                
                 await ultraAPI.transferTokens("ultra.eosio", EVM_CONTRACT, 2, "0x3787b98fc4e731d0456b3941f0b3fe2e01439961");
-                console.log(await evmAPI.getAllBalances());
-                console.log(await evmAPI.getBalanceWithDust());
+                accounts = await evmAPI.getAllAccounts();
+                balances = await evmAPI.getAllBalances();
+                balanceWithDust = await evmAPI.getBalanceWithDust();
+                assert(accounts.length == 2, "wrong accounts length after evm address transfer 2");
+                assert(accounts[1].eth_address == '3787b98fc4e731d0456b3941f0b3fe2e01439961', "wrong ethereum account address 2");
+                assert(Number('0x' + accounts[1].balance) == 1990000000000000000, "wrong ethereum account balance 2");
+                assert(balances.length == 2, "wrong balances length after evm address transfer 2");
+                assert(balances[0].owner == EVM_CONTRACT, "wrong balance[0] owner after evm address transfer 2");
+                assert(balances[0].balance.balance == '1.00000000 UOS', "wrong balance[0] balance after evm address transfer 2");
+                assert(balances[1].owner == 'uos.pool', "wrong balance[1] owner after evm address transfer 2");
+                assert(balances[1].balance.balance == '1.02000000 UOS', "wrong balance[1] balance after evm address transfer 2");
+                assert(balanceWithDust?.balance == '1001.98000000 UOS', "wrong balance with dust after evm address transfer 2");
             },
             'Perform a transfer in EVM': async () => {
                 const privateKey = '0x4bbbf85ce3377467afe5d46f804f221813b2bb87f24d81f60f1fcdbf7cbf4356';
                 let account = Web3Accounts.privateKeyToAccount(privateKey);
-                console.log(account.address);
                 let trx = new Transaction({
                     to: '0x3787b98fc4e731d0456b3941f0b3fe2e01439961',
                     value: 1,
@@ -289,13 +292,23 @@ export default class Test extends UltraTest {
                     nonce: 0,
                 }, {common: Web3Accounts.Common.custom({chainId: 15555})});
                 let signature = await signTransaction(trx, privateKey);
-                console.log(signature);
 
-                let result = await evmAPI.pushTransaction(EVM_CONTRACT, signature.rawTransaction.substring(2));
-                //console.log(JSON.stringify(result, null, 4));
-                console.log(await evmAPI.getAllAccounts());
-                console.log(await evmAPI.getAllBalances());
-                console.log(await evmAPI.getBalanceWithDust());
+                await assertAsync(evmAPI.pushTransaction(EVM_CONTRACT, signature.rawTransaction.substring(2)), 'Failed to send an EVM transfer');
+                
+                let accounts = await evmAPI.getAllAccounts();
+                let balances = await evmAPI.getAllBalances();
+                let balanceWithDust = await evmAPI.getBalanceWithDust();
+                assert(accounts.length == 2, "wrong accounts length after evm transaction");
+                assert(accounts[0].eth_address == '14dc79964da2c08b23698b3d3cc7ca32193d9955', "wrong ethereum account address 1");
+                assert(Number('0x' + accounts[0].balance) == 999986850000000000000, "wrong ethereum account balance 1");
+                assert(accounts[1].eth_address == '3787b98fc4e731d0456b3941f0b3fe2e01439961', "wrong ethereum account address 2");
+                assert(Number('0x' + accounts[1].balance) == 1990000000000000001, "wrong ethereum account balance 2");
+                assert(balances.length == 2, "wrong balances length after evm transaction");
+                assert(balances[0].owner == EVM_CONTRACT, "wrong balance[0] owner after evm transaction");
+                assert(balances[0].balance.balance == '1.00000000 UOS', "wrong balance[0] balance after evm transaction");
+                assert(balances[1].owner == 'uos.pool', "wrong balance[1] owner after evm transaction");
+                assert(balances[1].balance.balance == '1.02315000 UOS', "wrong balance[1] balance after evm transaction");
+                assert(balanceWithDust?.balance == '1001.97685000 UOS', "wrong balance with dust after transaction");
             }
         };
     }

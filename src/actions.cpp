@@ -214,6 +214,7 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
     // and now we accpet them regardless from self or not, so no special treatment.
     // 2 For special signature, we will reject calls not from self 
     // and process the special balance if the tx is from reserved address.
+    std::optional<intx::uint256> evm_contract_refund;
     if (is_special_signature) {
         check(rc.allow_special_signature, "bridge signature used outside of bridge transaction");
         if (is_reserved_address(*tx.from)) {
@@ -221,7 +222,7 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
 
             const intx::uint512 max_gas_cost = intx::uint256(tx.gas_limit) * tx.max_fee_per_gas;
             check(max_gas_cost + tx.value < std::numeric_limits<intx::uint256>::max(), "too much gas");
-            intx::uint256 value_with_max_gas = tx.value + (intx::uint256)max_gas_cost;
+            const intx::uint256 value_with_max_gas = tx.value + (intx::uint256)max_gas_cost;
 
             
 
@@ -231,10 +232,7 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
 
                 /*ultra-igor-sikachyna---BLOCK-2575 review evm contract --- if the transaction is initiated by evm contract then the uos.pool will be used for gas fee calculations*/
                 if (ingress_account == get_self()) {
-                    balance_table.modify(balance_table.get(uos_pool_account.value), eosio::same_payer, [&](balance& b){
-                        b.balance -= (intx::uint256)max_gas_cost;
-                    });
-                    b.balance += (intx::uint256)max_gas_cost;
+                    evm_contract_refund = (intx::uint256)max_gas_cost;
                 }
             });
             inevm->set(inevm->get() += value_with_max_gas, eosio::same_payer);
@@ -339,6 +337,13 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
         check(deducted_miner_cut, "unexpected error: contract account did not receive any funds through its reserved address");
         balance_table.modify(balance_table.get(miner.value), eosio::same_payer, [&](balance& b){
             b.balance += *gas_fee_miner_portion;
+            /*ultra-igor-sikachyna---BLOCK-2575 review evm contract --- if the max gas fee was taken from the evm contract, we can now reimburse it and charge the uos.pool instead*/
+            if (evm_contract_refund.has_value()) {
+                b.balance -= *evm_contract_refund;
+                balance_table.modify(balance_table.get(get_self().value), eosio::same_payer, [&](balance& b){
+                    b.balance += *evm_contract_refund;
+                });
+            }
         });
     }
 
