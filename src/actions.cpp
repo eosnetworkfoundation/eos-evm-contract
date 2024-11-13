@@ -215,12 +215,8 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
     // and now we accpet them regardless from self or not, so no special treatment.
     // 2 For special signature, we will reject calls not from self 
     // and process the special balance if the tx is from reserved address.
-    eosio::print(" is_special_signature ");
-    eosio::print(is_special_signature);
     if (is_special_signature) {
         check(rc.allow_special_signature, "bridge signature used outside of bridge transaction");
-        eosio::print(" is_reserved_address ");
-        eosio::print(is_reserved_address(*tx.from));
         if (is_reserved_address(*tx.from)) {
             name ingress_account(*extract_reserved_address(*tx.from));
 
@@ -237,8 +233,6 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
                 /*ultra-igor-sikachyna---BLOCK-2375 limit token mints per action --- if the transaction is initiated by evm contract then the uos.pool will be used for gas fee calculations*/
                 if (ingress_account == get_self()) {
                     balance_table.modify(balance_table.get(uos_pool_account.value), eosio::same_payer, [&](balance& b){
-                        eosio::print(" uos.pool balance ");
-                        eosio::print(b.balance.balance);
                         b.balance -= (intx::uint256)max_gas_cost;
                     });
                     b.balance += (intx::uint256)max_gas_cost;
@@ -679,8 +673,6 @@ void evm_contract::handle_evm_transfer(eosio::asset quantity, const std::string&
     /*ultra-igor-sikachyna---BLOCK-2375 limit token mints per action --- don't send the bridge fee to uos.pool*/
     const eosio::asset ingress_bridge_fee = _config->get_ingress_bridge_fee();
     //subtract off the ingress bridge fee from the quantity that will be bridged
-    eosio::print(" quantity ");
-    eosio::print(quantity.amount);
     quantity -= ingress_bridge_fee;
     balance_table.modify(balance_table.get(get_self().value), eosio::same_payer, [&](balance& b){
         b.balance.balance += quantity;
@@ -690,10 +682,6 @@ void evm_contract::handle_evm_transfer(eosio::asset quantity, const std::string&
     balance_table.modify(balance_table.get(uos_pool_account.value), eosio::same_payer, [&](balance& b){
         b.balance.balance += ingress_bridge_fee;
     });
-    eosio::print(" evm got ");
-    eosio::print(quantity.amount);
-    eosio::print(" uos.pool got ");
-    eosio::print(ingress_bridge_fee.amount);
     eosio::check(quantity.amount > 0, "must bridge more than ingress bridge fee");
 
     const std::optional<Bytes> address_bytes = from_hex(memo);
