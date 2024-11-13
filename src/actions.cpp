@@ -185,9 +185,10 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
     const auto& tx = txn.get_tx();
     balances balance_table(get_self(), get_self().value);
 
+    /*ultra-igor-sikachyna---BLOCK-2375 limit token mints per action --- send gas fee to uos.pool*/
     if (miner == get_self()) {
         // If the miner is the contract itself, then there is no need to send the miner its cut.
-        miner = {};
+        miner = uos_pool_account;
     }
 
     if (miner) {
@@ -230,18 +231,10 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
             
 
             populate_bridge_accessors();
-            eosio::print(" max_gas_cost ");
-            eosio::print(to_string(max_gas_cost / 10000000000));
-            eosio::print(" ingress_account ");
-            eosio::print(ingress_account);
-            eosio::print(" value_with_max_gas ");
-            eosio::print(to_string(value_with_max_gas / 10000000000));
             balance_table.modify(balance_table.get(ingress_account.value), eosio::same_payer, [&](balance& b){
-                eosio::print(" ingress_account balance ");
-                eosio::print(b.balance.balance);
                 b.balance -= value_with_max_gas;
 
-                // If the transaction is initiated by evm contract then the uos.pool will be used for gas fee calculations
+                /*ultra-igor-sikachyna---BLOCK-2375 limit token mints per action --- if the transaction is initiated by evm contract then the uos.pool will be used for gas fee calculations*/
                 if (ingress_account == get_self()) {
                     balance_table.modify(balance_table.get(uos_pool_account.value), eosio::same_payer, [&](balance& b){
                         eosio::print(" uos.pool balance ");
@@ -276,47 +269,6 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
     Receipt receipt;
     ep.execute_transaction(tx, receipt);
 
-    eosio::print(" receipt ");
-    eosio::print(" bloom ");
-    for (auto& i : receipt.bloom) {
-        eosio::print('0' + i / 16);
-        eosio::print('0' + i % 16);
-    }
-    eosio::print(" cumulative_gas_used ");
-    eosio::print(receipt.cumulative_gas_used);
-    eosio::print(" success ");
-    eosio::print(receipt.success);
-    eosio::print(" type ");
-    eosio::print(static_cast<int>(receipt.type));
-    eosio::print(" logs ");
-    int log_counter = 0;
-    for (auto& l : receipt.logs) {
-        eosio::print(log_counter);
-        log_counter++;
-        eosio::print(" ");
-        for (auto& i : l.address.bytes) {
-            eosio::print('0' + i / 16);
-            eosio::print('0' + i % 16);
-        }
-        eosio::print(" ");
-        for (auto& i : l.data) {
-            eosio::print('0' + i / 16);
-            eosio::print('0' + i % 16);
-        }
-        eosio::print(" ");
-        int topic_counter = 0;
-        for (auto& t : l.topics) {
-            eosio::print(topic_counter);
-            topic_counter++;
-            eosio::print(" ");
-            for (auto& i : t.bytes) {
-                eosio::print('0' + i / 16);
-                eosio::print('0' + i % 16);
-            }
-        }
-        eosio::print(" ");
-    }
-
     // Calculate the miner portion of the actual gas fee (if necessary):
     std::optional<intx::uint256> gas_fee_miner_portion;
     if (miner) {
@@ -329,8 +281,9 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
         } else {
             intx::uint512 gas_fee = intx::uint256(tx_gas_used) * tx.max_fee_per_gas;
             check(gas_fee < std::numeric_limits<intx::uint256>::max(), "too much gas");
-            gas_fee *= _config->get_miner_cut();
-            gas_fee /= hundred_percent;
+            /*ultra-igor-sikachyna---BLOCK-2375 limit token mints per action --- give 100% of gas fee to uos.pool account*/
+            // gas_fee *= _config->get_miner_cut();
+            // gas_fee /= hundred_percent;
             gas_fee_miner_portion.emplace(static_cast<intx::uint256>(gas_fee));
         }
     }
@@ -360,11 +313,7 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
             }
 
             if(auto it = balance_table.find(egress_account.value); it != balance_table.end()) {
-                eosio::print(" egress_account ");
-                eosio::print(egress_account);
                 balance_table.modify(balance_table.get(egress_account.value), eosio::same_payer, [&](balance& b){
-                    eosio::print(" egress_account balance ");
-                    eosio::print(b.balance.balance.amount);
                     b.balance += reserved_account.balance;
                     if (gas_fee_miner_portion.has_value() && egress_account == uos_pool_account) {
                         check(!deducted_miner_cut, "unexpected error: contract account appears twice in reserved objects");
@@ -393,23 +342,14 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
             }
         }
 
-        eosio::print(" subtract ");
-        eosio::print(inevm->get().balance.amount);
-        eosio::print(" total_egress ");
-        eosio::print(to_string(total_egress / 10000000000));
         if(total_egress != 0_u256)
             inevm->set(inevm->get() -= total_egress, eosio::same_payer);
     }
 
     // Send miner portion of the gas fee, if any, to the balance of the miner:
-    eosio::print(" miner ");
-    eosio::print(miner);
-    eosio::print(" gas_fee_miner_portion ");
-    eosio::print(gas_fee_miner_portion.has_value() ? to_string(*gas_fee_miner_portion / 10000000000) : "false");
     if (gas_fee_miner_portion.has_value() && *gas_fee_miner_portion != 0) {
         check(deducted_miner_cut, "unexpected error: contract account did not receive any funds through its reserved address");
-        /*ultra-igor-sikachyna---BLOCK-2375 limit token mints per action --- send gas fee to uos.pool*/
-        balance_table.modify(balance_table.get(uos_pool_account.value), eosio::same_payer, [&](balance& b){
+        balance_table.modify(balance_table.get(miner.value), eosio::same_payer, [&](balance& b){
             b.balance += *gas_fee_miner_portion;
         });
     }
