@@ -248,13 +248,16 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
     check_result( r, tx, "validate_transaction error" );
 
     Receipt receipt;
-    ep.execute_transaction(tx, receipt);
+    const auto res = ep.execute_transaction(tx, receipt);
 
     // Calculate the miner portion of the actual gas fee (if necessary):
     std::optional<intx::uint256> gas_fee_miner_portion;
     if (miner) {
+        auto version = _config->get_evm_version();
         uint64_t tx_gas_used = receipt.cumulative_gas_used; // Only transaction in the "block" so cumulative_gas_used is the tx gas_used.
-        if(_config->get_evm_version() >= 1) {
+        if(version >= 3) {
+            gas_fee_miner_portion.emplace(res.inclusion_fee);
+        } else if(version >= 1) {
             eosio::check(ep.evm().block().header.base_fee_per_gas.has_value(), "no base fee");
             intx::uint512 gas_fee = intx::uint256(tx_gas_used) * tx.priority_fee_per_gas(ep.evm().block().header.base_fee_per_gas.value());
             check(gas_fee < std::numeric_limits<intx::uint256>::max(), "too much gas");
@@ -344,12 +347,18 @@ void evm_contract::exec(const exec_input& input, const std::optional<exec_callba
     eosevm::block_mapping bm(_config->get_genesis_time().sec_since_epoch());
 
     Block block;
-
     auto evm_version = _config->get_evm_version();
+
     std::optional<uint64_t> base_fee_per_gas;
+    auto gas_prices = _config->get_gas_prices();
     if (evm_version >= 1) {
-        base_fee_per_gas = _config->get_gas_price();
+        if( evm_version >= 3) {
+            base_fee_per_gas = gas_prices.get_base_price();
+        } else {
+            base_fee_per_gas = _config->get_gas_price();
+        }
     }
+
     eosevm::prepare_block_header(block.header, bm, get_self().value,
         bm.timestamp_to_evm_block_num(eosio::current_time_point().time_since_epoch().count()), evm_version, base_fee_per_gas);
 
@@ -475,7 +484,7 @@ void evm_contract::process_tx(const runtime_config& rc, eosio::name miner, const
     auto gas_prices = _config->get_gas_prices();
     if (current_version >= 1) {
         if( current_version >= 3) {
-            //base_fee_per_gas = f(gas_prices, min_inclusion_price)
+            base_fee_per_gas = gas_prices.get_base_price();
         } else {
             base_fee_per_gas = _config->get_gas_price();
         }
@@ -501,12 +510,16 @@ void evm_contract::process_tx(const runtime_config& rc, eosio::name miner, const
     if (current_version >= 1) {
         auto inclusion_price = std::min(tx.max_priority_fee_per_gas, tx.max_fee_per_gas - *base_fee_per_gas);
         eosio::check(inclusion_price >= (min_inclusion_price.has_value() ? *min_inclusion_price : 0), "inclusion price must >= min_inclusion_price");
+        if (current_version >= 3) {
+            gas_params = evmone::gas_parameters::apply_discount_factor(inclusion_price, *base_fee_per_gas, gas_prices.storage_price, gas_params);
+        }
     } else { // old behavior
         check(tx.max_priority_fee_per_gas == tx.max_fee_per_gas, "max_priority_fee_per_gas must be equal to max_fee_per_gas");
         check(tx.max_fee_per_gas >= _config->get_gas_price(), "gas price is too low");
     }
 
-    silkworm::ExecutionProcessor ep{block, engine, state, *found_chain_config->second, gas_params};
+    auto gp = silkworm::gas_prices_t{gas_prices.overhead_price, gas_prices.storage_price};
+    silkworm::ExecutionProcessor ep{block, engine, state, *found_chain_config->second, gas_params, gp};
 
     // Filter EVM messages (with data) that are sent to the reserved address
     // corresponding to the EOS account holding the contract (self)
