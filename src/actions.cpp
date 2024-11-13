@@ -185,9 +185,8 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
     const auto& tx = txn.get_tx();
     balances balance_table(get_self(), get_self().value);
 
-    /*ultra-igor-sikachyna---BLOCK-2375 limit token mints per action --- send gas fee to uos.pool*/
+    /*ultra-igor-sikachyna---BLOCK-2575 review evm contract --- send gas fee to uos.pool if mined by the evm contract*/
     if (miner == get_self()) {
-        // If the miner is the contract itself, then there is no need to send the miner its cut.
         miner = uos_pool_account;
     }
 
@@ -218,7 +217,7 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
     if (is_special_signature) {
         check(rc.allow_special_signature, "bridge signature used outside of bridge transaction");
         if (is_reserved_address(*tx.from)) {
-            name ingress_account(*extract_reserved_address(*tx.from));
+            const name ingress_account(*extract_reserved_address(*tx.from));
 
             const intx::uint512 max_gas_cost = intx::uint256(tx.gas_limit) * tx.max_fee_per_gas;
             check(max_gas_cost + tx.value < std::numeric_limits<intx::uint256>::max(), "too much gas");
@@ -230,7 +229,7 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
             balance_table.modify(balance_table.get(ingress_account.value), eosio::same_payer, [&](balance& b){
                 b.balance -= value_with_max_gas;
 
-                /*ultra-igor-sikachyna---BLOCK-2375 limit token mints per action --- if the transaction is initiated by evm contract then the uos.pool will be used for gas fee calculations*/
+                /*ultra-igor-sikachyna---BLOCK-2575 review evm contract --- if the transaction is initiated by evm contract then the uos.pool will be used for gas fee calculations*/
                 if (ingress_account == get_self()) {
                     balance_table.modify(balance_table.get(uos_pool_account.value), eosio::same_payer, [&](balance& b){
                         b.balance -= (intx::uint256)max_gas_cost;
@@ -238,7 +237,6 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
                     b.balance += (intx::uint256)max_gas_cost;
                 }
             });
-            
             inevm->set(inevm->get() += value_with_max_gas, eosio::same_payer);
 
             ep.state().set_balance(*tx.from, value_with_max_gas);
@@ -275,7 +273,7 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
         } else {
             intx::uint512 gas_fee = intx::uint256(tx_gas_used) * tx.max_fee_per_gas;
             check(gas_fee < std::numeric_limits<intx::uint256>::max(), "too much gas");
-            /*ultra-igor-sikachyna---BLOCK-2375 limit token mints per action --- give 100% of gas fee to uos.pool account*/
+            /*ultra-igor-sikachyna---BLOCK-2575 review evm contract --- give 100% of gas fee to uos.pool or miner account*/
             // gas_fee *= _config->get_miner_cut();
             // gas_fee /= hundred_percent;
             gas_fee_miner_portion.emplace(static_cast<intx::uint256>(gas_fee));
@@ -292,7 +290,7 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
 
         for(const auto& reserved_object : ep.state().reserved_objects()) {
             const evmc::address& address = reserved_object.first;
-            name egress_account(*extract_reserved_address(address));
+            const name egress_account(*extract_reserved_address(address));
             const Account& reserved_account = *reserved_object.second.current;
 
             check(reserved_account.code_hash == kEmptyHash, "contracts cannot be created in the reserved address space");
@@ -302,14 +300,10 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
                 continue;
             total_egress += reserved_account.balance;
 
-            if (egress_account == get_self()) {
-                egress_account = uos_pool_account;
-            }
-
             if(auto it = balance_table.find(egress_account.value); it != balance_table.end()) {
                 balance_table.modify(balance_table.get(egress_account.value), eosio::same_payer, [&](balance& b){
                     b.balance += reserved_account.balance;
-                    if (gas_fee_miner_portion.has_value() && egress_account == uos_pool_account) {
+                    if (gas_fee_miner_portion.has_value() && egress_account == get_self()) {
                         check(!deducted_miner_cut, "unexpected error: contract account appears twice in reserved objects");
                         b.balance -= *gas_fee_miner_portion;
                         deducted_miner_cut = true;
@@ -670,7 +664,7 @@ void evm_contract::handle_evm_transfer(eosio::asset quantity, const std::string&
     if(_config->get_evm_version() >= 1) _config->process_price_queue();
     //move all incoming quantity in to the contract's balance. the evm bridge trx will "pull" from this balance
     balances balance_table(get_self(), get_self().value);
-    /*ultra-igor-sikachyna---BLOCK-2375 limit token mints per action --- don't send the bridge fee to uos.pool*/
+    /*ultra-igor-sikachyna---BLOCK-2575 review evm contract --- don't send the bridge fee to uos.pool*/
     const eosio::asset ingress_bridge_fee = _config->get_ingress_bridge_fee();
     //subtract off the ingress bridge fee from the quantity that will be bridged
     quantity -= ingress_bridge_fee;
@@ -678,7 +672,7 @@ void evm_contract::handle_evm_transfer(eosio::asset quantity, const std::string&
         b.balance.balance += quantity;
     });
 
-    /*ultra-igor-sikachyna---BLOCK-2375 limit token mints per action --- transfer the bridge fee to uos.pool*/
+    /*ultra-igor-sikachyna---BLOCK-2575 review evm contract --- transfer the bridge fee to uos.pool*/
     balance_table.modify(balance_table.get(uos_pool_account.value), eosio::same_payer, [&](balance& b){
         b.balance.balance += ingress_bridge_fee;
     });
