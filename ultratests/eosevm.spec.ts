@@ -185,11 +185,6 @@ export default class Test extends UltraTest {
         super();
     }
 
-    // handled by genesis plugin
-    // requiredProducers() {
-    //     return 1;
-    // }
-
     async onChainStart(ultra: UltraTestAPI) {
         ultra.addPlugins([genesis(ultra), system(ultra), ultraContracts(ultra), await ultraStartup(ultra)]);
     }
@@ -205,7 +200,6 @@ export default class Test extends UltraTest {
         return [{
             account: EVM_CONTRACT,
             contract: "../build/evm_runtime",
-            isPrivileged: true
         }]
     }
 

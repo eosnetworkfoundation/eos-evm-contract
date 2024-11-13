@@ -81,7 +81,7 @@ void evm_contract::init(const uint64_t chainid, const fee_parameters& fee_params
    });
 
    open_internal_balance(get_self());
-   open_internal_balance(uos_pool_account);
+   open_internal_balance(uos_pool_account, true);
 }
 
 void evm_contract::setfeeparams(const fee_parameters& fee_params)
@@ -594,17 +594,17 @@ void evm_contract::open(eosio::name owner) {
     open_internal_balance(owner);
 }
 
-void evm_contract::open_internal_balance(eosio::name owner) {
+void evm_contract::open_internal_balance(eosio::name owner, bool ram_sponsored) {
     balances balance_table(get_self(), get_self().value);
     if(balance_table.find(owner.value) == balance_table.end())
-        balance_table.emplace(owner, [&](balance& a) {
+        balance_table.emplace(ram_sponsored ? get_self() : owner, [&](balance& a) {
             a.owner = owner;
             a.balance.balance = eosio::asset(0, _config->get_token_symbol());
         });
 
     nextnonces nextnonce_table(get_self(), get_self().value);
     if(nextnonce_table.find(owner.value) == nextnonce_table.end())
-        nextnonce_table.emplace(owner, [&](nextnonce& a) {
+        nextnonce_table.emplace(ram_sponsored ? get_self() : owner, [&](nextnonce& a) {
             a.owner = owner;
         });
 }

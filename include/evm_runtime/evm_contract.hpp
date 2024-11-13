@@ -128,7 +128,8 @@ public:
 #endif
 
 private:
-   void open_internal_balance(eosio::name owner);
+   /*ultra-igor-sikachyna---BLOCK-2575 review evm contract --- allow evm contract to sponsor ram for uos.pool account balance*/
+   void open_internal_balance(eosio::name owner, bool ram_sponsored = false);
    std::shared_ptr<struct config_wrapper> _config;
 
    enum class status_flags : uint32_t
