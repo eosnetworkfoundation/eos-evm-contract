@@ -245,13 +245,12 @@ export default class Test extends UltraTest {
                 assert(balanceWithDust?.balance == '0.00000000 UOS', "wrong balance with dust");
                 
                 await ultraAPI.transferTokens("ultra.eosio", EVM_CONTRACT, 1, EVM_CONTRACT);
-                await ultraAPI.transferTokens("ultra.eosio", EVM_CONTRACT, 1, 'uos.pool');
                 balances = await evmAPI.getAllBalances();
                 assert(balances.length == 2, "wrong balances length after transfer");
                 assert(balances[0].owner == EVM_CONTRACT, "wrong balance[0] owner after transfer");
                 assert(balances[0].balance.balance == '1.00000000 UOS', "wrong balance[0] balance after transfer");
                 assert(balances[1].owner == 'uos.pool', "wrong balance[1] owner after transfer");
-                assert(balances[1].balance.balance == '1.00000000 UOS', "wrong balance[1] balance after transfer");
+                assert(balances[1].balance.balance == '0.00000000 UOS', "wrong balance[1] balance after transfer");
                 
                 await ultraAPI.transferTokens("ultra.eosio", EVM_CONTRACT, 1000, "0x14dC79964da2C08b23698B3D3cc7Ca32193d9955");
                 accounts = await evmAPI.getAllAccounts();
@@ -264,7 +263,7 @@ export default class Test extends UltraTest {
                 assert(balances[0].owner == EVM_CONTRACT, "wrong balance[0] owner after evm address transfer");
                 assert(balances[0].balance.balance == '1.00000000 UOS', "wrong balance[0] balance after evm address transfer");
                 assert(balances[1].owner == 'uos.pool', "wrong balance[1] owner after evm address transfer");
-                assert(balances[1].balance.balance == '1.01000000 UOS', "wrong balance[1] balance after evm address transfer");
+                assert(balances[1].balance.balance == '0.01000000 UOS', "wrong balance[1] balance after evm address transfer");
                 assert(balanceWithDust?.balance == '999.99000000 UOS', "wrong balance with dust after evm address transfer");
                 
                 await ultraAPI.transferTokens("ultra.eosio", EVM_CONTRACT, 2, "0x3787b98fc4e731d0456b3941f0b3fe2e01439961");
@@ -278,7 +277,7 @@ export default class Test extends UltraTest {
                 assert(balances[0].owner == EVM_CONTRACT, "wrong balance[0] owner after evm address transfer 2");
                 assert(balances[0].balance.balance == '1.00000000 UOS', "wrong balance[0] balance after evm address transfer 2");
                 assert(balances[1].owner == 'uos.pool', "wrong balance[1] owner after evm address transfer 2");
-                assert(balances[1].balance.balance == '1.02000000 UOS', "wrong balance[1] balance after evm address transfer 2");
+                assert(balances[1].balance.balance == '0.02000000 UOS', "wrong balance[1] balance after evm address transfer 2");
                 assert(balanceWithDust?.balance == '1001.98000000 UOS', "wrong balance with dust after evm address transfer 2");
             },
             'Perform a transfer in EVM': async () => {
@@ -307,7 +306,7 @@ export default class Test extends UltraTest {
                 assert(balances[0].owner == EVM_CONTRACT, "wrong balance[0] owner after evm transaction");
                 assert(balances[0].balance.balance == '1.00000000 UOS', "wrong balance[0] balance after evm transaction");
                 assert(balances[1].owner == 'uos.pool', "wrong balance[1] owner after evm transaction");
-                assert(balances[1].balance.balance == '1.02315000 UOS', "wrong balance[1] balance after evm transaction");
+                assert(balances[1].balance.balance == '0.02315000 UOS', "wrong balance[1] balance after evm transaction");
                 assert(balanceWithDust?.balance == '1001.97685000 UOS', "wrong balance with dust after transaction");
             }
         };

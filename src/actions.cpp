@@ -224,8 +224,6 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
             check(max_gas_cost + tx.value < std::numeric_limits<intx::uint256>::max(), "too much gas");
             const intx::uint256 value_with_max_gas = tx.value + (intx::uint256)max_gas_cost;
 
-            
-
             populate_bridge_accessors();
             balance_table.modify(balance_table.get(ingress_account.value), eosio::same_payer, [&](balance& b){
                 b.balance -= value_with_max_gas;
