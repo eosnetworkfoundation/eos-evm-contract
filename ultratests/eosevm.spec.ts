@@ -4,12 +4,10 @@ import { UltraAPIv2, ultraStartup } from 'ultratest-ultra-startup-plugin';
 import { ultraContracts } from 'ultratest-ultra-contracts-plugin';
 import { genesis } from 'ultratest-genesis-plugin/genesis';
 import { system, SystemAPI } from 'ultratest-system-plugin/system';
-import { RequiredContract } from 'ultratest-ultra-startup-plugin/interfaces';
-import { AccountConfiguration } from 'ultratest-ultra-startup-plugin/ultraStartupPermissions';
 import * as Web3 from 'web3';
 import * as Web3Accounts from 'web3-eth-accounts';
 import {signTransaction, Transaction} from 'web3-eth-accounts';
-import evmSetup from './evm_setup';
+import evmSetup, { EvmContractHelpers } from './evmSetup';
 
 export default class Test extends UltraTest {
     constructor() {
@@ -23,19 +21,20 @@ export default class Test extends UltraTest {
     async tests(ultra: UltraTestAPI) {
         const systemAPI = new SystemAPI(ultra);
         const ultraAPI = new UltraAPIv2(ultra);
+        const evm = new EvmContractHelpers(ultraAPI, ultra.api, systemAPI);
 
         return {
             'Initialize evm contract': async () => {
-                await assertAsync(ultraAPI.evm.init(15555, {gas_price: 150000000000, miner_cut: 10000, ingress_bridge_fee: "0.01000000 UOS"}), "failed to initialize evm");
-                const config = await ultraAPI.evm.getConfig();
+                await assertAsync(evm.init(15555, {gas_price: 150000000000, miner_cut: 10000, ingress_bridge_fee: "0.01000000 UOS"}), "failed to initialize evm");
+                const config = await evm.getConfig();
                 assert(config.chainid === 15555);
                 assert(config.miner_cut === 10000);
                 assert(config.gas_price == 150000000000);
             },
             'Perform a transfer and check balances': async () => {
-                let accounts = await ultraAPI.evm.getAllAccounts();
-                let balances = await ultraAPI.evm.getAllBalances();
-                let balanceWithDust = await ultraAPI.evm.getBalanceWithDust();
+                let accounts = await evm.getAllAccounts();
+                let balances = await evm.getAllBalances();
+                let balanceWithDust = await evm.getBalanceWithDust();
                 assert(accounts.length == 0, "wrong accounts length");
                 assert(balances.length == 1, "wrong balances length");
                 assert(balances[0].owner == 'eosio.evm', "wrong balance[0] owner");
@@ -43,15 +42,15 @@ export default class Test extends UltraTest {
                 assert(balanceWithDust?.balance == '0.00000000 UOS', "wrong balance with dust");
                 
                 await ultraAPI.transferTokens("ultra.eosio", 'eosio.evm', 1, 'eosio.evm');
-                balances = await ultraAPI.evm.getAllBalances();
+                balances = await evm.getAllBalances();
                 assert(balances.length == 1, "wrong balances length after transfer");
                 assert(balances[0].owner == 'eosio.evm', "wrong balance[0] owner after transfer");
                 assert(balances[0].balance.balance == '1.00000000 UOS', "wrong balance[0] balance after transfer");
                 
                 await ultraAPI.transferTokens("ultra.eosio", 'eosio.evm', 1000, "0x14dC79964da2C08b23698B3D3cc7Ca32193d9955");
-                accounts = await ultraAPI.evm.getAllAccounts();
-                balances = await ultraAPI.evm.getAllBalances();
-                balanceWithDust = await ultraAPI.evm.getBalanceWithDust();
+                accounts = await evm.getAllAccounts();
+                balances = await evm.getAllBalances();
+                balanceWithDust = await evm.getBalanceWithDust();
                 assert(accounts.length == 1, "wrong accounts length after evm address transfer");
                 assert(accounts[0].eth_address == '14dc79964da2c08b23698b3d3cc7ca32193d9955', "wrong ethereum account address");
                 assert(Number('0x' + accounts[0].balance) == 999990000000000000000, "wrong ethereum account balance");
@@ -61,9 +60,9 @@ export default class Test extends UltraTest {
                 assert(balanceWithDust?.balance == '999.99000000 UOS', "wrong balance with dust after evm address transfer");
                 
                 await ultraAPI.transferTokens("ultra.eosio", 'eosio.evm', 2, "0x3787b98fc4e731d0456b3941f0b3fe2e01439961");
-                accounts = await ultraAPI.evm.getAllAccounts();
-                balances = await ultraAPI.evm.getAllBalances();
-                balanceWithDust = await ultraAPI.evm.getBalanceWithDust();
+                accounts = await evm.getAllAccounts();
+                balances = await evm.getAllBalances();
+                balanceWithDust = await evm.getBalanceWithDust();
                 assert(accounts.length == 2, "wrong accounts length after evm address transfer 2");
                 assert(accounts[1].eth_address == '3787b98fc4e731d0456b3941f0b3fe2e01439961', "wrong ethereum account address 2");
                 assert(Number('0x' + accounts[1].balance) == 1990000000000000000, "wrong ethereum account balance 2");
@@ -84,11 +83,11 @@ export default class Test extends UltraTest {
                 }, {common: Web3Accounts.Common.custom({chainId: 15555})});
                 let signature = await signTransaction(trx, privateKey);
 
-                await assertAsync(ultraAPI.evm.pushTransaction('eosio.evm', signature.rawTransaction.substring(2)), 'Failed to send an EVM transfer');
+                await assertAsync(evm.pushTransaction('eosio.evm', signature.rawTransaction.substring(2)), 'Failed to send an EVM transfer');
                 
-                let accounts = await ultraAPI.evm.getAllAccounts();
-                let balances = await ultraAPI.evm.getAllBalances();
-                let balanceWithDust = await ultraAPI.evm.getBalanceWithDust();
+                let accounts = await evm.getAllAccounts();
+                let balances = await evm.getAllBalances();
+                let balanceWithDust = await evm.getBalanceWithDust();
                 assert(accounts.length == 2, "wrong accounts length after evm transaction");
                 assert(accounts[0].eth_address == '14dc79964da2c08b23698b3d3cc7ca32193d9955', "wrong ethereum account address 1");
                 assert(Number('0x' + accounts[0].balance) == 999986850000000000000, "wrong ethereum account balance 1");
