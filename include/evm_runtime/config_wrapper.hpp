@@ -74,6 +74,7 @@ private:
     void clear_dirty();
 
     eosio::time_point get_current_time()const;
+    bool check_gas_overflow(uint64_t gas_txcreate, uint64_t gas_codedeposit) const; // return true if pass
 
     bool _dirty  = false;
     bool _exists = false;

@@ -1,4 +1,5 @@
 #include <evm_runtime/tables.hpp>
+#include <silkworm/core/protocol/param.hpp>
 #include <evm_runtime/config_wrapper.hpp>
 
 namespace evm_runtime {
@@ -232,10 +233,7 @@ void config_wrapper::set_fee_parameters(const fee_parameters& fee_params,
                         bool allow_any_to_be_unspecified)
 {
     if (fee_params.gas_price.has_value()) {
-        eosio::check(*fee_params.gas_price >= one_gwei, "gas_price must >= 1Gwei");
-        auto current_version = get_evm_version_and_maybe_promote();
-        if( current_version >= 1 ) {
-            eosio::check(current_version < 3, "can't set gas_price");
+        if(get_evm_version() >= 1) {
             enqueue_gas_price(*fee_params.gas_price);
         } else {
             set_gas_price(*fee_params.gas_price);
@@ -270,22 +268,30 @@ void config_wrapper::update_consensus_parameters(eosio::asset ram_price_mb, uint
     eosio::check(get_evm_version() < 3, "unable to set params");
 
     //TODO: should we allow to call this when version>=3
+    constexpr char too_big_str[] = "gas_per_byte too big";
     eosio::check(ram_price_mb.symbol == get_token_symbol(), "invalid price symbol");
-    eosio::check(gas_price >= one_gwei, "gas_price must >= 1Gwei");
+    eosio::check(gas_price > 0, "zero gas price is not allowed");
 
     auto miner_cut = get_evm_version() >= 1 ? 0 : _cached_config.miner_cut;
+
+    eosio::check(miner_cut < hundred_percent, "100% miner cut is not allowed");
+
+    constexpr uint64_t overflow_limit = (1ull << 63) - 1;
+
+    eosio::check((double)overflow_limit/get_minimum_natively_representable() > ram_price_mb.amount / (1024.0 * 1024.0), too_big_str);
+
     double gas_per_byte_f = (ram_price_mb.amount / (1024.0 * 1024.0) * get_minimum_natively_representable()) / (gas_price * static_cast<double>(hundred_percent - miner_cut) / hundred_percent);
 
     constexpr uint64_t account_bytes = 347;
     constexpr uint64_t contract_fixed_bytes = 606;
     constexpr uint64_t storage_slot_bytes = 346;
 
-    constexpr uint64_t max_gas_per_byte = (1ull << 43) - 1;
-
     eosio::check(gas_per_byte_f >= 0.0, "gas_per_byte must >= 0");
-    eosio::check(gas_per_byte_f * contract_fixed_bytes < (double)(max_gas_per_byte), "gas_per_byte too big");
 
     uint64_t gas_per_byte = (uint64_t)(gas_per_byte_f + 1.0);
+
+    eosio::check((double)overflow_limit/gas_per_byte > contract_fixed_bytes, too_big_str);
+    eosio::check(check_gas_overflow(gas_per_byte * contract_fixed_bytes, gas_per_byte), too_big_str);
 
     this->update_consensus_parameters2(account_bytes * gas_per_byte, /* gas_txnewaccount */
                              account_bytes * gas_per_byte, /* gas_newaccount */
@@ -376,6 +382,17 @@ eosio::symbol config_wrapper::get_token_symbol() const {
 
 uint64_t config_wrapper::get_minimum_natively_representable() const {
     return pow10_const(evm_precision - _cached_config.ingress_bridge_fee.symbol.precision());
+}
+
+bool config_wrapper::check_gas_overflow(uint64_t gas_txcreate, uint64_t gas_codedeposit) const {
+    // We use 2^63 - 1 instead of 2^64 - 1 for some margin.
+    constexpr uint64_t overflow_limit = (1ull << 63) - 1;
+
+    if (overflow_limit / gas_txcreate < silkworm::protocol::kMaxCodeSize)
+        return false;
+    if (overflow_limit - silkworm::protocol::kMaxCodeSize * gas_txcreate < gas_codedeposit)
+        return false;
+    return true;
 }
 
 } //namespace evm_runtime
