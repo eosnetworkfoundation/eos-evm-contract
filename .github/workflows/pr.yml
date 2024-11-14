@@ -1,0 +1,178 @@
+name: "Validate build and run tests"
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  start-runner:
+    name: Start Runner
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get Token
+        id: application_token
+        uses: peter-murray/workflow-application-token-action@v2
+        with:
+          application_id: ${{ secrets.APPLICATION_ID }}
+          application_private_key: ${{ secrets.APPLICATION_PRIVATE_KEY }}
+
+      - name: Trigger start-runner job
+        uses: convictional/trigger-workflow-and-wait@v1.6.5
+        with:
+          owner: ultraio
+          repo: blockchain-manager
+          github_token: ${{ steps.application_token.outputs.token }}
+          workflow_file_name: start-runner.yml
+  job-cleanup:
+    needs: start-runner
+    name: "Cleanup"
+    timeout-minutes: 5
+    runs-on: "self-hosted"
+    steps:
+      - name: "Cleanup Previous Run"
+        run: |
+          sudo rm -rf ./* || true
+          sudo rm -rf ./.??* || true
+          sudo rm -rf $GITHUB_WORKSPACE || true
+          mkdir $GITHUB_WORKSPACE
+  build-contracts:
+    needs: [start-runner, job-cleanup]
+    name: "Build contracts"
+    timeout-minutes: 10
+    runs-on: "self-hosted"
+    container:
+      # This repository can be found / pushed to in: ultraio/eosio-docker-starter
+      image: quay.io/ultra.io/eosio-docker-starter:5.0.0
+      options: >-
+        --init
+        --cpus 8
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+    steps:
+      - name: Get Token
+        id: application_token
+        uses: peter-murray/workflow-application-token-action@v2
+        with:
+          application_id: ${{ secrets.APPLICATION_ID }}
+          application_private_key: ${{ secrets.APPLICATION_PRIVATE_KEY }}
+
+      - name: "Set env vars"
+        run: |
+          echo "JOBS=8" >> $GITHUB_ENV
+          echo "ULTRA_PATH=/__w/eos-evm-contract/eos-evm-contract/ultra/" >> $GITHUB_ENV
+
+      # Update dependencies
+      - name: 'Update dependencies'
+        run: |
+          apt-get update -y \
+          && apt-get install tree clang jq xxd -y
+
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: 'recursive'
+
+      # Download latest version of CDT from releases
+      - uses: robinraju/release-downloader@v1.8
+        with:
+          repository: "ultraio/eosio.cdt"
+          latest: true
+          fileName: "*.deb"
+          out-file-path: "./ultra/cdt"
+          token: '${{ steps.application_token.outputs.token }}'
+
+      # Install EOSIO.CDT Debian Image
+      - name: Install EOSIO.CDT Debian Image
+        run: apt install ./ultra/cdt/*.deb -y
+
+      - name: Build EOS EVM Contract
+        run: .github/workflows/build-contract.sh
+        env:
+          DWITH_TEST_ACTIONS: true
+
+      # Clone `eosio.contracts` repo
+      - uses: actions/checkout@v3
+        name: "Clone eosio.contracts"
+        with:
+          repository: 'ultraio/eosio.contracts'
+          token: '${{ steps.application_token.outputs.token }}'
+          path: './ultra/eosio.contracts'
+          submodules: 'recursive'
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.ref }}
+
+      # Download latest `eosio.contracts` release
+      - uses: robinraju/release-downloader@v1.8
+        with:
+          repository: "ultraio/eosio.contracts"
+          latest: true
+          fileName: "*.tar.gz"
+          out-file-path: "./ultra/eosio.contracts"
+          token: '${{ steps.application_token.outputs.token }}'
+
+      - name: Extract eosio.contracts.tar.gz
+        run: |
+          ls -l
+          ls -l ./ultra/eosio.contracts
+          mkdir -p ./ultra/eosio.contracts/build
+          tar -xf ./ultra/eosio.contracts/eosio-contracts-*.tar.gz -C ./ultra/eosio.contracts/build
+          ls -l ./ultra/eosio.contracts/build
+
+      # Download latest eosio
+      - name: Download latest eosio
+        uses: dsaltares/fetch-gh-release-asset@master
+        with:
+            repo: 'ultraio/eosio'
+            regex: true
+            # match eosio-***.deb
+            # don't match eosio-***-ubuntu20.deb
+            file: eosio-.*\.deb(?<!ubuntu20\.deb)$
+            target: "./ultra/eosio.deb"
+            token: '${{ steps.application_token.outputs.token }}'
+
+      # Install EOSIO Debian Image
+      - name: Install EOSIO Debian Image
+        run: dpkg -i ./ultra/eosio.deb
+      
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 20
+
+      - name: "Extract branch name"
+        run: |
+          GIT_BRANCH=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}
+          echo "branch=$GIT_BRANCH" >> $GITHUB_OUTPUT
+        id: extract_branch
+
+      - name: "Clone Ultratest2 with main"
+        uses: actions/checkout@v3
+        with:
+          repository: "ultraio/ultratest2"
+          token: "${{ steps.application_token.outputs.token }}"
+          path: "./ultra/ultratest2"
+          fetch-depth: 0
+          ref: "main"
+
+      - name: "Check if ultratest2 has branch with the same name"
+        continue-on-error: true
+        run: cd ./ultra/ultratest2 && git checkout ${{ steps.extract_branch.outputs.branch }}
+
+      - name: Install ultratest2
+        working-directory: ./ultra/ultratest2
+        run: |
+          npm install
+          npm link --force
+
+      - name: Run eosio.contracts ultratests2
+        if: always() && !cancelled()
+        working-directory: ./
+        shell: bash
+        run: ultratest2 --contracts-dir-path=$ULTRA_PATH/eosio.contracts/build/contracts
