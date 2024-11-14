@@ -26,6 +26,25 @@ struct gas_fee_evm_tester : basic_evm_tester
 
 BOOST_AUTO_TEST_SUITE(gas_fee_evm_tests)
 
+BOOST_FIXTURE_TEST_CASE(set_ingress_gas_limit, gas_fee_evm_tester)
+try {
+   init(evm_chain_id, suggested_gas_price, suggested_miner_cut, make_asset(suggested_ingress_bridge_fee_amount));
+
+   transfer_token(faucet_account_name, evm_account_name, make_asset(10'0000), faucet_eoa.address_0x());
+
+   push_action(evm_account_name, "setgaslimit"_n, evm_account_name, mvo()("ingress_gas_limit", 20999));
+
+   BOOST_REQUIRE_EXCEPTION(
+      transfer_token(faucet_account_name, evm_account_name, make_asset(11'0000), faucet_eoa.address_0x()),
+      eosio_assert_message_exception,
+      eosio_assert_message_is("pre_validate_transaction error: 22 Intrinsic gas too low"));
+
+   push_action(evm_account_name, "setgaslimit"_n, evm_account_name, mvo()("ingress_gas_limit", 24000));
+
+   transfer_token(faucet_account_name, evm_account_name, make_asset(12'0000), faucet_eoa.address_0x());
+}
+FC_LOG_AND_RETHROW()
+
 BOOST_FIXTURE_TEST_CASE(check_init_required_gas_fee_parameters, gas_fee_evm_tester)
 try {
 
