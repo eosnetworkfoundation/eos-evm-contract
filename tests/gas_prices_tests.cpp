@@ -55,20 +55,21 @@ struct gas_prices_evm_tester : basic_evm_tester
       return std::string(pl, '0') + s;
    }
 
-   auto validate_final_fee(const auto& res, uint64_t storage_gas, const silkworm::gas_prices_t& gas_prices) {
+   auto validate_final_fee(const auto& res, uint64_t cpu_gas, uint64_t storage_gas, const silkworm::gas_prices_t& gas_prices) {
       
-      auto [cost, inclusion_price, effective_gas_price, total_gas_used, scaled_gp] = res;
+      auto [cost, inclusion_price, effective_gas_price, total_gas_billed, scaled_gp] = res;
+      intx::uint256 total_gas_used = cpu_gas+storage_gas;
 
       intx::uint256 gas_refund = 0;
       if( gas_prices.storage_price >= gas_prices.overhead_price ) {
-         gas_refund = intx::uint256(total_gas_used - storage_gas);
+         gas_refund = cpu_gas;
          gas_refund *= intx::uint256(gas_prices.storage_price-gas_prices.overhead_price);
          gas_refund /= intx::uint256(effective_gas_price);
       }
 
-      auto cpu_gas = total_gas_used - storage_gas + gas_refund;
-      auto calculated_final_fee = (intx::uint256(cpu_gas + storage_gas)-gas_refund)*effective_gas_price;
-      BOOST_REQUIRE(cost == calculated_final_fee);
+      total_gas_used -= gas_refund;
+      BOOST_REQUIRE(total_gas_used == total_gas_billed);
+      BOOST_REQUIRE(cost == total_gas_used*effective_gas_price);
    }
 
 };
@@ -169,7 +170,8 @@ BOOST_FIXTURE_TEST_CASE(gas_param_scale, gas_prices_evm_tester) try {
       auto [res, contract_address] = deploy_contract_ex(evm1, evmc::from_hex(contract_bytecode).value());
       auto contract_account = find_account_by_address(contract_address).value();
       auto code_len = get_code_len(contract_account.code_id.value());
-      validate_final_fee(res, code_len*std::get<4>(res).G_codedeposit + std::get<4>(res).G_txcreate, gas_prices);
+      // total_cpu_gas_consumed: 30945
+      validate_final_fee(res, 30945, code_len*std::get<4>(res).G_codedeposit + std::get<4>(res).G_txcreate, gas_prices);
 
       // *****************************************************
       // TEST G_sset
@@ -181,7 +183,8 @@ BOOST_FIXTURE_TEST_CASE(gas_param_scale, gas_prices_evm_tester) try {
          return send_tx(eoa, txn, gas_prices, gas_params);
       };
       res = set_value(evm1, intx::uint256{77});
-      validate_final_fee(res, std::get<4>(res).G_sset - (2800 + 100), gas_prices); //sset - reset
+      // total_cpu_gas_consumed: 26646
+      validate_final_fee(res, 26646, std::get<4>(res).G_sset, gas_prices); //sset - reset
 
       // *****************************************************
       // TEST G_txnewaccount
@@ -192,7 +195,8 @@ BOOST_FIXTURE_TEST_CASE(gas_param_scale, gas_prices_evm_tester) try {
          return send_tx(eoa, txn, gas_prices, gas_params);
       };
       res = send_to_new_address(evm1, intx::uint256{1});
-      validate_final_fee(res, std::get<4>(res).G_txnewaccount, gas_prices);
+      // total_cpu_gas_consumed: 21000
+      validate_final_fee(res, 21000, std::get<4>(res).G_txnewaccount, gas_prices);
 
       // *****************************************************
       // TEST G_newaccount
@@ -211,7 +215,8 @@ BOOST_FIXTURE_TEST_CASE(gas_param_scale, gas_prices_evm_tester) try {
       };
 
       res = transfer_random_wei(evm1);
-      validate_final_fee(res, std::get<4>(res).G_newaccount, gas_prices);
+      // total_cpu_gas_consumed: 31250
+      validate_final_fee(res, 31250, std::get<4>(res).G_newaccount, gas_prices);
    };
 
    silkworm::gas_prices_t gas_prices1{
