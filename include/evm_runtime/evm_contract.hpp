@@ -15,8 +15,6 @@
 
 using namespace eosio;
 
-constexpr eosio::name uos_pool_account{"uos.pool"};
-
 namespace evm_runtime {
 
 struct gas_prices_type;
@@ -128,8 +126,7 @@ public:
 #endif
 
 private:
-   /*ultra-igor-sikachyna---BLOCK-2575 review evm contract --- allow evm contract to sponsor ram for uos.pool account balance*/
-   void open_internal_balance(eosio::name owner, bool ram_sponsored = false);
+   void open_internal_balance(eosio::name owner);
    std::shared_ptr<struct config_wrapper> _config;
 
    enum class status_flags : uint32_t

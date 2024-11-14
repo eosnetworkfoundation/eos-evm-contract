@@ -81,7 +81,6 @@ void evm_contract::init(const uint64_t chainid, const fee_parameters& fee_params
    });
 
    open_internal_balance(get_self());
-   open_internal_balance(uos_pool_account, true);
 }
 
 void evm_contract::setfeeparams(const fee_parameters& fee_params)
@@ -185,9 +184,9 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
     const auto& tx = txn.get_tx();
     balances balance_table(get_self(), get_self().value);
 
-    /*ultra-igor-sikachyna---BLOCK-2575 review evm contract --- send gas fee to uos.pool if mined by the evm contract*/
     if (miner == get_self()) {
-        miner = uos_pool_account;
+        // If the miner is the contract itself, then there is no need to send the miner its cut.
+        miner = {};
     }
 
     if (miner) {
@@ -214,7 +213,6 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
     // and now we accpet them regardless from self or not, so no special treatment.
     // 2 For special signature, we will reject calls not from self 
     // and process the special balance if the tx is from reserved address.
-    std::optional<intx::uint256> evm_contract_refund;
     if (is_special_signature) {
         check(rc.allow_special_signature, "bridge signature used outside of bridge transaction");
         if (is_reserved_address(*tx.from)) {
@@ -227,11 +225,6 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
             populate_bridge_accessors();
             balance_table.modify(balance_table.get(ingress_account.value), eosio::same_payer, [&](balance& b){
                 b.balance -= value_with_max_gas;
-
-                /*ultra-igor-sikachyna---BLOCK-2575 review evm contract --- if the transaction is initiated by evm contract then the uos.pool will be used for gas fee calculations*/
-                if (ingress_account == get_self()) {
-                    evm_contract_refund = (intx::uint256)max_gas_cost;
-                }
             });
             inevm->set(inevm->get() += value_with_max_gas, eosio::same_payer);
 
@@ -269,9 +262,8 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
         } else {
             intx::uint512 gas_fee = intx::uint256(tx_gas_used) * tx.max_fee_per_gas;
             check(gas_fee < std::numeric_limits<intx::uint256>::max(), "too much gas");
-            /*ultra-igor-sikachyna---BLOCK-2575 review evm contract --- give 100% of gas fee to uos.pool or miner account*/
-            // gas_fee *= _config->get_miner_cut();
-            // gas_fee /= hundred_percent;
+            gas_fee *= _config->get_miner_cut();
+            gas_fee /= hundred_percent;
             gas_fee_miner_portion.emplace(static_cast<intx::uint256>(gas_fee));
         }
     }
@@ -335,13 +327,6 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
         check(deducted_miner_cut, "unexpected error: contract account did not receive any funds through its reserved address");
         balance_table.modify(balance_table.get(miner.value), eosio::same_payer, [&](balance& b){
             b.balance += *gas_fee_miner_portion;
-            /*ultra-igor-sikachyna---BLOCK-2575 review evm contract --- if the max gas fee was taken from the evm contract, we can now reimburse it and charge the uos.pool instead*/
-            if (evm_contract_refund.has_value()) {
-                b.balance -= *evm_contract_refund;
-                balance_table.modify(balance_table.get(get_self().value), eosio::same_payer, [&](balance& b){
-                    b.balance += *evm_contract_refund;
-                });
-            }
         });
     }
 
@@ -597,17 +582,17 @@ void evm_contract::open(eosio::name owner) {
     open_internal_balance(owner);
 }
 
-void evm_contract::open_internal_balance(eosio::name owner, bool ram_sponsored) {
+void evm_contract::open_internal_balance(eosio::name owner) {
     balances balance_table(get_self(), get_self().value);
     if(balance_table.find(owner.value) == balance_table.end())
-        balance_table.emplace(ram_sponsored ? get_self() : owner, [&](balance& a) {
+        balance_table.emplace(owner, [&](balance& a) {
             a.owner = owner;
             a.balance.balance = eosio::asset(0, _config->get_token_symbol());
         });
 
     nextnonces nextnonce_table(get_self(), get_self().value);
     if(nextnonce_table.find(owner.value) == nextnonce_table.end())
-        nextnonce_table.emplace(ram_sponsored ? get_self() : owner, [&](nextnonce& a) {
+        nextnonce_table.emplace(owner, [&](nextnonce& a) {
             a.owner = owner;
         });
 }
@@ -667,18 +652,12 @@ void evm_contract::handle_evm_transfer(eosio::asset quantity, const std::string&
     if(_config->get_evm_version() >= 1) _config->process_price_queue();
     //move all incoming quantity in to the contract's balance. the evm bridge trx will "pull" from this balance
     balances balance_table(get_self(), get_self().value);
-    /*ultra-igor-sikachyna---BLOCK-2575 review evm contract --- don't send the bridge fee to uos.pool*/
-    const eosio::asset ingress_bridge_fee = _config->get_ingress_bridge_fee();
-    //subtract off the ingress bridge fee from the quantity that will be bridged
-    quantity -= ingress_bridge_fee;
     balance_table.modify(balance_table.get(get_self().value), eosio::same_payer, [&](balance& b){
         b.balance.balance += quantity;
     });
 
-    /*ultra-igor-sikachyna---BLOCK-2575 review evm contract --- transfer the bridge fee to uos.pool*/
-    balance_table.modify(balance_table.get(uos_pool_account.value), eosio::same_payer, [&](balance& b){
-        b.balance.balance += ingress_bridge_fee;
-    });
+    //subtract off the ingress bridge fee from the quantity that will be bridged
+    quantity -= _config->get_ingress_bridge_fee();
     eosio::check(quantity.amount > 0, "must bridge more than ingress bridge fee");
 
     const std::optional<Bytes> address_bytes = from_hex(memo);

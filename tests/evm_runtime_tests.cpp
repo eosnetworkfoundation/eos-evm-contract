@@ -93,7 +93,6 @@ static const std::vector<fs::path> kSlowTests{
 
 
 const static account_name ME = account_name("evm");
-const static account_name uos_pool_account = account_name("uos.pool");
 const static symbol core_symbol = symbol{CORE_SYM};
 const static name system_account_name = eosio::chain::config::system_account_name;
 struct currency_stats {
@@ -464,7 +463,6 @@ struct evm_runtime_tester : eosio_system_tester, silkworm::State {
 
       BOOST_REQUIRE_EQUAL( success(), push_action(eosio::chain::config::system_account_name, "wasmcfg"_n, mvo()("settings", "high")) );
       create_account_with_resources(ME, system_account_name, 6000000);
-      create_account_with_resources(uos_pool_account, system_account_name, 6000000);
       set_authority( ME, "active"_n, {1, {{get_public_key(ME,"active"),1}}, {{{ME,"eosio.code"_n},1}}} );
 
       set_code(ME, contracts::evm_runtime_wasm());
