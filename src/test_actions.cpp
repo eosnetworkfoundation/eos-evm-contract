@@ -19,7 +19,7 @@ using namespace silkworm;
 
     evm_runtime::test::engine engine{evm_runtime::test::kTestNetwork};
     evm_runtime::state state{get_self(), get_self()};
-    silkworm::ExecutionProcessor ep{block, engine, state, evm_runtime::test::kTestNetwork, {}};
+    silkworm::ExecutionProcessor ep{block, engine, state, evm_runtime::test::kTestNetwork, {}, {}};
 
     if(orlptx) {
         Transaction tx;
