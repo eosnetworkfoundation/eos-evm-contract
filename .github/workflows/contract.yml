@@ -70,7 +70,7 @@ jobs:
           owner: AntelopeIO
           repo: spring
           file: 'antelope-spring-dev.*ubuntu22\.04_amd64.deb'
-          target: 'main'
+          target: '1'
           prereleases: false
           artifact-name: antelope-spring-dev-ubuntu22-amd64
           container-package: antelope-spring-experimental-binaries
