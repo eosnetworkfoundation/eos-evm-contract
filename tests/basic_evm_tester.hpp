@@ -118,6 +118,7 @@ struct config_table_row
    std::optional<consensus_parameter_type> consensus_parameter;
    std::optional<name> token_contract;
    std::optional<uint32_t> queue_front_block;
+   std::optional<uint64_t> ingress_gas_limit;
    std::optional<gas_prices_type> gas_prices;
 };
 

@@ -269,9 +269,10 @@ struct [[eosio::table]] [[eosio::contract("evm_contract")]] config
     binary_extension<value_promoter_consensus_parameter_data_type> consensus_parameter;
     binary_extension<eosio::name> token_contract; // <- default(unset) means eosio.token
     binary_extension<uint32_t> queue_front_block;
+    binary_extension<uint64_t> ingress_gas_limit;
     binary_extension<gas_prices_type> gas_prices;
 
-    EOSLIB_SERIALIZE(config, (version)(chainid)(genesis_time)(ingress_bridge_fee)(gas_price)(miner_cut)(status)(evm_version)(consensus_parameter)(token_contract)(queue_front_block)(gas_prices));
+    EOSLIB_SERIALIZE(config, (version)(chainid)(genesis_time)(ingress_bridge_fee)(gas_price)(miner_cut)(status)(evm_version)(consensus_parameter)(token_contract)(queue_front_block)(ingress_gas_limit)(gas_prices));
 };
 
 struct [[eosio::table]] [[eosio::contract("evm_contract")]] price_queue

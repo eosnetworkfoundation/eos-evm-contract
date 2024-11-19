@@ -27,6 +27,9 @@ config_wrapper::config_wrapper(eosio::name self) : _self(self), _config(self, se
     if (!_cached_config.gas_prices.has_value()) {
         _cached_config.gas_prices = gas_prices_type{};
     }
+    if (!_cached_config.ingress_gas_limit.has_value()) {
+        _cached_config.ingress_gas_limit = 21000;
+    }
 }
 
 config_wrapper::~config_wrapper() {
@@ -393,6 +396,15 @@ bool config_wrapper::check_gas_overflow(uint64_t gas_txcreate, uint64_t gas_code
     if (overflow_limit - silkworm::protocol::kMaxCodeSize * gas_txcreate < gas_codedeposit)
         return false;
     return true;
+}
+
+void config_wrapper::set_ingress_gas_limit(uint64_t gas_limit) {
+    _cached_config.ingress_gas_limit = gas_limit;
+    set_dirty();
+}
+
+uint64_t config_wrapper::get_ingress_gas_limit() const {
+    return *_cached_config.ingress_gas_limit;
 }
 
 } //namespace evm_runtime

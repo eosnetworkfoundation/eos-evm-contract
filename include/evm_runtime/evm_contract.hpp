@@ -90,6 +90,7 @@ public:
    [[eosio::action]] void setgasparam(uint64_t gas_txnewaccount, uint64_t gas_newaccount, uint64_t gas_txcreate, uint64_t gas_codedeposit, uint64_t gas_sset);
 
    [[eosio::action]] void setgasprices(const gas_prices_type& prices);
+   [[eosio::action]] void setgaslimit(uint64_t ingress_gas_limit);
 
    // Events
    [[eosio::action]] void evmtx(eosio::ignore<evm_runtime::evmtx_type> event){

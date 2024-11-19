@@ -104,6 +104,11 @@ namespace fc { namespace raw {
          tmp.queue_front_block.emplace(queue_front_block);
       }
       if(ds.remaining()) {
+         uint64_t ingress_gas_limit;
+         fc::raw::unpack(ds, ingress_gas_limit);
+         tmp.ingress_gas_limit.emplace(ingress_gas_limit);
+      }
+      if(ds.remaining()) {
          evm_test::gas_prices_type prices;
          fc::raw::unpack(ds, prices);
          tmp.gas_prices.emplace(prices);
