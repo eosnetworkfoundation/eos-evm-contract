@@ -91,8 +91,8 @@ BOOST_FIXTURE_TEST_CASE(max_limit_external, stack_limit_tester) try {
 
    deploy_simple_contract(evm1);
 
-   // At least 11 for external calls. We will try every value until it fails just in case.   
-   const int64_t external_limit = 11;
+   // At least 10 for external calls. We will try every value until it fails just in case.
+   const int64_t external_limit = 10;
    int64_t level = 0;
    try {
       for (level = 0; level < 256; ++level) {
