@@ -19,7 +19,7 @@ using namespace silkworm;
 
     evm_runtime::test::engine engine{evm_runtime::test::kTestNetwork};
     evm_runtime::state state{get_self(), get_self()};
-    silkworm::ExecutionProcessor ep{block, engine, state, evm_runtime::test::kTestNetwork, {}, {}};
+    silkworm::ExecutionProcessor ep{block, engine, state, evm_runtime::test::kTestNetwork, {}};
 
     if(orlptx) {
         Transaction tx;
@@ -32,7 +32,7 @@ using namespace silkworm;
             .enforce_chain_id = false,
             .allow_non_self_miner = true
         };
-        execute_tx(rc, eosio::name{}, block, transaction{std::move(tx)}, ep);
+        execute_tx(rc, eosio::name{}, block, transaction{std::move(tx)}, ep, {});
     }
     engine.finalize(ep.state(), ep.evm().block());
     ep.state().write_to_db(ep.evm().block().header.number);
