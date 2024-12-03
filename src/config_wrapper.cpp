@@ -300,7 +300,7 @@ void config_wrapper::update_consensus_parameters(eosio::asset ram_price_mb, uint
                              account_bytes * gas_per_byte, /* gas_newaccount */
                              contract_fixed_bytes * gas_per_byte, /*gas_txcreate*/
                              gas_per_byte,/*gas_codedeposit*/
-                             gas_sset_min + storage_slot_bytes * gas_per_byte /*gas_sset*/
+                             (get_evm_version() < 3 ? gas_sset_min : 0) + storage_slot_bytes * gas_per_byte /*gas_sset*/
     );
 
     if(get_evm_version() >= 1) {
@@ -324,7 +324,7 @@ void config_wrapper::update_consensus_parameters2(std::optional<uint64_t> gas_tx
             if (gas_txcreate.has_value()) v.gas_parameter.gas_txcreate = *gas_txcreate;
             if (gas_codedeposit.has_value()) v.gas_parameter.gas_codedeposit = *gas_codedeposit;
             if (gas_sset.has_value()) {
-                eosio::check(*gas_sset >= gas_sset_min, "gas_sset too small");
+                eosio::check(get_evm_version() >= 3 || *gas_sset >= gas_sset_min, "gas_sset too small");
                 v.gas_parameter.gas_sset = *gas_sset;
             }
         }, p);

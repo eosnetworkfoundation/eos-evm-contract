@@ -249,6 +249,10 @@ struct [[eosio::table]] [[eosio::contract("evm_contract")]] config2
 struct gas_prices_type {
     uint64_t overhead_price{0};
     uint64_t storage_price{0};
+
+    uint64_t get_base_price()const {
+        return std::max(overhead_price, storage_price);
+    }
 };
 
 using evm_version_type = uint64_t;
