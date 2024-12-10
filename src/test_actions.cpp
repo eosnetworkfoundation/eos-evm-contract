@@ -32,7 +32,7 @@ using namespace silkworm;
             .enforce_chain_id = false,
             .allow_non_self_miner = true
         };
-        execute_tx(rc, eosio::name{}, block, transaction{std::move(tx)}, ep);
+        execute_tx(rc, eosio::name{}, block, transaction{std::move(tx)}, ep, {});
     }
     engine.finalize(ep.state(), ep.evm().block());
     ep.state().write_to_db(ep.evm().block().header.number);

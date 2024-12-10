@@ -71,6 +71,7 @@ list(APPEND SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/../silkworm/silkworm/core/crypto/ecdsa.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../silkworm/silkworm/core/crypto/secp256k1n.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../silkworm/silkworm/core/chain/config.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../silkworm/eosevm/refund_v3.cpp
 )
 
 add_contract( evm_contract evm_runtime ${SOURCES})
