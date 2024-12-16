@@ -752,13 +752,22 @@ bool evm_contract::gc(uint32_t max) {
 }
 
 void evm_contract::call_(const runtime_config& rc, intx::uint256 s, const bytes& to, intx::uint256 value, const bytes& data, uint64_t gas_limit, uint64_t nonce) {
-    if(_config->get_evm_version() >= 1) _config->process_price_queue();
+    auto current_version = _config->get_evm_version();
+    if(current_version >= 1) _config->process_price_queue();
+
+    uint64_t gas_price_for_tx{0};
+    if( current_version >= 3) {
+        auto gas_prices = _config->get_gas_prices();
+        gas_price_for_tx = gas_prices.get_base_price();
+    } else {
+        gas_price_for_tx = _config->get_gas_price();
+    }
 
     Transaction txn;
     txn.type = TransactionType::kLegacy;
     txn.nonce = nonce;
-    txn.max_priority_fee_per_gas = _config->get_gas_price();
-    txn.max_fee_per_gas = _config->get_gas_price();
+    txn.max_priority_fee_per_gas = gas_price_for_tx;
+    txn.max_fee_per_gas = gas_price_for_tx;
     txn.gas_limit = gas_limit;
     txn.value = value;
     txn.data = Bytes{(const uint8_t*)data.data(), data.size()};
