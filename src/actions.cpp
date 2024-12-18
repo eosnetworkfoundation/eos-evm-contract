@@ -350,13 +350,8 @@ void evm_contract::exec(const exec_input& input, const std::optional<exec_callba
     auto evm_version = _config->get_evm_version();
 
     std::optional<uint64_t> base_fee_per_gas;
-    auto gas_prices = _config->get_gas_prices();
     if (evm_version >= 1) {
-        if( evm_version >= 3) {
-            base_fee_per_gas = gas_prices.get_base_price();
-        } else {
-            base_fee_per_gas = _config->get_gas_price();
-        }
+        base_fee_per_gas = get_gas_price(evm_version);
     }
 
     eosevm::prepare_block_header(block.header, bm, get_self().value,
@@ -481,13 +476,8 @@ void evm_contract::process_tx(const runtime_config& rc, eosio::name miner, const
     Block block;
 
     std::optional<uint64_t> base_fee_per_gas;
-    auto gas_prices = _config->get_gas_prices();
     if (current_version >= 1) {
-        if( current_version >= 3) {
-            base_fee_per_gas = gas_prices.get_base_price();
-        } else {
-            base_fee_per_gas = _config->get_gas_price();
-        }
+        base_fee_per_gas = get_gas_price(current_version);
     }
 
     eosevm::prepare_block_header(block.header, bm, get_self().value,
@@ -512,9 +502,10 @@ void evm_contract::process_tx(const runtime_config& rc, eosio::name miner, const
         eosio::check(inclusion_price >= (min_inclusion_price.has_value() ? *min_inclusion_price : 0), "inclusion price must >= min_inclusion_price");
     } else { // old behavior
         check(tx.max_priority_fee_per_gas == tx.max_fee_per_gas, "max_priority_fee_per_gas must be equal to max_fee_per_gas");
-        check(tx.max_fee_per_gas >= _config->get_gas_price(), "gas price is too low");
+        check(tx.max_fee_per_gas >= get_gas_price(current_version), "gas price is too low");
     }
 
+    auto gas_prices = _config->get_gas_prices();
     auto gp = silkworm::gas_prices_t{gas_prices.overhead_price, gas_prices.storage_price};
     silkworm::ExecutionProcessor ep{block, engine, state, *found_chain_config->second, gp};
 
@@ -659,7 +650,8 @@ void evm_contract::handle_account_transfer(const eosio::asset& quantity, const s
 }
 
 void evm_contract::handle_evm_transfer(eosio::asset quantity, const std::string& memo) {
-    if(_config->get_evm_version() >= 1) _config->process_price_queue();
+    auto current_version = _config->get_evm_version();
+    if(current_version >= 1) _config->process_price_queue();
     //move all incoming quantity in to the contract's balance. the evm bridge trx will "pull" from this balance
     balances balance_table(get_self(), get_self().value);
     balance_table.modify(balance_table.get(get_self().value), eosio::same_payer, [&](balance& b){
@@ -690,11 +682,13 @@ void evm_contract::handle_evm_transfer(eosio::asset quantity, const std::string&
         return gas_limit;
     };
 
+    auto txn_price = get_gas_price(current_version);
+
     Transaction txn;
     txn.type = TransactionType::kLegacy;
     txn.nonce = get_and_increment_nonce(get_self());
-    txn.max_priority_fee_per_gas = _config->get_gas_price();
-    txn.max_fee_per_gas = _config->get_gas_price();
+    txn.max_priority_fee_per_gas = txn_price;
+    txn.max_fee_per_gas = txn_price;
     txn.to = to_evmc_address(*address_bytes);
     txn.gas_limit = calculate_gas_limit(*txn.to);
     txn.value = value;
@@ -755,19 +749,13 @@ void evm_contract::call_(const runtime_config& rc, intx::uint256 s, const bytes&
     auto current_version = _config->get_evm_version();
     if(current_version >= 1) _config->process_price_queue();
 
-    uint64_t gas_price_for_tx{0};
-    if( current_version >= 3) {
-        auto gas_prices = _config->get_gas_prices();
-        gas_price_for_tx = gas_prices.get_base_price();
-    } else {
-        gas_price_for_tx = _config->get_gas_price();
-    }
+    auto txn_price = get_gas_price(current_version);
 
     Transaction txn;
     txn.type = TransactionType::kLegacy;
     txn.nonce = nonce;
-    txn.max_priority_fee_per_gas = gas_price_for_tx;
-    txn.max_fee_per_gas = gas_price_for_tx;
+    txn.max_priority_fee_per_gas = txn_price;
+    txn.max_fee_per_gas = txn_price;
     txn.gas_limit = gas_limit;
     txn.value = value;
     txn.data = Bytes{(const uint8_t*)data.data(), data.size()};
@@ -937,6 +925,14 @@ void evm_contract::setgasprices(const gas_prices_type& prices) {
 
 void evm_contract::setgaslimit(uint64_t ingress_gas_limit) {
     _config->set_ingress_gas_limit(ingress_gas_limit);
+}
+
+uint64_t evm_contract::get_gas_price(uint64_t evm_version) {
+    if( evm_version >= 3) {
+        auto gas_prices = _config->get_gas_prices();
+        return gas_prices.get_base_price();
+    }
+    return _config->get_gas_price();
 }
 
 } //evm_runtime

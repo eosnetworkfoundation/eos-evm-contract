@@ -154,6 +154,8 @@ private:
 
    void process_tx(const runtime_config& rc, eosio::name miner, const transaction& tx, std::optional<uint64_t> min_inclusion_price);
    void dispatch_tx(const runtime_config& rc, const transaction& tx);
+
+   uint64_t get_gas_price(uint64_t version);
 };
 
 } // namespace evm_runtime
