@@ -35,7 +35,9 @@ struct gas_prices_evm_tester : basic_evm_tester
       auto effective_gas_price =  inclusion_price + static_cast<uint64_t>(gas_prices.get_base_price());
       auto cost = *pre - *post - txn.value;
       auto total_gas_used = cost/effective_gas_price;
-      auto scaled_gp = evmone::gas_parameters::apply_discount_factor(inclusion_price, gas_prices.get_base_price(), gas_prices.storage_price, gas_params);
+      const intx::uint256 factor_num{gas_prices.storage_price};
+      const intx::uint256 factor_den{gas_prices.get_base_price() + inclusion_price};
+      auto scaled_gp = evmone::gas_parameters::apply_discount_factor(factor_num, factor_den, gas_params);
       return std::make_tuple(cost, inclusion_price, effective_gas_price, total_gas_used, scaled_gp);
    }
 
@@ -162,7 +164,9 @@ BOOST_FIXTURE_TEST_CASE(gas_param_scale, gas_prices_evm_tester) try {
          auto effective_gas_price =  inclusion_price + base_fee_per_gas;
          auto cost = *pre - *post;
          auto total_gas_used = cost/effective_gas_price;
-         auto scaled_gp = evmone::gas_parameters::apply_discount_factor(inclusion_price, gas_prices.get_base_price(), gas_prices.storage_price, gas_params);
+         const intx::uint256 factor_num{gas_prices.storage_price};
+         const intx::uint256 factor_den{gas_prices.get_base_price() + inclusion_price};
+         auto scaled_gp = evmone::gas_parameters::apply_discount_factor(factor_num, factor_den, gas_params);
          return std::make_tuple(std::make_tuple(cost, inclusion_price, effective_gas_price, total_gas_used, scaled_gp), contract_address);
       };
 
