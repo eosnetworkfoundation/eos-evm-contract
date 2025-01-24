@@ -16,29 +16,27 @@
     };
 
 #define VALUE_PROMOTER_IMPL(T)\
-    T get_value(time_point_sec genesis_time, time_point current_time)const {\
-        T current_value = cached_value;\
+    const T& get_value(time_point_sec genesis_time, time_point current_time)const {\
         if(pending_value.has_value() && pending_value->is_active(genesis_time, current_time)) {\
-            current_value = pending_value->value;\
+            return pending_value->value;\
         }\
-        return current_value;\
+        return cached_value;\
     }\
-    std::pair<T, bool> get_value_and_maybe_promote(time_point_sec genesis_time, time_point current_time) {\
-        T current_value = cached_value;\
+    std::pair<const T&, bool> get_value_and_maybe_promote(time_point_sec genesis_time, time_point current_time) {\
         bool promoted = false;\
         if(pending_value.has_value() && pending_value->is_active(genesis_time, current_time)) {\
-            current_value = pending_value->value;\
             promote_pending();\
             promoted = true;\
         }\
-        return std::pair<T, bool>(current_value, promoted);\
+        return std::pair<const T&, bool>(cached_value, promoted);\
     }\
     template <typename Visitor>\
     void update(Visitor&& visitor_fn, time_point_sec genesis_time, time_point current_time) {\
-        auto value = get_value_and_maybe_promote(genesis_time, current_time);\
-        visitor_fn(value.first);\
+        auto tmp = get_value_and_maybe_promote(genesis_time, current_time);\
+        T value = tmp.first;\
+        visitor_fn(value);\
         pending_value.emplace(T##_pending{\
-            .value = value.first,\
+            .value = value,\
             .time = current_time\
         });\
     }\
