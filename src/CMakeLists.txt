@@ -26,6 +26,10 @@ if (WITH_ADMIN_ACTIONS)
     list(APPEND SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/admin_actions.cpp)
 endif()
 
+if (WITH_SOFT_FORKS)
+    add_compile_definitions(WITH_SOFT_FORKS)
+endif()
+
 add_compile_definitions(ANTELOPE)
 add_compile_definitions(PROJECT_VERSION="1.0.0")
 
