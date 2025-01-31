@@ -205,6 +205,11 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
 
     bool is_special_signature = silkworm::is_special_signature(tx.r, tx.s);
 
+    ValidationResult r = silkworm::protocol::pre_validate_transaction(tx, ep.evm().revision(), ep.evm().config().chain_id,
+                            ep.evm().block().header.base_fee_per_gas, ep.evm().block().header.data_gas_price(),
+                            ep.evm().get_eos_evm_version(), ep.evm().get_gas_params());
+    check_result( r, tx, "pre_validate_transaction error" );
+
     txn.recover_sender();
     eosio::check(tx.from.has_value(), "unable to recover sender");
     LOGTIME("EVM RECOVER SENDER");
@@ -239,11 +244,6 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
         check(tx.chain_id.has_value(), "tx without chain-id");
     }
 
-    ValidationResult r = silkworm::protocol::pre_validate_transaction(tx, ep.evm().revision(), ep.evm().config().chain_id,
-                            ep.evm().block().header.base_fee_per_gas, ep.evm().block().header.data_gas_price(),
-                            ep.evm().get_eos_evm_version(), gas_params);
-
-    check_result( r, tx, "pre_validate_transaction error" );
     r = silkworm::protocol::validate_transaction(tx, ep.state(), ep.available_gas());
     check_result( r, tx, "validate_transaction error" );
 
