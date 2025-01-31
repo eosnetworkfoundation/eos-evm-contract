@@ -19,6 +19,9 @@ option(WITH_LARGE_STACK
 option(WITH_ADMIN_ACTIONS
    "Enables admin actions" ON)
 
+option(WITH_SOFT_FORKS
+   "Enables soft-forks" ON)
+
 ExternalProject_Add(
    evm_runtime_project
    SOURCE_DIR ${CMAKE_SOURCE_DIR}/src
@@ -29,6 +32,7 @@ ExternalProject_Add(
               -DWITH_LOGTIME=${WITH_LOGTIME}
               -DWITH_LARGE_STACK=${WITH_LARGE_STACK}
               -DWITH_ADMIN_ACTIONS=${WITH_ADMIN_ACTIONS}
+              -DWITH_SOFT_FORKS=${WITH_SOFT_FORKS}
    UPDATE_COMMAND ""
    PATCH_COMMAND ""
    TEST_COMMAND ""
