@@ -88,6 +88,14 @@ BOOST_FIXTURE_TEST_CASE(gas_param_scale, gas_prices_evm_tester) try {
    /////////////////////////////////////
    /// change EOS EVM VERSION => 3   ///
    /////////////////////////////////////
+
+   // We need to have some gas prices active before switching to v3
+   silkworm::gas_prices_t gas_prices1{
+      .overhead_price = 80*kGiga,
+      .storage_price  = 70*kGiga
+   };
+   setgasprices({.overhead_price=gas_prices1.overhead_price, .storage_price=gas_prices1.storage_price});
+
    setversion(3, evm_account_name);
    fund_evm_faucet();
    produce_block();
@@ -223,10 +231,6 @@ BOOST_FIXTURE_TEST_CASE(gas_param_scale, gas_prices_evm_tester) try {
       validate_final_fee(res, 31250, std::get<4>(res).G_newaccount, gas_prices);
    };
 
-   silkworm::gas_prices_t gas_prices1{
-      .overhead_price = 80*kGiga,
-      .storage_price  = 70*kGiga
-   };
    run_gasparams_scale_test(gas_prices1);
 
    silkworm::gas_prices_t gas_prices2{

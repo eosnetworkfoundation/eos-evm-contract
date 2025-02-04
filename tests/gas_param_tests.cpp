@@ -199,6 +199,13 @@ BOOST_FIXTURE_TEST_CASE(gas_param_traces, gas_param_evm_tester) try {
 
     init();
 
+    // We need to have some gas prices active before switching to v3
+    silkworm::gas_prices_t gas_prices1{
+        .overhead_price = 80*silkworm::kGiga,
+        .storage_price  = 70*silkworm::kGiga
+    };
+    setgasprices({.overhead_price=gas_prices1.overhead_price, .storage_price=gas_prices1.storage_price});
+
     setversion(3, evm_account_name);
     produce_blocks(2);
 
