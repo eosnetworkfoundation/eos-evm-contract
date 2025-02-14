@@ -58,6 +58,6 @@ add_eosio_test_executable( unit_test
     ${CMAKE_SOURCE_DIR}/../silkworm/third_party/ethash/lib/ethash/primes.c
 )
 
-add_test(NAME consensus_tests COMMAND unit_test --report_level=detailed --color_output --run_test=evm_runtime_tests -- --eos-vm-oc)
+add_test(NAME consensus_tests COMMAND unit_test --report_level=detailed --color_output --run_test=evm_runtime_tests )
 
-add_test(NAME unit_tests COMMAND unit_test --report_level=detailed --color_output --run_test=!evm_runtime_tests -- --eos-vm-oc)
+add_test(NAME unit_tests COMMAND unit_test --report_level=detailed --color_output --run_test=!evm_runtime_tests )

@@ -299,22 +299,33 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
                 });
             }
             else {
-                check(!non_open_account_sent, "only one non-open account for egress bridging allowed in single transaction");
+                // check(!non_open_account_sent, "only one non-open account for egress bridging allowed in single transaction");
+                // Assert not transfer to self
+                check(egress_account != get_self(), "evm runtime account not open");
                 check(is_account(egress_account), "can only egress bridge to existing accounts");
                 if(get_code_hash(egress_account) != checksum256())
                     egresslist(get_self(), get_self().value).get(egress_account.value, "non-open accounts containing contract code must be on allow list for egress bridging");
 
                 intx::uint256 minimum_natively_representable = intx::uint256(_config->get_minimum_natively_representable());
 
-                check(reserved_account.balance % minimum_natively_representable == 0_u256, "egress bridging to non-open accounts must not contain dust");
+                auto balance = reserved_account.balance;
+                for (const auto& rawmsg: ep.state().filtered_messages()) {
+                    if (rawmsg.receiver == address) {
+                        auto value = intx::be::unsafe::load<uint256>(rawmsg.value.bytes);
+                        check(value % minimum_natively_representable == 0_u256, "egress bridging to non-open accounts must not contain dust");
 
-                const bool was_to = tx.to && *tx.to == address;
-                const Bytes exit_memo = {'E', 'V', 'M', ' ', 'e', 'x', 'i', 't'}; //yikes
+                        token::transfer_bytes_memo_action transfer_act(_config->get_token_contract(), {{get_self(), "active"_n}});
+                        transfer_act.send(get_self(), egress_account, asset((uint64_t)(value / minimum_natively_representable), _config->get_token_symbol()), rawmsg.data);
 
-                token::transfer_bytes_memo_action transfer_act(_config->get_token_contract(), {{get_self(), "active"_n}});
-                transfer_act.send(get_self(), egress_account, asset((uint64_t)(reserved_account.balance / minimum_natively_representable), _config->get_token_symbol()), was_to ? tx.data : exit_memo);
+                        check(balance >= value, "sum of bridge transfers not match total received balance");
+                        balance -= value;
+                    }
+                }
 
-                non_open_account_sent = true;
+                check(balance == 0_u256, "sum of bridge transfers not match total received balance");
+                
+
+                // non_open_account_sent = true;
             }
         }
 
@@ -394,10 +405,13 @@ void evm_contract::exec(const exec_input& input, const std::optional<exec_callba
     }
 }
 
-void evm_contract::process_filtered_messages(const std::vector<silkworm::FilteredMessage>& filtered_messages ) {
+void evm_contract::process_filtered_messages(std::function<bool(const silkworm::FilteredMessage&)> extra_filter, const std::vector<silkworm::FilteredMessage>& filtered_messages ) {
 
     intx::uint256 accumulated_value;
     for(const auto& rawmsg : filtered_messages) {
+        if (!(extra_filter)(rawmsg)) {
+            continue;
+        }
 
         auto msg = bridge::decode_message(ByteView{rawmsg.data});
         eosio::check(msg.has_value(), "unable to decode bridge message");
@@ -503,16 +517,19 @@ void evm_contract::process_tx(const runtime_config& rc, eosio::name miner, const
         check(tx.max_fee_per_gas >= _config->get_gas_price(), "gas price is too low");
     }
 
-    // Filter EVM messages (with data) that are sent to the reserved address
-    // corresponding to the EOS account holding the contract (self)
+    // Capture all messages to reserved addresses. They should be bridge transfers and EVM messages.
     ep.set_evm_message_filter([&](const evmc_message& message) -> bool {
-        static auto me = make_reserved_address(get_self().value);
-        return message.recipient == me && message.input_size > 0;
+        return is_reserved_address(message.recipient);
     });
 
     auto receipt = execute_tx(rc, miner, block, txn, ep);
 
-    process_filtered_messages(ep.state().filtered_messages());
+    // Filter EVM messages (with data) that are sent to the reserved address
+    // corresponding to the EOS account holding the contract (self)
+    process_filtered_messages([&](const silkworm::FilteredMessage& message) -> bool {
+        static auto me = make_reserved_address(get_self().value);
+        return message.receiver == me && message.data.size() > 0;
+    }, ep.state().filtered_messages());
 
     engine.finalize(ep.state(), ep.evm().block());
     ep.state().write_to_db(ep.evm().block().header.number);
