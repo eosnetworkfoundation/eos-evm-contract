@@ -276,6 +276,11 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
         intx::uint256 total_egress;
         populate_bridge_accessors();
 
+        intx::uint256 minimum_natively_representable = intx::uint256(_config->get_minimum_natively_representable());
+
+        std::vector<bool> need_send;
+        need_send.resize(ep.state().filtered_messages().size(), false);
+
         for(const auto& reserved_object : ep.state().reserved_objects()) {
             const evmc::address& address = reserved_object.first;
             const name egress_account(*extract_reserved_address(address));
@@ -306,27 +311,36 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
                 if(get_code_hash(egress_account) != checksum256())
                     egresslist(get_self(), get_self().value).get(egress_account.value, "non-open accounts containing contract code must be on allow list for egress bridging");
 
-                intx::uint256 minimum_natively_representable = intx::uint256(_config->get_minimum_natively_representable());
-
                 auto balance = reserved_account.balance;
-                for (const auto& rawmsg: ep.state().filtered_messages()) {
+                for (size_t i = 0; i < ep.state().filtered_messages().size(); ++i) {      
+                    const auto& rawmsg = ep.state().filtered_messages()[i];
                     if (rawmsg.receiver == address) {
                         auto value = intx::be::unsafe::load<uint256>(rawmsg.value.bytes);
                         check(value % minimum_natively_representable == 0_u256, "egress bridging to non-open accounts must not contain dust");
-
-                        token::transfer_bytes_memo_action transfer_act(_config->get_token_contract(), {{get_self(), "active"_n}});
-                        transfer_act.send(get_self(), egress_account, asset((uint64_t)(value / minimum_natively_representable), _config->get_token_symbol()), rawmsg.data);
-
                         check(balance >= value, "sum of bridge transfers not match total received balance");
                         balance -= value;
+
+                        // Only record action here so that we can launch transfers in order later.
+                        need_send[i] = true;
                     }
                 }
 
                 check(balance == 0_u256, "sum of bridge transfers not match total received balance");
-                
-
                 // non_open_account_sent = true;
             }
+        }
+
+        // Keep the transfer order.
+        for (size_t i = 0; i < ep.state().filtered_messages().size(); ++i) {
+            if (!need_send[i]) {
+                continue;
+            }
+
+            const auto& rawmsg = ep.state().filtered_messages()[i];
+            const name egress_account(*extract_reserved_address(rawmsg.receiver));
+            auto value = intx::be::unsafe::load<uint256>(rawmsg.value.bytes);
+            token::transfer_bytes_memo_action transfer_act(_config->get_token_contract(), {{get_self(), "active"_n}});
+            transfer_act.send(get_self(), egress_account, asset((uint64_t)(value / minimum_natively_representable), _config->get_token_symbol()), rawmsg.data);
         }
 
         if(total_egress != 0_u256)
