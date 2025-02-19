@@ -272,7 +272,6 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
         eosio::check(receipt.success, "tx executed inline by contract must succeed");
 
     if(!ep.state().reserved_objects().empty()) {
-        bool non_open_account_sent = false;
         intx::uint256 total_egress;
         populate_bridge_accessors();
 
@@ -312,9 +311,11 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
                     egresslist(get_self(), get_self().value).get(egress_account.value, "non-open accounts containing contract code must be on allow list for egress bridging");
 
                 auto balance = reserved_account.balance;
+                uint64_t pending_transfer = 0;
                 for (size_t i = 0; i < ep.state().filtered_messages().size(); ++i) {      
                     const auto& rawmsg = ep.state().filtered_messages()[i];
                     if (rawmsg.receiver == address) {
+                        check(++pending_transfer <= 5, "only five transfers to each non-open account allowed in single transaction");
                         auto value = intx::be::unsafe::load<uint256>(rawmsg.value.bytes);
                         check(value % minimum_natively_representable == 0_u256, "egress bridging to non-open accounts must not contain dust");
                         check(balance >= value, "sum of bridge transfers not match total received balance");
