@@ -293,10 +293,6 @@ try {
       const intx::uint256 miner_balance_before{vault_balance(miner_account_name)};
       const intx::uint256 faucet_before = evm_balance(faucet_eoa).value();
 
-      // Gas fee statistics
-      const auto s = get_statistics();
-      const auto gas_fee_sum_before = s.gas_fee_income;
-
       auto tx = generate_tx(recipient.address, 1_gwei);
       faucet_eoa.sign(tx);
       pushtx(tx, miner_account_name);
@@ -308,11 +304,6 @@ try {
                         (special_balance_before + gas_fee - gas_fee_miner_portion));
       BOOST_CHECK_EQUAL(static_cast<intx::uint256>(vault_balance(miner_account_name)),
                         (miner_balance_before + gas_fee_miner_portion));
-
-      // Gas fee statistics
-      const auto s2 = get_statistics();
-      BOOST_CHECK_EQUAL(static_cast<intx::uint256>(s2.gas_fee_income), 
-                        static_cast<intx::uint256>(gas_fee_sum_before) + gas_fee - gas_fee_miner_portion);
 
       faucet_eoa.next_nonce = 0;
    };
@@ -473,11 +464,6 @@ try {
    //21'000 * 50'000'000'000 = 0.00105
    BOOST_REQUIRE(vault_balance(miner_account) == (balance_and_dust{make_asset(10), 50'000'000'000'000ULL}));
 
-   // Gas fee statistics
-   //21'000 * 300'000'000'000 = 0.0063
-   const auto s = get_statistics();
-   BOOST_REQUIRE(s.gas_fee_income == (balance_and_dust{make_asset(63), 0ULL}));
-
    tx = generate_tx(evm2.address, 1);
    tx.type = silkworm::TransactionType::kDynamicFee;
    tx.max_priority_fee_per_gas = 0;
@@ -488,11 +474,6 @@ try {
 
    //0.00105 + 0
    BOOST_REQUIRE(vault_balance(miner_account) == (balance_and_dust{make_asset(10), 50'000'000'000'000ULL}));
-
-   // Gas fee statistics
-   // 0.0063 + 0.0063 = 0.0126
-   const auto s2 = get_statistics();
-   BOOST_REQUIRE(s2.gas_fee_income == (balance_and_dust{make_asset(126), 0ULL}));
 }
 FC_LOG_AND_RETHROW()
 

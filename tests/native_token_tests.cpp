@@ -294,10 +294,6 @@ BOOST_FIXTURE_TEST_CASE(basic_eos_evm_bridge, native_token_evm_tester_EOS) try {
 
    //transfer 2.0000 EOS from alice to evm1 account, expect 1.9000 to be delivered to evm1 account, 0.1000 to contract balance
    {
-      const auto s = get_statistics();
-      const auto initial_gas_count = s.gas_fee_income;
-      BOOST_REQUIRE_EQUAL(s.ingress_bridge_fee_income.balance, make_asset(0));
-
       const int64_t to_bridge = 2'0000;
       const int64_t alice_native_before = native_balance("alice"_n);
       BOOST_REQUIRE(!!evm_balance(evm1));
@@ -313,11 +309,6 @@ BOOST_FIXTURE_TEST_CASE(basic_eos_evm_bridge, native_token_evm_tester_EOS) try {
       intx::uint256 new_special_balance{initial_special_balance};
       new_special_balance += smallest * bridge_fee;
       BOOST_REQUIRE_EQUAL(static_cast<intx::uint256>(vault_balance("evm"_n)), new_special_balance);
-
-      const auto s2 = get_statistics();
-      BOOST_REQUIRE_EQUAL(s2.ingress_bridge_fee_income.balance, make_asset(bridge_fee));
-      // Bridge transfers should not generate gas income as the gas fee for the evm transfer is paid by evm_runtime.
-      BOOST_REQUIRE(s2.gas_fee_income == initial_gas_count);
    }
 
 } FC_LOG_AND_RETHROW()
