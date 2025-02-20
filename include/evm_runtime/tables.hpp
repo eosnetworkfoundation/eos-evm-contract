@@ -363,4 +363,14 @@ struct [[eosio::table]] [[eosio::contract("evm_contract")]] price_queue
 
 typedef eosio::multi_index<"pricequeue"_n, price_queue> price_queue_table;
 
+struct [[eosio::table("statistics")]] [[eosio::contract("evm_contract")]] statistics
+{
+    unsigned_int version; // placeholder for future variant index
+    balance_with_dust gas_fee_income;
+    balance_with_dust ingress_bridge_fee_income;
+
+    EOSLIB_SERIALIZE(statistics, (version)(gas_fee_income)(ingress_bridge_fee_income));
+};
+typedef eosio::singleton<"statistics"_n, statistics> statistics_singleton;
+
 } //namespace evm_runtime

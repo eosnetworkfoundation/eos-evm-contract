@@ -152,6 +152,9 @@ private:
 
    void process_tx(const runtime_config& rc, eosio::name miner, const transaction& tx, std::optional<uint64_t> min_inclusion_price);
    void dispatch_tx(const runtime_config& rc, const transaction& tx);
+
+   struct statistics get_statistics() const;
+   void set_statistics(const struct statistics &v);
 };
 
 } // namespace evm_runtime

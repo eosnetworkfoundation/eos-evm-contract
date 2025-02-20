@@ -195,6 +195,7 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
     }
 
     bool deducted_miner_cut = false;
+    bool from_self = false;
 
     std::optional<inevm_singleton> inevm;
     auto populate_bridge_accessors = [&]() {
@@ -222,6 +223,8 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
         check(rc.allow_special_signature, "bridge signature used outside of bridge transaction");
         if (is_reserved_address(*tx.from)) {
             const name ingress_account(*extract_reserved_address(*tx.from));
+
+            from_self = ingress_account == get_self();
 
             const intx::uint512 max_gas_cost = intx::uint256(tx.gas_limit) * tx.max_fee_per_gas;
             check(max_gas_cost + tx.value < std::numeric_limits<intx::uint256>::max(), "too much gas");
@@ -328,6 +331,27 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
         balance_table.modify(balance_table.get(miner.value), eosio::same_payer, [&](balance& b){
             b.balance += *gas_fee_miner_portion;
         });
+    }
+
+    // Statistics
+    if (!from_self) {
+        // Gas income from tx sent from self should not be counted.
+        // Bridge transfers can generate such txs.
+        uint64_t tx_gas_used = receipt.cumulative_gas_used; // Only transaction in the "block" so cumulative_gas_used is the tx gas_used.
+        auto s = get_statistics();
+        if (_config->get_evm_version() >= 1) {
+            intx::uint512 gas_fee = intx::uint256(tx_gas_used) * ep.evm().block().header.base_fee_per_gas.value();
+            check(gas_fee < std::numeric_limits<intx::uint256>::max(), "too much gas");
+            s.gas_fee_income += static_cast<intx::uint256>(gas_fee);
+        } else {
+            intx::uint512 gas_fee = intx::uint256(tx_gas_used) * tx.max_fee_per_gas;
+            check(gas_fee < std::numeric_limits<intx::uint256>::max(), "too much gas");
+            if (gas_fee_miner_portion.has_value()) {
+                gas_fee -= *gas_fee_miner_portion;
+            } 
+            s.gas_fee_income += static_cast<intx::uint256>(gas_fee);
+        }
+        set_statistics(s);
     }
 
     LOGTIME("EVM EXECUTE");
@@ -653,6 +677,11 @@ void evm_contract::handle_evm_transfer(eosio::asset quantity, const std::string&
     quantity -= _config->get_ingress_bridge_fee();
     eosio::check(quantity.amount > 0, "must bridge more than ingress bridge fee");
 
+    // Statistics
+    auto s = get_statistics();
+    s.ingress_bridge_fee_income.balance += _config->get_ingress_bridge_fee();
+    set_statistics(s);
+
     const std::optional<Bytes> address_bytes = from_hex(memo);
     eosio::check(!!address_bytes, "unable to parse destination address");
 
@@ -901,6 +930,20 @@ void evm_contract::setgasparam(uint64_t gas_txnewaccount,
 
 void evm_contract::setgaslimit(uint64_t ingress_gas_limit) {
     _config->set_ingress_gas_limit(ingress_gas_limit);
+}
+
+statistics evm_contract::get_statistics() const { 
+    statistics_singleton statistics_v(get_self(), get_self().value);
+    return statistics_v.get_or_create(get_self(), statistics {
+        .version = 0,
+        .ingress_bridge_fee_income = { .balance = eosio::asset(0, _config->get_ingress_bridge_fee().symbol), .dust = 0 },
+        .gas_fee_income = { .balance = eosio::asset(0, _config->get_ingress_bridge_fee().symbol), .dust = 0 },
+    });
+}
+
+void evm_contract::set_statistics(const statistics &v) {
+    statistics_singleton statistics_v(get_self(), get_self().value);
+    statistics_v.set(v, get_self());
 }
 
 } //evm_runtime
