@@ -323,39 +323,31 @@ public:
       return validating_node;
    }
 
-   signed_block_ptr produce_block( fc::microseconds skip_time = fc::milliseconds(config::block_interval_ms), bool no_throw = false )override {
-      auto produce_block_result = _produce_block(skip_time, false, no_throw);
-      auto sb = produce_block_result.block;
-      auto bhf = validating_node->create_block_handle_future( sb->calculate_id(), sb );
-      struct controller::block_report br; 
-      validating_node->push_block(br, bhf.get(), forked_callback_t{}, trx_meta_cache_lookup{} );
-
-      return sb;
-   }
-
    testing::produce_block_result_t produce_block_ex( fc::microseconds skip_time = default_skip_time, bool no_throw = false ) override {
       auto produce_block_result = _produce_block(skip_time, false, no_throw);
       validate_push_block(produce_block_result.block);
       return produce_block_result;
    }
 
-   signed_block_ptr produce_block_no_validation( fc::microseconds skip_time = fc::milliseconds(config::block_interval_ms) ) {
-      return _produce_block(skip_time, false);
+   signed_block_ptr produce_block( fc::microseconds skip_time = default_skip_time, bool no_throw = false ) override {
+      return produce_block_ex(skip_time, no_throw).block;
+   }
+
+   signed_block_ptr produce_block_no_validation( fc::microseconds skip_time = default_skip_time ) {
+      return _produce_block(skip_time, false, false).block;
    }
 
    void validate_push_block(const signed_block_ptr& sb) {
-      auto bhf = validating_node->create_block_handle_future( sb->calculate_id(), sb );
-      struct controller::block_report br;
-      validating_node->push_block(br, bhf.get(), forked_callback_t{}, trx_meta_cache_lookup{} );
+      auto [best_head, obh] = validating_node->accept_block( sb->calculate_id(), sb );
+      EOS_ASSERT(obh, unlinkable_block_exception, "block did not link ${b}", ("b", sb->calculate_id()));
+      validating_node->apply_blocks( {}, trx_meta_cache_lookup{} );
+      _check_for_vote_if_needed(*validating_node, *obh);
    }
 
-   signed_block_ptr produce_empty_block( fc::microseconds skip_time = fc::milliseconds(config::block_interval_ms) )override {
+   signed_block_ptr produce_empty_block( fc::microseconds skip_time = default_skip_time )override {
       unapplied_transactions.add_aborted( control->abort_block() );
       auto sb = _produce_block(skip_time, true);
-      auto bhf = validating_node->create_block_handle_future( sb->calculate_id(), sb );
-      struct controller::block_report br;
-      validating_node->push_block(br, bhf.get(), forked_callback_t{}, trx_meta_cache_lookup{} );
-
+      validate_push_block(sb);
       return sb;
    }
 
