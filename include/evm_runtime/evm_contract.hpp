@@ -137,7 +137,7 @@ private:
    void assert_unfrozen();
 
    silkworm::Receipt execute_tx(const runtime_config& rc, eosio::name miner, silkworm::Block& block, const transaction& tx, silkworm::ExecutionProcessor& ep);
-   void process_filtered_messages(const std::vector<silkworm::FilteredMessage>& filtered_messages);
+   void process_filtered_messages(std::function<bool(const silkworm::FilteredMessage&)> extra_filter, const std::vector<silkworm::FilteredMessage>& filtered_messages);
 
    uint64_t get_and_increment_nonce(const name owner);
 
