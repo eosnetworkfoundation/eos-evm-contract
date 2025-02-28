@@ -81,13 +81,13 @@ private:
     };
 
     bool is_same_as_current_price(const gas_prices_type& new_value) {
-        if(new_value.overhead_price.has_value() && _cached_config.gas_prices.value().overhead_price == new_value.overhead_price) {
-            return true;
+        if(new_value.overhead_price.has_value() && _cached_config.gas_prices.value().overhead_price != new_value.overhead_price) {
+            return false;
         }
-        if(new_value.storage_price.has_value() && _cached_config.gas_prices.value().storage_price == new_value.storage_price) {
-            return true;
+        if(new_value.storage_price.has_value() && _cached_config.gas_prices.value().storage_price != new_value.storage_price) {
+            return false;
         }
-        return false;
+        return true;
     };
 
     eosio::time_point get_current_time()const;
