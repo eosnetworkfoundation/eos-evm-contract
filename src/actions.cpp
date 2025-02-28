@@ -195,6 +195,7 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
     }
 
     bool deducted_miner_cut = false;
+    bool from_self = false;
 
     std::optional<inevm_singleton> inevm;
     auto populate_bridge_accessors = [&]() {
@@ -222,6 +223,8 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
         check(rc.allow_special_signature, "bridge signature used outside of bridge transaction");
         if (is_reserved_address(*tx.from)) {
             const name ingress_account(*extract_reserved_address(*tx.from));
+
+            from_self = ingress_account == get_self();
 
             const intx::uint512 max_gas_cost = intx::uint256(tx.gas_limit) * tx.max_fee_per_gas;
             check(max_gas_cost + tx.value < std::numeric_limits<intx::uint256>::max(), "too much gas");
@@ -275,9 +278,13 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
         eosio::check(receipt.success, "tx executed inline by contract must succeed");
 
     if(!ep.state().reserved_objects().empty()) {
-        bool non_open_account_sent = false;
         intx::uint256 total_egress;
         populate_bridge_accessors();
+
+        intx::uint256 minimum_natively_representable = intx::uint256(_config->get_minimum_natively_representable());
+
+        std::vector<bool> need_send;
+        need_send.resize(ep.state().filtered_messages().size(), false);
 
         for(const auto& reserved_object : ep.state().reserved_objects()) {
             const evmc::address& address = reserved_object.first;
@@ -302,23 +309,45 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
                 });
             }
             else {
-                check(!non_open_account_sent, "only one non-open account for egress bridging allowed in single transaction");
+                // check(!non_open_account_sent, "only one non-open account for egress bridging allowed in single transaction");
+                // Assert not transfer to self
+                check(egress_account != get_self(), "evm runtime account not open");
                 check(is_account(egress_account), "can only egress bridge to existing accounts");
                 if(get_code_hash(egress_account) != checksum256())
                     egresslist(get_self(), get_self().value).get(egress_account.value, "non-open accounts containing contract code must be on allow list for egress bridging");
 
-                intx::uint256 minimum_natively_representable = intx::uint256(_config->get_minimum_natively_representable());
+                auto balance = reserved_account.balance;
+                uint64_t pending_transfer = 0;
+                for (size_t i = 0; i < ep.state().filtered_messages().size(); ++i) {      
+                    const auto& rawmsg = ep.state().filtered_messages()[i];
+                    if (rawmsg.receiver == address) {
+                        check(++pending_transfer <= 5, "only five transfers to each non-open account allowed in single transaction");
+                        auto value = intx::be::unsafe::load<uint256>(rawmsg.value.bytes);
+                        check(value % minimum_natively_representable == 0_u256, "egress bridging to non-open accounts must not contain dust");
+                        check(balance >= value, "sum of bridge transfers not match total received balance");
+                        balance -= value;
 
-                check(reserved_account.balance % minimum_natively_representable == 0_u256, "egress bridging to non-open accounts must not contain dust");
+                        // Only record action here so that we can launch transfers in order later.
+                        need_send[i] = true;
+                    }
+                }
 
-                const bool was_to = tx.to && *tx.to == address;
-                const Bytes exit_memo = {'E', 'V', 'M', ' ', 'e', 'x', 'i', 't'}; //yikes
-
-                token::transfer_bytes_memo_action transfer_act(_config->get_token_contract(), {{get_self(), "active"_n}});
-                transfer_act.send(get_self(), egress_account, asset((uint64_t)(reserved_account.balance / minimum_natively_representable), _config->get_token_symbol()), was_to ? tx.data : exit_memo);
-
-                non_open_account_sent = true;
+                check(balance == 0_u256, "sum of bridge transfers not match total received balance");
+                // non_open_account_sent = true;
             }
+        }
+
+        // Keep the transfer order.
+        for (size_t i = 0; i < ep.state().filtered_messages().size(); ++i) {
+            if (!need_send[i]) {
+                continue;
+            }
+
+            const auto& rawmsg = ep.state().filtered_messages()[i];
+            const name egress_account(*extract_reserved_address(rawmsg.receiver));
+            auto value = intx::be::unsafe::load<uint256>(rawmsg.value.bytes);
+            token::transfer_bytes_memo_action transfer_act(_config->get_token_contract(), {{get_self(), "active"_n}});
+            transfer_act.send(get_self(), egress_account, asset((uint64_t)(value / minimum_natively_representable), _config->get_token_symbol()), rawmsg.data);
         }
 
         if(total_egress != 0_u256)
@@ -331,6 +360,27 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
         balance_table.modify(balance_table.get(miner.value), eosio::same_payer, [&](balance& b){
             b.balance += *gas_fee_miner_portion;
         });
+    }
+
+    // Statistics
+    if (!from_self) {
+        // Gas income from tx sent from self should not be counted.
+        // Bridge transfers can generate such txs.
+        uint64_t tx_gas_used = receipt.cumulative_gas_used; // Only transaction in the "block" so cumulative_gas_used is the tx gas_used.
+        auto s = get_statistics();
+        if (_config->get_evm_version() >= 1) {
+            intx::uint512 gas_fee = intx::uint256(tx_gas_used) * ep.evm().block().header.base_fee_per_gas.value();
+            check(gas_fee < std::numeric_limits<intx::uint256>::max(), "too much gas");
+            s.gas_fee_income += static_cast<intx::uint256>(gas_fee);
+        } else {
+            intx::uint512 gas_fee = intx::uint256(tx_gas_used) * tx.max_fee_per_gas;
+            check(gas_fee < std::numeric_limits<intx::uint256>::max(), "too much gas");
+            if (gas_fee_miner_portion.has_value()) {
+                gas_fee -= *gas_fee_miner_portion;
+            } 
+            s.gas_fee_income += static_cast<intx::uint256>(gas_fee);
+        }
+        set_statistics(s);
     }
 
     LOGTIME("EVM EXECUTE");
@@ -398,10 +448,13 @@ void evm_contract::exec(const exec_input& input, const std::optional<exec_callba
     }
 }
 
-void evm_contract::process_filtered_messages(const std::vector<silkworm::FilteredMessage>& filtered_messages ) {
+void evm_contract::process_filtered_messages(std::function<bool(const silkworm::FilteredMessage&)> extra_filter, const std::vector<silkworm::FilteredMessage>& filtered_messages ) {
 
     intx::uint256 accumulated_value;
     for(const auto& rawmsg : filtered_messages) {
+        if (!(extra_filter)(rawmsg)) {
+            continue;
+        }
 
         auto msg = bridge::decode_message(ByteView{rawmsg.data});
         eosio::check(msg.has_value(), "unable to decode bridge message");
@@ -509,16 +562,19 @@ void evm_contract::process_tx(const runtime_config& rc, eosio::name miner, const
     auto gp = silkworm::gas_prices_t{gas_prices.overhead_price, gas_prices.storage_price};
     silkworm::ExecutionProcessor ep{block, engine, state, *found_chain_config->second, gp};
 
-    // Filter EVM messages (with data) that are sent to the reserved address
-    // corresponding to the EOS account holding the contract (self)
+    // Capture all messages to reserved addresses. They should be bridge transfers and EVM messages.
     ep.set_evm_message_filter([&](const evmc_message& message) -> bool {
-        static auto me = make_reserved_address(get_self().value);
-        return message.recipient == me && message.input_size > 0;
+        return is_reserved_address(message.recipient);
     });
 
     auto receipt = execute_tx(rc, miner, block, txn, ep, gas_params);
 
-    process_filtered_messages(ep.state().filtered_messages());
+    // Filter EVM messages (with data) that are sent to the reserved address
+    // corresponding to the EOS account holding the contract (self)
+    process_filtered_messages([&](const silkworm::FilteredMessage& message) -> bool {
+        static auto me = make_reserved_address(get_self().value);
+        return message.receiver == me && message.data.size() > 0;
+    }, ep.state().filtered_messages());
 
     engine.finalize(ep.state(), ep.evm().block());
     ep.state().write_to_db(ep.evm().block().header.number);
@@ -661,6 +717,11 @@ void evm_contract::handle_evm_transfer(eosio::asset quantity, const std::string&
     //subtract off the ingress bridge fee from the quantity that will be bridged
     quantity -= _config->get_ingress_bridge_fee();
     eosio::check(quantity.amount > 0, "must bridge more than ingress bridge fee");
+
+    // Statistics
+    auto s = get_statistics();
+    s.ingress_bridge_fee_income.balance += _config->get_ingress_bridge_fee();
+    set_statistics(s);
 
     const std::optional<Bytes> address_bytes = from_hex(memo);
     eosio::check(!!address_bytes, "unable to parse destination address");
@@ -933,6 +994,20 @@ uint64_t evm_contract::get_gas_price(uint64_t evm_version) {
         return gas_prices.get_base_price();
     }
     return _config->get_gas_price();
+}
+
+statistics evm_contract::get_statistics() const { 
+    statistics_singleton statistics_v(get_self(), get_self().value);
+    return statistics_v.get_or_create(get_self(), statistics {
+        .version = 0,
+        .ingress_bridge_fee_income = { .balance = eosio::asset(0, _config->get_ingress_bridge_fee().symbol), .dust = 0 },
+        .gas_fee_income = { .balance = eosio::asset(0, _config->get_ingress_bridge_fee().symbol), .dust = 0 },
+    });
+}
+
+void evm_contract::set_statistics(const statistics &v) {
+    statistics_singleton statistics_v(get_self(), get_self().value);
+    statistics_v.set(v, get_self());
 }
 
 } //evm_runtime

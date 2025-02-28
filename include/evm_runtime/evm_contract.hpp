@@ -139,7 +139,7 @@ private:
    void assert_unfrozen();
 
    silkworm::Receipt execute_tx(const runtime_config& rc, eosio::name miner, silkworm::Block& block, const transaction& tx, silkworm::ExecutionProcessor& ep, const evmone::gas_parameters& gas_params);
-   void process_filtered_messages(const std::vector<silkworm::FilteredMessage>& filtered_messages);
+   void process_filtered_messages(std::function<bool(const silkworm::FilteredMessage&)> extra_filter, const std::vector<silkworm::FilteredMessage>& filtered_messages);
 
    uint64_t get_and_increment_nonce(const name owner);
 
@@ -156,6 +156,8 @@ private:
    void dispatch_tx(const runtime_config& rc, const transaction& tx);
 
    uint64_t get_gas_price(uint64_t version);
+   struct statistics get_statistics() const;
+   void set_statistics(const struct statistics &v);
 };
 
 } // namespace evm_runtime

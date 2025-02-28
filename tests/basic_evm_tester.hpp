@@ -71,6 +71,13 @@ struct evmtx_v3 : evmtx_base {
 
 using evmtx_type = std::variant<evmtx_v1, evmtx_v3>;
 
+struct transfer_data {
+   name  from;
+   name  to;
+   asset  quantity;
+   string  memo;
+};
+
 struct evm_version_type {
    struct pending {
       uint64_t version;
@@ -136,6 +143,13 @@ struct balance_and_dust
 
    bool operator==(const balance_and_dust&) const;
    bool operator!=(const balance_and_dust&) const;
+};
+
+struct statistics
+{
+   unsigned_int version; // placeholder for future variant index
+   balance_and_dust gas_fee_income;
+   balance_and_dust ingress_bridge_fee_income;
 };
 
 struct account_object
@@ -238,6 +252,7 @@ FC_REFLECT(evm_test::evm_version_type, (pending_version)(cached_version))
 FC_REFLECT(evm_test::evm_version_type::pending, (version)(time))
 FC_REFLECT(evm_test::config2_table_row,(next_account_id))
 FC_REFLECT(evm_test::balance_and_dust, (balance)(dust));
+FC_REFLECT(evm_test::statistics, (version)(gas_fee_income)(ingress_bridge_fee_income));
 FC_REFLECT(evm_test::account_object, (id)(address)(nonce)(balance))
 FC_REFLECT(evm_test::storage_slot, (id)(key)(value))
 FC_REFLECT(evm_test::fee_parameters, (gas_price)(miner_cut)(ingress_bridge_fee))
@@ -253,6 +268,8 @@ FC_REFLECT(evm_test::account_code, (id)(ref_count)(code)(code_hash));
 FC_REFLECT(evm_test::evmtx_base, (eos_evm_version)(rlptx));
 FC_REFLECT_DERIVED(evm_test::evmtx_v1, (evm_test::evmtx_base), (base_fee_per_gas));
 FC_REFLECT_DERIVED(evm_test::evmtx_v3, (evm_test::evmtx_base), (overhead_price)(storage_price));
+FC_REFLECT(evm_test::evmtx_v0, (eos_evm_version)(rlptx)(base_fee_per_gas));
+FC_REFLECT(evm_test::transfer_data, (from)(to)(quantity)(memo));
 
 FC_REFLECT(evm_test::consensus_parameter_type, (current)(pending));
 FC_REFLECT(evm_test::pending_consensus_parameter_data_type, (data)(pending_time));
@@ -341,39 +358,31 @@ public:
       return validating_node;
    }
 
-   signed_block_ptr produce_block( fc::microseconds skip_time = fc::milliseconds(config::block_interval_ms), bool no_throw = false )override {
-      auto produce_block_result = _produce_block(skip_time, false, no_throw);
-      auto sb = produce_block_result.block;
-      auto bhf = validating_node->create_block_handle_future( sb->calculate_id(), sb );
-      struct controller::block_report br; 
-      validating_node->push_block(br, bhf.get(), forked_callback_t{}, trx_meta_cache_lookup{} );
-
-      return sb;
-   }
-
    testing::produce_block_result_t produce_block_ex( fc::microseconds skip_time = default_skip_time, bool no_throw = false ) override {
       auto produce_block_result = _produce_block(skip_time, false, no_throw);
       validate_push_block(produce_block_result.block);
       return produce_block_result;
    }
 
-   signed_block_ptr produce_block_no_validation( fc::microseconds skip_time = fc::milliseconds(config::block_interval_ms) ) {
-      return _produce_block(skip_time, false);
+   signed_block_ptr produce_block( fc::microseconds skip_time = default_skip_time, bool no_throw = false ) override {
+      return produce_block_ex(skip_time, no_throw).block;
+   }
+
+   signed_block_ptr produce_block_no_validation( fc::microseconds skip_time = default_skip_time ) {
+      return _produce_block(skip_time, false, false).block;
    }
 
    void validate_push_block(const signed_block_ptr& sb) {
-      auto bhf = validating_node->create_block_handle_future( sb->calculate_id(), sb );
-      struct controller::block_report br;
-      validating_node->push_block(br, bhf.get(), forked_callback_t{}, trx_meta_cache_lookup{} );
+      auto [best_head, obh] = validating_node->accept_block( sb->calculate_id(), sb );
+      EOS_ASSERT(obh, unlinkable_block_exception, "block did not link ${b}", ("b", sb->calculate_id()));
+      validating_node->apply_blocks( {}, trx_meta_cache_lookup{} );
+      _check_for_vote_if_needed(*validating_node, *obh);
    }
 
-   signed_block_ptr produce_empty_block( fc::microseconds skip_time = fc::milliseconds(config::block_interval_ms) )override {
+   signed_block_ptr produce_empty_block( fc::microseconds skip_time = default_skip_time )override {
       unapplied_transactions.add_aborted( control->abort_block() );
       auto sb = _produce_block(skip_time, true);
-      auto bhf = validating_node->create_block_handle_future( sb->calculate_id(), sb );
-      struct controller::block_report br;
-      validating_node->push_block(br, bhf.get(), forked_callback_t{}, trx_meta_cache_lookup{} );
-
+      validate_push_block(sb);
       return sb;
    }
 
@@ -459,6 +468,8 @@ public:
 
    config_table_row get_config() const;
    config2_table_row get_config2() const;
+
+   statistics get_statistics() const;
 
    void setfeeparams(const fee_parameters& fee_params);
 
