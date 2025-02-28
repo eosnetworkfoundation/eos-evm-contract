@@ -260,7 +260,6 @@ FC_REFLECT(evm_test::account_code, (id)(ref_count)(code)(code_hash));
 FC_REFLECT(evm_test::evmtx_base, (eos_evm_version)(rlptx));
 FC_REFLECT_DERIVED(evm_test::evmtx_v1, (evm_test::evmtx_base), (base_fee_per_gas));
 FC_REFLECT_DERIVED(evm_test::evmtx_v3, (evm_test::evmtx_base), (overhead_price)(storage_price));
-FC_REFLECT(evm_test::evmtx_v0, (eos_evm_version)(rlptx)(base_fee_per_gas));
 FC_REFLECT(evm_test::transfer_data, (from)(to)(quantity)(memo));
 
 FC_REFLECT(evm_test::consensus_parameter_type, (current)(pending));
