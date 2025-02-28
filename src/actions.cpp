@@ -506,7 +506,7 @@ void evm_contract::process_tx(const runtime_config& rc, eosio::name miner, const
     }
 
     auto gas_prices = _config->get_gas_prices();
-    auto gp = silkworm::gas_prices_t{gas_prices.overhead_price, gas_prices.storage_price};
+    auto gp = silkworm::gas_prices_t{gas_prices.overhead_price.value_or(0), gas_prices.storage_price.value_or(0)};
     silkworm::ExecutionProcessor ep{block, engine, state, *found_chain_config->second, gp};
 
     // Filter EVM messages (with data) that are sent to the reserved address
@@ -529,7 +529,7 @@ void evm_contract::process_tx(const runtime_config& rc, eosio::name miner, const
     }
 
     if(current_version >= 3) {
-        auto event = evmtx_type{evmtx_v3{current_version, txn.get_rlptx(), gas_prices.overhead_price, gas_prices.storage_price}};
+        auto event = evmtx_type{evmtx_v3{current_version, txn.get_rlptx(), gas_prices.overhead_price.value_or(0), gas_prices.storage_price.value_or(0)}};
         action(std::vector<permission_level>{}, get_self(), "evmtx"_n, event).send();
     } else if (current_version >= 1) {
         auto event = evmtx_type{evmtx_v1{current_version, txn.get_rlptx(), *base_fee_per_gas}};
@@ -895,9 +895,9 @@ void evm_contract::setversion(uint64_t version) {
     _config->set_evm_version(version);
 }
 
-void evm_contract::updtgasparam(eosio::asset ram_price_mb, uint64_t gas_price) {
+void evm_contract::updtgasparam(eosio::asset ram_price_mb, uint64_t storage_price) {
     require_auth(get_self());
-    _config->update_consensus_parameters(ram_price_mb, gas_price);
+    _config->update_consensus_parameters(ram_price_mb, storage_price);
 }
 
 void evm_contract::setgasparam(uint64_t gas_txnewaccount, 
@@ -915,6 +915,8 @@ void evm_contract::setgasparam(uint64_t gas_txnewaccount,
 
 void evm_contract::setgasprices(const gas_prices_type& prices) {
     require_auth(get_self());
+    eosio::check(prices.overhead_price.has_value() || prices.storage_price.has_value(), "at least one price must be specified");
+    eosio::check(!prices.storage_price.has_value() || *prices.storage_price > 0, "zero storage price is not allowed");
     auto current_version = _config->get_evm_version_and_maybe_promote();
     if(current_version >= 3) {
         _config->enqueue_gas_prices(prices);

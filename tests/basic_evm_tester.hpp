@@ -101,8 +101,12 @@ struct consensus_parameter_type {
 };
 
 struct gas_prices_type {
-    uint64_t overhead_price{0};
-    uint64_t storage_price{0};
+    std::optional<uint64_t> overhead_price;
+    std::optional<uint64_t> storage_price;
+
+    uint64_t get_storage_price() const {
+      return std::max(overhead_price.value_or(0), storage_price.value_or(0));
+    }
 };
 
 struct config_table_row
@@ -544,6 +548,7 @@ public:
    bool scan_prices_queue(std::function<bool(evm_test::prices_queue)> visitor) const;
 
    intx::uint128 tx_data_cost(const silkworm::Transaction& txn) const;
+   uint64_t get_gas_price() const;
 
    silkworm::Transaction get_tx_from_trace(const bytes& v);
 

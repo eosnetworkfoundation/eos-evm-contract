@@ -453,6 +453,7 @@ try {
    cfg = get_config();
    BOOST_CHECK_EQUAL(cfg.queue_front_block.value(), 0);
 
+   setgasprices({.storage_price = one_gwei});
    setversion(3, evm_account_name);
    produce_blocks(2);
 
@@ -464,8 +465,8 @@ try {
    auto q = get_prices_queue();
    BOOST_CHECK_EQUAL(q.size(), 1);
    BOOST_CHECK_EQUAL(q[0].block, b1);
-   BOOST_CHECK_EQUAL(q[0].prices.overhead_price, ten_gwei);
-   BOOST_CHECK_EQUAL(q[0].prices.storage_price, one_gwei);
+   BOOST_CHECK_EQUAL(q[0].prices.overhead_price.value_or(0), ten_gwei);
+   BOOST_CHECK_EQUAL(q[0].prices.storage_price.value_or(0), one_gwei);
 
    cfg = get_config();
    BOOST_CHECK_EQUAL(cfg.queue_front_block.value(), b1);
@@ -480,11 +481,11 @@ try {
    q = get_prices_queue();
    BOOST_CHECK_EQUAL(q.size(), 2);
    BOOST_CHECK_EQUAL(q[0].block, b1);
-   BOOST_CHECK_EQUAL(q[0].prices.overhead_price, ten_gwei);
-   BOOST_CHECK_EQUAL(q[0].prices.storage_price, one_gwei);
+   BOOST_CHECK_EQUAL(q[0].prices.overhead_price.value_or(0), ten_gwei);
+   BOOST_CHECK_EQUAL(q[0].prices.storage_price.value_or(0), one_gwei);
    BOOST_CHECK_EQUAL(q[1].block, b2);
-   BOOST_CHECK_EQUAL(q[1].prices.overhead_price, 3*ten_gwei);
-   BOOST_CHECK_EQUAL(q[1].prices.storage_price, ten_gwei);
+   BOOST_CHECK_EQUAL(q[1].prices.overhead_price.value_or(0), 3*ten_gwei);
+   BOOST_CHECK_EQUAL(q[1].prices.storage_price.value_or(0), ten_gwei);
 
    cfg = get_config();
    BOOST_CHECK_EQUAL(cfg.queue_front_block.value(), b1);
@@ -495,11 +496,11 @@ try {
    q = get_prices_queue();
    BOOST_CHECK_EQUAL(q.size(), 2);
    BOOST_CHECK_EQUAL(q[0].block, b1);
-   BOOST_CHECK_EQUAL(q[0].prices.overhead_price, ten_gwei);
-   BOOST_CHECK_EQUAL(q[0].prices.storage_price, one_gwei);
+   BOOST_CHECK_EQUAL(q[0].prices.overhead_price.value_or(0), ten_gwei);
+   BOOST_CHECK_EQUAL(q[0].prices.storage_price.value_or(0), one_gwei);
    BOOST_CHECK_EQUAL(q[1].block, b2);
-   BOOST_CHECK_EQUAL(q[1].prices.overhead_price, 2*ten_gwei);
-   BOOST_CHECK_EQUAL(q[1].prices.storage_price, 5*one_gwei);
+   BOOST_CHECK_EQUAL(q[1].prices.overhead_price.value_or(0), 2*ten_gwei);
+   BOOST_CHECK_EQUAL(q[1].prices.storage_price.value_or(0), 5*one_gwei);
 
    cfg = get_config();
    BOOST_CHECK_EQUAL(cfg.queue_front_block.value(), b1);
@@ -510,14 +511,14 @@ try {
    trigger_prices_queue_processing();
 
    cfg = get_config();
-   BOOST_CHECK_EQUAL(cfg.gas_prices->overhead_price, ten_gwei);
-   BOOST_CHECK_EQUAL(cfg.gas_prices->storage_price, one_gwei);
+   BOOST_CHECK_EQUAL(cfg.gas_prices->overhead_price.value_or(0), ten_gwei);
+   BOOST_CHECK_EQUAL(cfg.gas_prices->storage_price.value_or(0), one_gwei);
 
    q = get_prices_queue();
    BOOST_CHECK_EQUAL(q.size(), 1);
    BOOST_CHECK_EQUAL(q[0].block, b2);
-   BOOST_CHECK_EQUAL(q[0].prices.overhead_price, 2*ten_gwei);
-   BOOST_CHECK_EQUAL(q[0].prices.storage_price, 5*one_gwei);
+   BOOST_CHECK_EQUAL(q[0].prices.overhead_price.value_or(0), 2*ten_gwei);
+   BOOST_CHECK_EQUAL(q[0].prices.storage_price.value_or(0), 5*one_gwei);
 
    BOOST_CHECK_EQUAL(cfg.queue_front_block.value(), b2);
 
@@ -527,13 +528,15 @@ try {
    trigger_prices_queue_processing();
 
    cfg = get_config();
-   BOOST_CHECK_EQUAL(cfg.gas_prices->overhead_price, 2*ten_gwei);
-   BOOST_CHECK_EQUAL(cfg.gas_prices->storage_price, 5*one_gwei);
+   BOOST_CHECK_EQUAL(cfg.gas_prices->overhead_price.value_or(0), 2*ten_gwei);
+   BOOST_CHECK_EQUAL(cfg.gas_prices->storage_price.value_or(0), 5*one_gwei);
 
    q = get_prices_queue();
    BOOST_CHECK_EQUAL(q.size(), 0);
-
    BOOST_CHECK_EQUAL(cfg.queue_front_block.value(), 0);
+
+
+   
 }
 FC_LOG_AND_RETHROW()
 

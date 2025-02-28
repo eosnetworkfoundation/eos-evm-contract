@@ -100,12 +100,22 @@ gas_prices_type config_wrapper::get_gas_prices()const {
 }
 
 void config_wrapper::set_gas_prices(const gas_prices_type& prices) {
-    _cached_config.gas_prices = prices;
+    if(prices.overhead_price.has_value()) {
+        _cached_config.gas_prices.value().overhead_price = prices.overhead_price.value();
+    }
+    if(prices.storage_price.has_value()) {
+        _cached_config.gas_prices.value().storage_price = prices.storage_price.value();
+    }
     set_dirty();
 }
 
-template <typename Q, typename Func>
-void config_wrapper::enqueue(Func&& update_fnc) {
+template <typename Q, typename V>
+void config_wrapper::enqueue(const V& new_value) {
+
+    if( _cached_config.queue_front_block.value() == 0 && is_same_as_current_price(new_value)) {
+        return;
+    }
+
     Q queue(_self, _self.value);
     auto activation_time = get_current_time() + eosio::seconds(grace_period_seconds);
 
@@ -115,10 +125,11 @@ void config_wrapper::enqueue(Func&& update_fnc) {
     auto it = queue.end();
     if( it != queue.begin()) {
         --it;
+        if( new_value == it->get_value() ) return;
         eosio::check(activation_block_num >= it->block, "internal error");
         if(activation_block_num == it->block) {
             queue.modify(*it, eosio::same_payer, [&](auto& el) {
-                update_fnc(el);
+                el.set_value(new_value);
             });
             return;
         }
@@ -126,7 +137,7 @@ void config_wrapper::enqueue(Func&& update_fnc) {
 
     queue.emplace(_self, [&](auto& el) {
         el.block = activation_block_num;
-        update_fnc(el);
+        el.set_value(new_value);
     });
 
     if( _cached_config.queue_front_block.value() == 0 ) {
@@ -135,15 +146,11 @@ void config_wrapper::enqueue(Func&& update_fnc) {
 }
 
 void config_wrapper::enqueue_gas_price(uint64_t gas_price) {
-    enqueue<price_queue_table>([&](auto& el){
-        el.price = gas_price;
-    });
+    enqueue<price_queue_table>(gas_price);
 }
 
 void config_wrapper::enqueue_gas_prices(const gas_prices_type& prices) {
-    enqueue<prices_queue_table>([&](auto& el){
-        el.prices = prices;
-    });
+    enqueue<prices_queue_table>(prices);
 }
 
 void config_wrapper::set_queue_front_block(uint32_t block_num) {
@@ -224,10 +231,12 @@ uint64_t config_wrapper::get_evm_version_and_maybe_promote() {
 void config_wrapper::set_evm_version(uint64_t new_version) {
     eosio::check(new_version <= eosevm::max_eos_evm_version, "Unsupported version");
     eosio::check(new_version != 3 || _cached_config.queue_front_block.value() == 0, "price queue must be empty");
+    eosio::check(new_version != 3 || _cached_config.gas_prices.value().storage_price.value_or(0) != 0, "storage price must be set");
     auto current_version = get_evm_version_and_maybe_promote();
     eosio::check(new_version > current_version, "new version must be greater than the active one");
     _cached_config.evm_version->update([&](auto& v) {
         v = new_version;
+        if( new_version == 3 ) _cached_config.gas_price = 0;
     }, _cached_config.genesis_time, get_current_time());
     set_dirty();
 }
@@ -236,7 +245,9 @@ void config_wrapper::set_fee_parameters(const fee_parameters& fee_params,
                         bool allow_any_to_be_unspecified)
 {
     if (fee_params.gas_price.has_value()) {
-        if(get_evm_version() >= 1) {
+        if(get_evm_version() >= 3) {
+            eosio::check(false, "Can't use set_fee_parameters to set gas_price");
+        } else if(get_evm_version() >= 1) {
             enqueue_gas_price(*fee_params.gas_price);
         } else {
             set_gas_price(*fee_params.gas_price);
@@ -267,15 +278,13 @@ void config_wrapper::set_fee_parameters(const fee_parameters& fee_params,
     set_dirty();
 }
 
-void config_wrapper::update_consensus_parameters(eosio::asset ram_price_mb, uint64_t gas_price) {
-    eosio::check(get_evm_version() < 3, "unable to set params");
-
-    //TODO: should we allow to call this when version>=3
+void config_wrapper::update_consensus_parameters(eosio::asset ram_price_mb, uint64_t storage_price) {
     constexpr char too_big_str[] = "gas_per_byte too big";
     eosio::check(ram_price_mb.symbol == get_token_symbol(), "invalid price symbol");
-    eosio::check(gas_price > 0, "zero gas price is not allowed");
+    eosio::check(storage_price > 0, "zero storage price is not allowed");
 
-    auto miner_cut = get_evm_version() >= 1 ? 0 : _cached_config.miner_cut;
+    auto evm_version = get_evm_version();
+    auto miner_cut = evm_version >= 1 ? 0 : _cached_config.miner_cut;
 
     eosio::check(miner_cut < hundred_percent, "100% miner cut is not allowed");
 
@@ -283,7 +292,7 @@ void config_wrapper::update_consensus_parameters(eosio::asset ram_price_mb, uint
 
     eosio::check((double)overflow_limit/get_minimum_natively_representable() > ram_price_mb.amount / (1024.0 * 1024.0), too_big_str);
 
-    double gas_per_byte_f = (ram_price_mb.amount / (1024.0 * 1024.0) * get_minimum_natively_representable()) / (gas_price * static_cast<double>(hundred_percent - miner_cut) / hundred_percent);
+    double gas_per_byte_f = (ram_price_mb.amount / (1024.0 * 1024.0) * get_minimum_natively_representable()) / (storage_price * static_cast<double>(hundred_percent - miner_cut) / hundred_percent);
 
     constexpr uint64_t account_bytes = 347;
     constexpr uint64_t contract_fixed_bytes = 606;
@@ -300,13 +309,15 @@ void config_wrapper::update_consensus_parameters(eosio::asset ram_price_mb, uint
                              account_bytes * gas_per_byte, /* gas_newaccount */
                              contract_fixed_bytes * gas_per_byte, /*gas_txcreate*/
                              gas_per_byte,/*gas_codedeposit*/
-                             (get_evm_version() < 3 ? gas_sset_min : 0) + storage_slot_bytes * gas_per_byte /*gas_sset*/
+                             (evm_version < 3 ? gas_sset_min : 0) + storage_slot_bytes * gas_per_byte /*gas_sset*/
     );
 
-    if(get_evm_version() >= 1) {
-        enqueue_gas_price(gas_price);
+    if(evm_version >= 3) {
+        enqueue_gas_prices({.storage_price=storage_price});
+    } else if(evm_version >= 1) {
+        enqueue_gas_price(storage_price);
     } else {
-        set_gas_price(gas_price);
+        set_gas_price(storage_price);
     }
 }
 

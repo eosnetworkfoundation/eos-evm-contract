@@ -247,11 +247,15 @@ struct [[eosio::table]] [[eosio::contract("evm_contract")]] config2
 };
 
 struct gas_prices_type {
-    uint64_t overhead_price{0};
-    uint64_t storage_price{0};
+    std::optional<uint64_t> overhead_price;
+    std::optional<uint64_t> storage_price;
 
     uint64_t get_base_price()const {
-        return std::max(overhead_price, storage_price);
+        return std::max(overhead_price.value_or(0), storage_price.value_or(0));
+    }
+
+    bool operator==(const gas_prices_type& o) const {
+        return o.overhead_price == overhead_price && o.storage_price == storage_price;
     }
 };
 
@@ -266,7 +270,7 @@ struct [[eosio::table]] [[eosio::contract("evm_contract")]] config
     uint64_t chainid = 0;
     time_point_sec genesis_time;
     asset ingress_bridge_fee;
-    uint64_t gas_price = 0;
+    uint64_t gas_price = 0; //after v3 not used anymore, stays here for structure compatibility
     uint32_t miner_cut = 0;
     uint32_t status = 0; // <- bit mask values from status_flags
     binary_extension<value_promoter_evm_version_type> evm_version;
@@ -285,6 +289,8 @@ struct [[eosio::table]] [[eosio::contract("evm_contract")]] price_queue
     uint64_t price;
 
     uint64_t primary_key()const { return block; }
+    const uint64_t get_value()const { return price; }
+    void set_value(uint64_t value) { price = value; }
 
     EOSLIB_SERIALIZE(price_queue, (block)(price));
 };
@@ -296,6 +302,8 @@ struct [[eosio::table]] [[eosio::contract("evm_contract")]] prices_queue
     gas_prices_type prices;
 
     uint64_t primary_key()const { return block; }
+    const gas_prices_type& get_value()const { return prices; }
+    void set_value(const gas_prices_type& value) { prices = value; }
 
     EOSLIB_SERIALIZE(prices_queue, (block)(prices));
 };

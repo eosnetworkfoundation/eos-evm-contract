@@ -67,7 +67,7 @@ BOOST_FIXTURE_TEST_CASE(basic, gas_param_evm_tester) try {
     BOOST_REQUIRE_EXCEPTION(
         updtgasparam(asset(10'0000, native_symbol), 0, evm_account_name),
         eosio_assert_message_exception,
-        eosio_assert_message_is("zero gas price is not allowed"));
+        eosio_assert_message_is("zero storage price is not allowed"));
     
      // fee too high
     BOOST_REQUIRE_EXCEPTION(

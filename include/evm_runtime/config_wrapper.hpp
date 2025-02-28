@@ -33,8 +33,8 @@ struct config_wrapper {
     uint64_t get_gas_price()const;
     void set_gas_price(uint64_t gas_price);
 
-    template <typename Q, typename Func>
-    void enqueue(Func&& update_fnc);
+    template <typename Q, typename V>
+    void enqueue(const V& new_value);
     void enqueue_gas_price(uint64_t gas_price);
     void enqueue_gas_prices(const gas_prices_type& prices);
 
@@ -75,6 +75,20 @@ private:
     bool is_dirty()const;
     void set_dirty();
     void clear_dirty();
+
+    uint64_t is_same_as_current_price(uint64_t new_value) {
+        return _cached_config.gas_price == new_value;
+    };
+
+    bool is_same_as_current_price(const gas_prices_type& new_value) {
+        if(new_value.overhead_price.has_value() && _cached_config.gas_prices.value().overhead_price == new_value.overhead_price) {
+            return true;
+        }
+        if(new_value.storage_price.has_value() && _cached_config.gas_prices.value().storage_price == new_value.storage_price) {
+            return true;
+        }
+        return false;
+    };
 
     eosio::time_point get_current_time()const;
     bool check_gas_overflow(uint64_t gas_txcreate, uint64_t gas_codedeposit) const; // return true if pass
