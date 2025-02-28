@@ -71,6 +71,13 @@ struct evmtx_v3 : evmtx_base {
 
 using evmtx_type = std::variant<evmtx_v1, evmtx_v3>;
 
+struct transfer_data {
+   name  from;
+   name  to;
+   asset  quantity;
+   string  memo;
+};
+
 struct evm_version_type {
    struct pending {
       uint64_t version;
@@ -253,6 +260,7 @@ FC_REFLECT(evm_test::account_code, (id)(ref_count)(code)(code_hash));
 FC_REFLECT(evm_test::evmtx_base, (eos_evm_version)(rlptx));
 FC_REFLECT_DERIVED(evm_test::evmtx_v1, (evm_test::evmtx_base), (base_fee_per_gas));
 FC_REFLECT_DERIVED(evm_test::evmtx_v3, (evm_test::evmtx_base), (overhead_price)(storage_price));
+FC_REFLECT(evm_test::transfer_data, (from)(to)(quantity)(memo));
 
 FC_REFLECT(evm_test::consensus_parameter_type, (current)(pending));
 FC_REFLECT(evm_test::pending_consensus_parameter_data_type, (data)(pending_time));
