@@ -145,6 +145,13 @@ struct balance_and_dust
    bool operator!=(const balance_and_dust&) const;
 };
 
+struct statistics
+{
+   unsigned_int version; // placeholder for future variant index
+   balance_and_dust gas_fee_income;
+   balance_and_dust ingress_bridge_fee_income;
+};
+
 struct account_object
 {
    enum class flag : uint32_t {
@@ -245,6 +252,7 @@ FC_REFLECT(evm_test::evm_version_type, (pending_version)(cached_version))
 FC_REFLECT(evm_test::evm_version_type::pending, (version)(time))
 FC_REFLECT(evm_test::config2_table_row,(next_account_id))
 FC_REFLECT(evm_test::balance_and_dust, (balance)(dust));
+FC_REFLECT(evm_test::statistics, (version)(gas_fee_income)(ingress_bridge_fee_income));
 FC_REFLECT(evm_test::account_object, (id)(address)(nonce)(balance))
 FC_REFLECT(evm_test::storage_slot, (id)(key)(value))
 FC_REFLECT(evm_test::fee_parameters, (gas_price)(miner_cut)(ingress_bridge_fee))
@@ -459,6 +467,8 @@ public:
 
    config_table_row get_config() const;
    config2_table_row get_config2() const;
+
+   statistics get_statistics() const;
 
    void setfeeparams(const fee_parameters& fee_params);
 

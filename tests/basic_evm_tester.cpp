@@ -332,6 +332,14 @@ config_table_row basic_evm_tester::get_config() const
    return fc::raw::unpack<config_table_row>(d);
 }
 
+statistics basic_evm_tester::get_statistics() const
+{
+   static constexpr eosio::chain::name statistics_singleton_name = "statistics"_n;
+   const vector<char> d =
+      get_row_by_account(evm_account_name, evm_account_name, statistics_singleton_name, statistics_singleton_name);
+   return fc::raw::unpack<statistics>(d);
+}
+
 config2_table_row basic_evm_tester::get_config2() const
 {
    static constexpr eosio::chain::name config2_singleton_name = "config2"_n;

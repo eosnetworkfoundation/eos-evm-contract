@@ -156,6 +156,8 @@ private:
    void dispatch_tx(const runtime_config& rc, const transaction& tx);
 
    uint64_t get_gas_price(uint64_t version);
+   struct statistics get_statistics() const;
+   void set_statistics(const struct statistics &v);
 };
 
 } // namespace evm_runtime
