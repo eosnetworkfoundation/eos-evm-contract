@@ -71,7 +71,7 @@ namespace fc { namespace raw {
       if(ds.remaining()) { fc::raw::unpack(ds, tmp.flags); }
     } FC_RETHROW_EXCEPTIONS(warn, "error unpacking partial_account_table_row") }
 
-    template<>
+     template<>
     inline void unpack( datastream<const char*>& ds, evm_test::config_table_row& tmp)
     { try  {
       fc::raw::unpack(ds, tmp.version);
@@ -380,10 +380,17 @@ void basic_evm_tester::setfeeparams(const fee_parameters& fee_params)
    push_action(evm_account_name, "setfeeparams"_n, evm_account_name, mvo()("fee_params", fee_params_vo));
 }
 
+uint64_t basic_evm_tester::get_gas_price() const {
+   const auto cfg = get_config();
+   BOOST_REQUIRE(cfg.evm_version.has_value() == true);
+   BOOST_REQUIRE(cfg.gas_prices.has_value() == true);
+   return cfg.evm_version.value().cached_version < 3 ? cfg.gas_price : cfg.gas_prices->get_storage_price();
+}
+
 silkworm::Transaction
 basic_evm_tester::generate_tx(const evmc::address& to, const intx::uint256& value, uint64_t gas_limit) const
 {
-   const auto gas_price = get_config().gas_price;
+   const auto gas_price = get_gas_price();
 
    return silkworm::Transaction{
       silkworm::UnsignedTransaction {
@@ -536,8 +543,7 @@ transaction_trace_ptr basic_evm_tester::setgasprices(const gas_prices_type& pric
 evmc::address basic_evm_tester::deploy_contract(evm_eoa& eoa, evmc::bytes bytecode)
 {
    uint64_t nonce = eoa.next_nonce;
-
-   const auto gas_price = get_config().gas_price;
+   const auto gas_price = get_gas_price();
 
    silkworm::Transaction tx{
       silkworm::UnsignedTransaction {

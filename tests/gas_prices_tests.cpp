@@ -76,6 +76,128 @@ struct gas_prices_evm_tester : basic_evm_tester
 
 };
 
+BOOST_FIXTURE_TEST_CASE(gas_price_validation, gas_prices_evm_tester) try {
+   using silkworm::kGiga;
+
+   uint64_t suggested_gas_price = 150*kGiga;
+   init(15555, suggested_gas_price);
+   produce_block();
+
+   auto get_prices_queue = [&]() -> std::vector<prices_queue> {
+      std::vector<prices_queue> queue;
+      scan_prices_queue([&](prices_queue&& row) -> bool {
+         queue.push_back(row);
+         return false;
+      });
+      return queue;
+   };
+
+   // no price specified
+   BOOST_REQUIRE_EXCEPTION(
+      setgasprices({.overhead_price={}, .storage_price={}}),
+      eosio_assert_message_exception,
+      eosio_assert_message_is("at least one price must be specified"));
+
+   // zero storage price
+   BOOST_REQUIRE_EXCEPTION(
+      setgasprices({.overhead_price={}, .storage_price=0}),
+      eosio_assert_message_exception,
+      eosio_assert_message_is("zero storage price is not allowed"));
+
+   // switch to v3 without gas prices
+   BOOST_REQUIRE_EXCEPTION(
+      setversion(3, evm_account_name),
+      eosio_assert_message_exception,
+      eosio_assert_message_is("storage price must be set"));
+
+   // gas price before switch
+   BOOST_REQUIRE( get_config().gas_price == 150*kGiga );
+
+   setgasprices({.overhead_price={}, .storage_price=1});
+   setversion(3, evm_account_name);
+   fund_evm_faucet();
+   produce_block();
+   produce_block();
+
+   // queue is empty
+   BOOST_REQUIRE( get_prices_queue().size() == 0 );
+
+   // old gas price == 0
+   BOOST_REQUIRE( get_config().gas_price == 0 );
+
+   // overhead={} storage=1
+   auto gas_prices = get_config().gas_prices.value();
+   BOOST_REQUIRE(gas_prices.overhead_price.has_value() == false);
+   BOOST_REQUIRE(gas_prices.storage_price.value() == 1);
+
+   // same as current
+   setgasprices({.overhead_price={}, .storage_price=1});
+   BOOST_REQUIRE( get_prices_queue().size() == 0 );
+
+   // new value (queued)
+   setgasprices({.overhead_price={}, .storage_price=2});
+   BOOST_REQUIRE( get_prices_queue().size() == 1 );
+   produce_block();
+
+   // repeat last value (not queued)
+   setgasprices({.overhead_price={}, .storage_price=2});
+   BOOST_REQUIRE( get_prices_queue().size() == 1 );
+
+   // wait and trigger queue processing
+   produce_blocks(2*181);
+   fund_evm_faucet();
+
+   // empty queue
+   BOOST_REQUIRE( get_prices_queue().size() == 0 );
+
+   // overhead={} storage=2
+   gas_prices = get_config().gas_prices.value();
+   BOOST_REQUIRE(gas_prices.overhead_price.has_value() == false);
+   BOOST_REQUIRE(gas_prices.storage_price.value() == 2);
+
+   // set only overhead
+   setgasprices({.overhead_price=10, .storage_price={}});
+   BOOST_REQUIRE( get_prices_queue().size() == 1 );
+
+   // wait and trigger queue processing
+   produce_blocks(2*181);
+   fund_evm_faucet();
+
+   // empty queue
+   BOOST_REQUIRE( get_prices_queue().size() == 0 );
+
+   // overhead=10 storage=2
+   gas_prices = get_config().gas_prices.value();
+   BOOST_REQUIRE(gas_prices.overhead_price.value() == 10);
+   BOOST_REQUIRE(gas_prices.storage_price.value() == 2);
+
+   // reject change of gas with setfeeparams
+   BOOST_REQUIRE_EXCEPTION(
+      setfeeparams({.gas_price = 1}),
+      eosio_assert_message_exception,
+      eosio_assert_message_is("Can't use set_fee_parameters to set gas_price"));
+
+   // updtgasparam should enqueue price
+   updtgasparam(asset(10'0000, native_symbol), 1'000'000'000, evm_account_name);
+   auto q = get_prices_queue();
+   BOOST_REQUIRE(q.size() == 1);
+   BOOST_REQUIRE(q[0].prices.overhead_price.has_value() == false);
+   BOOST_REQUIRE(q[0].prices.storage_price.has_value() == true);
+
+   // wait and trigger queue processing
+   produce_blocks(2*181);
+   fund_evm_faucet();
+
+   // empty queue
+   BOOST_REQUIRE( get_prices_queue().size() == 0 );
+
+   // set only overhead (should not enqueue, since we already have that value as the current value)
+   setgasprices({.overhead_price=10, .storage_price={}});
+   BOOST_REQUIRE( get_prices_queue().size() == 0 );
+
+
+} FC_LOG_AND_RETHROW()
+
 BOOST_FIXTURE_TEST_CASE(gas_param_scale, gas_prices_evm_tester) try {
    using silkworm::kGiga;
 
