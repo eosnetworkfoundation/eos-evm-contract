@@ -74,6 +74,7 @@ list(APPEND SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/../silkworm/silkworm/core/rlp/decode.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../silkworm/silkworm/core/crypto/ecdsa.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../silkworm/silkworm/core/crypto/secp256k1n.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../silkworm/silkworm/core/crypto/kzg.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../silkworm/silkworm/core/chain/config.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../silkworm/eosevm/refund_v3.cpp
 )
@@ -97,5 +98,5 @@ target_compile_options(evm_runtime PUBLIC --no-missing-ricardian-clause)
 if (WITH_LARGE_STACK)
     target_link_options(evm_runtime PUBLIC --stack-size=50000000)
 else()
-    target_link_options(evm_runtime PUBLIC --stack-size=35984)
+    target_link_options(evm_runtime PUBLIC --stack-size=20480)
 endif()

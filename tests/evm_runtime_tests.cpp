@@ -922,7 +922,7 @@ struct evm_runtime_tester : eosio_system_tester, silkworm::State {
 
       Block block;
       ByteView view{*rlp};
-      if (!rlp::decode_legacy(view, block) || !view.empty()) {
+      if (!rlp::decode(view, block) || !view.empty()) {
          if (invalid) {
                dlog("invalid=kPassed 2");
                return Status::kPassed;
@@ -1089,6 +1089,7 @@ struct evm_runtime_tester : eosio_system_tester, silkworm::State {
    }
 
    void run_test_file(const fs::path& file_path, RunnerFunc runner) {
+      std::cout << "run_test_file: file_path=" << file_path.string() << std::endl; 
       std::ifstream in{file_path.string()};
       nlohmann::json json;
 
@@ -1108,7 +1109,8 @@ struct evm_runtime_tester : eosio_system_tester, silkworm::State {
          std::string network{json_test["network"].get<std::string>()};
 
          //Only Istanbul
-         if(network != "Shanghai") continue;
+         //if(network != "Shanghai") continue;
+         if(network != "Cancun") continue;
 
          const RunResults r{(*this.*runner)(test.key(), json_test)};
          total += r;

@@ -21,7 +21,8 @@ inline constexpr ChainConfig kTestNetwork{
     ._arrow_glacier_block = 0,
     ._gray_glacier_block = 0,
     ._terminal_total_difficulty = 0,
-    ._shanghai_time = 0
+    ._shanghai_time = 0,
+    ._cancun_time = 0
 };
 
 } //namespace test

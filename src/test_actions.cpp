@@ -18,6 +18,11 @@ using namespace silkworm;
     block.header = bi.get_block_header();
 
     evm_runtime::test::engine engine{evm_runtime::test::kTestNetwork};
+
+    
+    eosio::print("REVISION: ", uint64_t(evm_runtime::test::kTestNetwork.revision(block.header)), "\n");
+
+
     evm_runtime::state state{get_self(), get_self()};
     silkworm::ExecutionProcessor ep{block, engine, state, evm_runtime::test::kTestNetwork, {}};
 
