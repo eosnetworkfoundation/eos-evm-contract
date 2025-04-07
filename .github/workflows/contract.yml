@@ -33,7 +33,7 @@ jobs:
       DCMAKE_BUILD_TYPE: 'Release'
     steps:
       - name: Install Git
-        run: sudo apt-get update && apt-get install -y build-essential cmake git
+        run: apt-get update && apt-get install -y build-essential cmake git
 
       - name: Check Git Version
         run: git --version
