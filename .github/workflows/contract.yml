@@ -54,7 +54,7 @@ jobs:
           file: 'cdt_.*amd64.deb'
 
       - name: Install CDT
-        run: sudo apt-get install -y ./cdt*.deb
+        run: apt-get install -y ./cdt*.deb
 
       - name: Build EOS EVM Contract
         run: .github/workflows/build-contract.sh
@@ -80,7 +80,7 @@ jobs:
           container-package: antelope-spring-experimental-binaries
 
       - name: Install packages
-        run: sudo apt-get install -y ./*.deb
+        run: apt-get install -y ./*.deb
 
       - name: Build EOS EVM Contract Tests
         run: .github/workflows/build-contract-test.sh
