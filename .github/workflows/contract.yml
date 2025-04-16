@@ -49,7 +49,7 @@ jobs:
         with:
           owner: AntelopeIO
           repo: cdt
-          target: 'v4.0.1'
+          target: 'v4.1.0'
           prereleases: false
           file: 'cdt_.*amd64.deb'
 
