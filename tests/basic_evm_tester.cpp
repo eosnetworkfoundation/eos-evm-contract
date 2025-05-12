@@ -276,6 +276,33 @@ transaction_trace_ptr basic_evm_tester::push_action( const account_name& code,
    return push_transaction( trx );
 } FC_CAPTURE_AND_RETHROW( (code)(acttype)(auths)(data)(expiration)(delay_sec) ) }
 
+transaction_trace_ptr basic_evm_tester::push_action2( const account_name& code,
+   const action_name& acttype,
+   const account_name& actor,
+   const account_name& actor2,
+   const variant_object &data,
+   uint32_t expiration,
+   uint32_t delay_sec)
+{
+   vector<permission_level> auths;
+   auths.push_back( permission_level{actor, config::active_name} );
+   if (actor != actor2)
+      auths.push_back( permission_level{actor2, config::active_name} );
+
+   try {
+      signed_transaction trx;
+
+      trx.actions.emplace_back( base_tester::get_action( code, acttype, auths, data ));
+      set_transaction_headers( trx, expiration, delay_sec );
+      for (const auto& auth : auths) {
+      trx.sign( get_private_key( auth.actor, auth.permission.to_string() ), control->get_chain_id() );
+   }
+
+   return push_transaction( trx );
+   }
+   FC_CAPTURE_AND_RETHROW( (code)(acttype)(auths)(data)(expiration)(delay_sec) ) 
+}
+
 
 void basic_evm_tester::init(const uint64_t chainid,
                             const uint64_t gas_price,
@@ -404,6 +431,23 @@ transaction_trace_ptr basic_evm_tester::call(name from, const evmc::bytes& to, c
    memcpy(value_bytes.data(), value.data(), value.size());
 
    return push_action(evm_account_name, "call"_n, actor,  mvo()("from", from)("to", to_bytes)("value", value_bytes)("data", data_bytes)("gas_limit", gas_limit));
+}
+
+transaction_trace_ptr basic_evm_tester::callotherpay(name payer, name from, const evmc::bytes& to, const evmc::bytes& value, evmc::bytes& data, uint64_t gas_limit, name actor)
+{
+   bytes to_bytes;
+   to_bytes.resize(to.size());
+   memcpy(to_bytes.data(), to.data(), to.size());
+   
+   bytes data_bytes;
+   data_bytes.resize(data.size());
+   memcpy(data_bytes.data(), data.data(), data.size());
+
+   bytes value_bytes;
+   value_bytes.resize(value.size());
+   memcpy(value_bytes.data(), value.data(), value.size());
+
+   return push_action2(evm_account_name, "callotherpay"_n, actor, payer, mvo()("payer", payer)("from", from)("to", to_bytes)("value", value_bytes)("data", data_bytes)("gas_limit", gas_limit));
 }
 
 transaction_trace_ptr basic_evm_tester::admincall(const evmc::bytes& from, const evmc::bytes& to, const evmc::bytes& value, evmc::bytes& data, uint64_t gas_limit, name actor)

@@ -6,6 +6,7 @@ struct runtime_config {
   bool abort_on_failure        = false;
   bool enforce_chain_id        = true;
   bool allow_non_self_miner    = true;
+  uint64_t gas_payer           = 0;
 };
 
 struct gas_parameter_type {

@@ -77,6 +77,7 @@ public:
    
    [[eosio::action]] void call(eosio::name from, const bytes& to, const bytes& value, const bytes& data, uint64_t gas_limit);
    [[eosio::action]] void admincall(const bytes& from, const bytes& to, const bytes& value, const bytes& data, uint64_t gas_limit);
+   [[eosio::action]] void callotherpay(eosio::name payer, eosio::name from, const bytes& to, const bytes& value, const bytes& data, uint64_t gas_limit);
 
    [[eosio::action]] void bridgereg(eosio::name receiver, eosio::name handler, const eosio::asset& min_fee);
    [[eosio::action]] void bridgeunreg(eosio::name receiver);

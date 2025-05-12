@@ -424,6 +424,14 @@ public:
                                       uint32_t expiration = DEFAULT_EXPIRATION_DELTA,
                                       uint32_t delay_sec = 0 );
 
+   transaction_trace_ptr push_action2( const account_name& code,
+                                       const action_name& acttype,
+                                       const account_name& actor,
+                                       const account_name& actor2,
+                                       const variant_object &data,
+                                       uint32_t expiration = DEFAULT_EXPIRATION_DELTA,
+                                       uint32_t delay_sec = 0 );
+
    void init(const uint64_t chainid = evm_chain_id,
              const uint64_t gas_price = suggested_gas_price,
              const uint32_t miner_cut = suggested_miner_cut,
@@ -456,6 +464,7 @@ public:
    transaction_trace_ptr setversion(uint64_t version, name actor);
    transaction_trace_ptr call(name from, const evmc::bytes& to, const evmc::bytes& value, evmc::bytes& data, uint64_t gas_limit, name actor);
    transaction_trace_ptr admincall(const evmc::bytes& from, const evmc::bytes& to, const evmc::bytes& value, evmc::bytes& data, uint64_t gas_limit, name actor);
+   transaction_trace_ptr callotherpay(name payer, name from, const evmc::bytes& to, const evmc::bytes& value, evmc::bytes& data, uint64_t gas_limit, name actor);
    evmc::address deploy_contract(evm_eoa& eoa, evmc::bytes bytecode);
    transaction_trace_ptr updtgasparam(asset ram_price_mb, uint64_t gas_price, name actor);
    transaction_trace_ptr setgasparam(uint64_t gas_txnewaccount, 
