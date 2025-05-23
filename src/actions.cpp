@@ -232,7 +232,7 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
 
             populate_bridge_accessors();
             if (rc.gas_payer) {
-                balance_table.modify(balance_table.get(rc.gas_payer.value(), "gas payer account has not been opened"), eosio::same_payer, [&](balance& b){
+                balance_table.modify(balance_table.get(rc.gas_payer->value, "gas payer account has not been opened"), eosio::same_payer, [&](balance& b){
                     b.balance -= (intx::uint256)max_gas_cost;
                 });
                 if (tx.value > 0) {
@@ -389,7 +389,7 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
         balance_table.modify(balance_table.get(ingress_account.value), eosio::same_payer, [&](balance& b){
             b.balance -= refund;
         });
-        balance_table.modify(balance_table.get(rc.gas_payer.value()), eosio::same_payer, [&](balance& b){
+        balance_table.modify(balance_table.get(rc.gas_payer->value), eosio::same_payer, [&](balance& b){
             b.balance += refund;
         });
         // inevm remain same
@@ -910,7 +910,7 @@ void evm_contract::callotherpay(eosio::name payer, eosio::name from, const bytes
         .abort_on_failure = true,
         .enforce_chain_id = false,
         .allow_non_self_miner = false,
-        .gas_payer = payer.value,
+        .gas_payer = payer,
     };
 
     call_(rc, from.value, to, v, data, gas_limit, get_and_increment_nonce(from));
