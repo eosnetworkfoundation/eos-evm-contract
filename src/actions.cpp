@@ -231,8 +231,8 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
             const intx::uint256 value_with_max_gas = tx.value + (intx::uint256)max_gas_cost;
 
             populate_bridge_accessors();
-            if (rc.gas_payer != 0) {
-                balance_table.modify(balance_table.get(rc.gas_payer, "gas payer account has not been opened"), eosio::same_payer, [&](balance& b){
+            if (rc.gas_payer) {
+                balance_table.modify(balance_table.get(rc.gas_payer.value(), "gas payer account has not been opened"), eosio::same_payer, [&](balance& b){
                     b.balance -= (intx::uint256)max_gas_cost;
                 });
                 if (tx.value > 0) {
@@ -375,7 +375,7 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
         });
     }
 
-    if (rc.gas_payer != 0) {
+    if (rc.gas_payer) {
         // return excess gas
         uint64_t tx_gas_used = receipt.cumulative_gas_used;
         auto base_fee = ep.evm().block().header.base_fee_per_gas.value();
@@ -389,7 +389,7 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
         balance_table.modify(balance_table.get(ingress_account.value), eosio::same_payer, [&](balance& b){
             b.balance -= refund;
         });
-        balance_table.modify(balance_table.get(rc.gas_payer), eosio::same_payer, [&](balance& b){
+        balance_table.modify(balance_table.get(rc.gas_payer.value()), eosio::same_payer, [&](balance& b){
             b.balance += refund;
         });
         // inevm remain same
@@ -869,7 +869,7 @@ void evm_contract::dispatch_tx(const runtime_config& rc, const transaction& tx) 
     if (_config->get_evm_version_and_maybe_promote() >= 1) {
         process_tx(rc, get_self(), tx, {} /* min_inclusion_price */);
     } else {
-        eosio::check(rc.gas_payer == 0 && rc.allow_special_signature && rc.abort_on_failure && !rc.enforce_chain_id && !rc.allow_non_self_miner, "invalid runtime config");
+        eosio::check(!rc.gas_payer && rc.allow_special_signature && rc.abort_on_failure && !rc.enforce_chain_id && !rc.allow_non_self_miner, "invalid runtime config");
         action(permission_level{get_self(),"active"_n}, get_self(), "pushtx"_n,
             std::tuple<eosio::name, bytes>(get_self(), tx.get_rlptx())
         ).send();
