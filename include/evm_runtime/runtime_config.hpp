@@ -1,11 +1,14 @@
 #pragma once
+#include <eosio/name.hpp>
 #include <variant>
+#include <optional>
 namespace evm_runtime {
 struct runtime_config {
   bool allow_special_signature = false;
   bool abort_on_failure        = false;
   bool enforce_chain_id        = true;
   bool allow_non_self_miner    = true;
+  std::optional<eosio::name> gas_payer;
 };
 
 struct gas_parameter_type {
