@@ -21,7 +21,7 @@ struct call_evm_tester : basic_evm_tester {
         address public lastcaller;
 
         function test(uint256 input) public {
-            require(input != 0);
+            require(input != 0, "solidity:input can't be zero");
             
             count += input;
             lastcaller = msg.sender;
@@ -47,7 +47,7 @@ struct call_evm_tester : basic_evm_tester {
     const intx::uint256 gas_fee_notpayable = suggested_gas_price * 21274;
     
     const std::string contract_bytecode = 
-          "608060405234801561001057600080fd5b5061030f806100206000396000f3fe60806040526004361061004a5760003560e01c806306661abd1461004f57806329e99f071461007a578063a1a7d817146100a3578063d097e7a6146100ad578063d79e1b6a146100d8575b600080fd5b34801561005b57600080fd5b506100646100ef565b60405161007191906101a1565b60405180910390f35b34801561008657600080fd5b506100a1600480360381019061009c91906101ed565b6100f5565b005b6100ab61015e565b005b3480156100b957600080fd5b506100c2610160565b6040516100cf919061025b565b60405180910390f35b3480156100e457600080fd5b506100ed610186565b005b60005481565b6000810361010257600080fd5b8060008082825461011391906102a5565b9250508190555033600160006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff16021790555050565b565b600160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1681565b565b6000819050919050565b61019b81610188565b82525050565b60006020820190506101b66000830184610192565b92915050565b600080fd5b6101ca81610188565b81146101d557600080fd5b50565b6000813590506101e7816101c1565b92915050565b600060208284031215610203576102026101bc565b5b6000610211848285016101d8565b91505092915050565b600073ffffffffffffffffffffffffffffffffffffffff82169050919050565b60006102458261021a565b9050919050565b6102558161023a565b82525050565b6000602082019050610270600083018461024c565b92915050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052601160045260246000fd5b60006102b082610188565b91506102bb83610188565b92508282019050808211156102d3576102d2610276565b5b9291505056fea2646970667358221220ed95d8f74110a8eb6307b7ae52b8623fd3e959169b208830a960c99a9ba1dbf564736f6c63430008120033";
+          "608060405234801561001057600080fd5b506103c2806100206000396000f3fe60806040526004361061004a5760003560e01c806306661abd1461004f57806329e99f071461007a578063a1a7d817146100a3578063d097e7a6146100ad578063d79e1b6a146100d8575b600080fd5b34801561005b57600080fd5b506100646100ef565b60405161007191906101d7565b60405180910390f35b34801561008657600080fd5b506100a1600480360381019061009c9190610223565b6100f5565b005b6100ab610194565b005b3480156100b957600080fd5b506100c2610196565b6040516100cf9190610291565b60405180910390f35b3480156100e457600080fd5b506100ed6101bc565b005b60005481565b60008103610138576040517f08c379a000000000000000000000000000000000000000000000000000000000815260040161012f90610309565b60405180910390fd5b806000808282546101499190610358565b9250508190555033600160006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff16021790555050565b565b600160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1681565b565b6000819050919050565b6101d1816101be565b82525050565b60006020820190506101ec60008301846101c8565b92915050565b600080fd5b610200816101be565b811461020b57600080fd5b50565b60008135905061021d816101f7565b92915050565b600060208284031215610239576102386101f2565b5b60006102478482850161020e565b91505092915050565b600073ffffffffffffffffffffffffffffffffffffffff82169050919050565b600061027b82610250565b9050919050565b61028b81610270565b82525050565b60006020820190506102a66000830184610282565b92915050565b600082825260208201905092915050565b7f736f6c69646974793a696e7075742063616e2774206265207a65726f00000000600082015250565b60006102f3601c836102ac565b91506102fe826102bd565b602082019050919050565b60006020820190508181036000830152610322816102e6565b9050919050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052601160045260246000fd5b6000610363826101be565b915061036e836101be565b925082820190508082111561038657610385610329565b5b9291505056fea264697066735822122072b253e04d7675d9751c68c632df2c04d32dcce47beddcdd35fa75e485afe2fa64736f6c63430008120033";
 
     call_evm_tester() {
       create_accounts({"alice"_n});
@@ -233,7 +233,7 @@ BOOST_FIXTURE_TEST_CASE(call_test_function, call_evm_tester) try {
   auto evm_account_balance = intx::uint256(vault_balance(evm_account_name));
 
   BOOST_REQUIRE_EXCEPTION(call_test(token_addr, 0, "alice"_n, "alice"_n),
-                          eosio_assert_message_exception, eosio_assert_message_is("tx executed inline by contract must succeed"));
+                          eosio_assert_message_exception, eosio_assert_message_is("inline evm tx failed, data:[100] 08 C3 79 A0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 20 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 1C 73 6F 6C 69 64 69 74 79 3A 69 6E 70 75 74 20 63 61 6E 27 74 20 62 65 20 7A 65 72 6F 00 00 00 00"));
 
   BOOST_REQUIRE(intx::uint256(vault_balance("alice"_n)) == alice_balance);
   BOOST_REQUIRE(intx::uint256(vault_balance(evm_account_name)) == evm_account_balance);
@@ -267,9 +267,8 @@ BOOST_FIXTURE_TEST_CASE(call_test_function, call_evm_tester) try {
   auto caller = get_lastcaller(token_addr);
   BOOST_REQUIRE(caller == make_reserved_address("alice"_n.to_uint64_t()));
 
-
   BOOST_REQUIRE_EXCEPTION(call_notpayable(token_addr, 100, "alice"_n, "alice"_n),
-                          eosio_assert_message_exception, eosio_assert_message_is("tx executed inline by contract must succeed"));
+                          eosio_assert_message_exception, eosio_assert_message_is("inline evm tx failed, data:[0]"));
 
   BOOST_REQUIRE(intx::uint256(vault_balance("alice"_n)) == alice_balance);
   BOOST_REQUIRE(intx::uint256(vault_balance(evm_account_name)) == evm_account_balance);
@@ -369,9 +368,10 @@ BOOST_FIXTURE_TEST_CASE(admincall_test_function, call_evm_tester) try {
   BOOST_REQUIRE(evm_balance(evm2) == evm2_balance);
   auto evm_account_balance = intx::uint256(vault_balance(evm_account_name));
 
-  BOOST_REQUIRE_EXCEPTION(admincall_test(token_addr, 0, evm2, evm_account_name),
-                          eosio_assert_message_exception, eosio_assert_message_is("tx executed inline by contract must succeed"));
-
+  try {
+    BOOST_REQUIRE_EXCEPTION(admincall_test(token_addr, 0, evm2, evm_account_name),
+                            eosio_assert_message_exception, eosio_assert_message_is("inline evm tx failed, data:[100] 08 C3 79 A0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 20 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 1C 73 6F 6C 69 64 69 74 79 3A 69 6E 70 75 74 20 63 61 6E 27 74 20 62 65 20 7A 65 72 6F 00 00 00 00"));
+  } FC_LOG_AND_RETHROW()
 
   // Call and check results  
   admincall_test(token_addr, 1234, evm2, evm_account_name);
@@ -402,8 +402,10 @@ BOOST_FIXTURE_TEST_CASE(admincall_test_function, call_evm_tester) try {
   auto caller = get_lastcaller(token_addr);
   BOOST_REQUIRE(caller== evm2.address);
   
-  BOOST_REQUIRE_EXCEPTION(admincall_notpayable(token_addr, 100, evm2, evm_account_name),
-                          eosio_assert_message_exception, eosio_assert_message_is("tx executed inline by contract must succeed"));
+  try {
+    BOOST_REQUIRE_EXCEPTION(admincall_notpayable(token_addr, 100, evm2, evm_account_name),
+                            eosio_assert_message_exception, eosio_assert_message_is("inline evm tx failed, data:[0]"));
+  } FC_LOG_AND_RETHROW()
 
   BOOST_REQUIRE(evm_balance(evm2)== evm2_balance);
   BOOST_REQUIRE(intx::uint256(vault_balance(evm_account_name)) == evm_account_balance);
