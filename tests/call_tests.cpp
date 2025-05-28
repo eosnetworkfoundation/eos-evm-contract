@@ -644,7 +644,7 @@ BOOST_FIXTURE_TEST_CASE(call_test_function_version_1, call_evm_tester) try {
   auto evm_account_balance = intx::uint256(vault_balance(evm_account_name));
 
   BOOST_REQUIRE_EXCEPTION(call_test(token_addr, 0, "alice"_n, "alice"_n),
-                          eosio_assert_message_exception, eosio_assert_message_is("tx executed inline by contract must succeed"));
+                          eosio_assert_message_exception, eosio_assert_message_is("inline evm tx failed, data:[100] 08 C3 79 A0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 20 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 1C 73 6F 6C 69 64 69 74 79 3A 69 6E 70 75 74 20 63 61 6E 27 74 20 62 65 20 7A 65 72 6F 00 00 00 00"));
 
   BOOST_REQUIRE(intx::uint256(vault_balance("alice"_n)) == alice_balance);
   BOOST_REQUIRE(intx::uint256(vault_balance(evm_account_name)) == evm_account_balance);
@@ -687,7 +687,7 @@ BOOST_FIXTURE_TEST_CASE(call_test_function_version_1, call_evm_tester) try {
 
 
   BOOST_REQUIRE_EXCEPTION(call_notpayable(token_addr, 100, "alice"_n, "alice"_n),
-                          eosio_assert_message_exception, eosio_assert_message_is("tx executed inline by contract must succeed"));
+                          eosio_assert_message_exception, eosio_assert_message_is("inline evm tx failed, data:[0]"));
 
   BOOST_REQUIRE(intx::uint256(vault_balance("alice"_n)) == alice_balance);
   BOOST_REQUIRE(intx::uint256(vault_balance(evm_account_name)) == evm_account_balance);
@@ -787,7 +787,7 @@ BOOST_FIXTURE_TEST_CASE(call_other_payer_actually_same_function, call_evm_tester
   auto evm_account_balance = intx::uint256(vault_balance(evm_account_name));
 
   BOOST_REQUIRE_EXCEPTION(callotherpay_test(token_addr, 0, "alice"_n, "alice"_n, "alice"_n),
-                          eosio_assert_message_exception, eosio_assert_message_is("tx executed inline by contract must succeed"));
+                          eosio_assert_message_exception, eosio_assert_message_is("inline evm tx failed, data:[100] 08 C3 79 A0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 20 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 1C 73 6F 6C 69 64 69 74 79 3A 69 6E 70 75 74 20 63 61 6E 27 74 20 62 65 20 7A 65 72 6F 00 00 00 00"));
 
   BOOST_REQUIRE(intx::uint256(vault_balance("alice"_n)) == alice_balance);
   BOOST_REQUIRE(intx::uint256(vault_balance(evm_account_name)) == evm_account_balance);
@@ -828,7 +828,7 @@ BOOST_FIXTURE_TEST_CASE(call_other_payer_actually_same_function, call_evm_tester
 
 
   BOOST_REQUIRE_EXCEPTION(callotherpay_notpayable(token_addr, 100, "alice"_n, "alice"_n, "alice"_n),
-                          eosio_assert_message_exception, eosio_assert_message_is("tx executed inline by contract must succeed"));
+                          eosio_assert_message_exception, eosio_assert_message_is("inline evm tx failed, data:[0]"));
 
   BOOST_REQUIRE(intx::uint256(vault_balance("alice"_n)) == alice_balance);
   BOOST_REQUIRE(intx::uint256(vault_balance(evm_account_name)) == evm_account_balance);
@@ -942,7 +942,7 @@ BOOST_FIXTURE_TEST_CASE(call_other_payer_function, call_evm_tester) try {
   auto evm_account_balance = intx::uint256(vault_balance(evm_account_name));
 
   BOOST_REQUIRE_EXCEPTION(callotherpay_test(token_addr, 0, "alice"_n, "alice"_n, "bob"_n),
-                          eosio_assert_message_exception, eosio_assert_message_is("tx executed inline by contract must succeed"));
+                          eosio_assert_message_exception, eosio_assert_message_is("inline evm tx failed, data:[100] 08 C3 79 A0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 20 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 1C 73 6F 6C 69 64 69 74 79 3A 69 6E 70 75 74 20 63 61 6E 27 74 20 62 65 20 7A 65 72 6F 00 00 00 00"));
 
   BOOST_REQUIRE(intx::uint256(vault_balance("alice"_n)) == alice_balance);
   BOOST_REQUIRE(intx::uint256(vault_balance(evm_account_name)) == evm_account_balance);
@@ -991,7 +991,7 @@ BOOST_FIXTURE_TEST_CASE(call_other_payer_function, call_evm_tester) try {
   alice_balance = 100_ether;
 
   BOOST_REQUIRE_EXCEPTION(callotherpay_notpayable(token_addr, 100, "alice"_n, "alice"_n, "bob"_n),
-                          eosio_assert_message_exception, eosio_assert_message_is("tx executed inline by contract must succeed"));
+                          eosio_assert_message_exception, eosio_assert_message_is("inline evm tx failed, data:[0]"));
 
   BOOST_REQUIRE(intx::uint256(vault_balance("alice"_n)) == alice_balance);
   BOOST_REQUIRE(intx::uint256(vault_balance(evm_account_name)) == evm_account_balance);
