@@ -291,10 +291,12 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
     if (rc.abort_on_failure) {
         if (receipt.success == false) {
             size_t size = (int)call_result.data.length();
-            constexpr size_t max_print_size = 324;/*max printable solidity error msg size=256*/
+            constexpr size_t max_print_size = 292;/*max printable solidity error msg size=224*/
             std::string errmsg;
             errmsg.reserve(1024);
-            errmsg += "inline evm tx failed, data:[";
+            errmsg += "inline evm tx failed, evmc_status_code:";
+            errmsg += std::to_string((int)call_result.status);
+            errmsg += ", data:[";
             errmsg += std::to_string(size);
             errmsg += "]";
             size_t i = 0;
