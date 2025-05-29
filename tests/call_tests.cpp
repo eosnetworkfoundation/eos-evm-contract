@@ -71,7 +71,7 @@ struct call_evm_tester : basic_evm_tester {
       return deploy_contract(eoa, evmc::from_hex(contract_bytecode).value());
     }
 
-    void call_test(const evmc::address& contract_addr, uint64_t amount, name eos, name actor) {
+    void call_test(const evmc::address& contract_addr, uint64_t amount, name eos, name actor, uint64_t gaslimit = 500000) {
 
       auto to = evmc::bytes{std::begin(contract_addr.bytes), std::end(contract_addr.bytes)};
 
@@ -82,7 +82,7 @@ struct call_evm_tester : basic_evm_tester {
       evmc::bytes32 v;
       intx::be::store(v.bytes, intx::uint256(0));
 
-      call(eos, to, silkworm::Bytes(v), data, 500000, actor);
+      call(eos, to, silkworm::Bytes(v), data, gaslimit, actor);
     }
 
     void call_testpay(const evmc::address& contract_addr, uint128_t amount, name eos, name actor) {
@@ -283,6 +283,10 @@ BOOST_FIXTURE_TEST_CASE(call_test_function, call_evm_tester) try {
 
   BOOST_REQUIRE_EXCEPTION(call_test(token_addr, 0, "alice"_n, "alice"_n),
                           eosio_assert_message_exception, eosio_assert_message_is("inline evm tx failed, evmc_status_code:2, data:[100] 08 C3 79 A0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 20 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 1C 73 6F 6C 69 64 69 74 79 3A 69 6E 70 75 74 20 63 61 6E 27 74 20 62 65 20 7A 65 72 6F 00 00 00 00"));
+
+  // call run out of gas, EVMC_OUT_OF_GAS = 3, (gas limit > intrinsic gas)
+  BOOST_REQUIRE_EXCEPTION(call_test(token_addr, 0, "alice"_n, "alice"_n, 21200),
+                          eosio_assert_message_exception, eosio_assert_message_is("inline evm tx failed, evmc_status_code:3, data:[0]"));
 
   BOOST_REQUIRE(intx::uint256(vault_balance("alice"_n)) == alice_balance);
   BOOST_REQUIRE(intx::uint256(vault_balance(evm_account_name)) == evm_account_balance);
