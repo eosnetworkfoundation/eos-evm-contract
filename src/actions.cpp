@@ -264,7 +264,8 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
     check_result( r, tx, "validate_transaction error" );
 
     Receipt receipt;
-    const auto res = ep.execute_transaction(tx, receipt, gas_params);
+    CallResult call_result; 
+    const auto res = ep.execute_transaction(tx, receipt, gas_params, call_result);
 
     // Calculate the miner portion of the actual gas fee (if necessary):
     std::optional<intx::uint256> gas_fee_miner_portion;
@@ -287,8 +288,29 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
         }
     }
 
-    if (rc.abort_on_failure)
-        eosio::check(receipt.success, "tx executed inline by contract must succeed");
+    if (rc.abort_on_failure) {
+        if (receipt.success == false) {
+            size_t size = (int)call_result.data.length();
+            constexpr size_t max_size = 1024;
+            std::string errmsg;
+            errmsg.reserve(max_size);
+            errmsg += "inline evm tx failed, evmc_status_code:";
+            errmsg += std::to_string((int)call_result.status);
+            errmsg += ", data:[";
+            errmsg += std::to_string(size);
+            errmsg += "]";
+            size_t i = 0;
+            for (; i < size && errmsg.length() < max_size - 6; ++i ) {
+                static const char hex_chars[] = "0123456789abcdef";
+                errmsg += hex_chars[((uint8_t)call_result.data[i]) >> 4];
+                errmsg += hex_chars[((uint8_t)call_result.data[i]) & 0xf];
+            }
+            if (i < size) {
+                errmsg += "...";
+            }
+            eosio::check(false, errmsg);
+        }
+    }
 
     if(!ep.state().reserved_objects().empty()) {
         intx::uint256 total_egress;
