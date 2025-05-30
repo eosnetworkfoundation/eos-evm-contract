@@ -291,16 +291,16 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
     if (rc.abort_on_failure) {
         if (receipt.success == false) {
             size_t size = (int)call_result.data.length();
-            constexpr size_t max_print_size = 384 + 68; // 68 byte is overhead
+            constexpr size_t max_size = 1024;
             std::string errmsg;
-            errmsg.reserve(1024);
+            errmsg.reserve(max_size);
             errmsg += "inline evm tx failed, evmc_status_code:";
             errmsg += std::to_string((int)call_result.status);
             errmsg += ", data:[";
             errmsg += std::to_string(size);
             errmsg += "]";
             size_t i = 0;
-            for (; i < max_print_size && i < size; ++i ) {
+            for (; i < size && errmsg.length() < max_size - 6; ++i ) {
                 static const char hex_chars[] = "0123456789abcdef";
                 errmsg += hex_chars[((uint8_t)call_result.data[i]) >> 4];
                 errmsg += hex_chars[((uint8_t)call_result.data[i]) & 0xf];
