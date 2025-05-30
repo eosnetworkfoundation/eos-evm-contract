@@ -231,9 +231,22 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
             const intx::uint256 value_with_max_gas = tx.value + (intx::uint256)max_gas_cost;
 
             populate_bridge_accessors();
-            balance_table.modify(balance_table.get(ingress_account.value), eosio::same_payer, [&](balance& b){
-                b.balance -= value_with_max_gas;
-            });
+            if (rc.gas_payer) {
+                balance_table.modify(balance_table.get(rc.gas_payer->value, "gas payer account has not been opened"), eosio::same_payer, [&](balance& b){
+                    b.balance -= (intx::uint256)max_gas_cost;
+                });
+                if (tx.value > 0) {
+                    balance_table.modify(balance_table.get(ingress_account.value), eosio::same_payer, [&](balance& b){
+                        b.balance -= tx.value;
+                    });
+                }
+            }
+            else {
+                balance_table.modify(balance_table.get(ingress_account.value), eosio::same_payer, [&](balance& b){
+                    b.balance -= value_with_max_gas;
+                });
+            }
+           
             inevm->set(inevm->get() += value_with_max_gas, eosio::same_payer);
 
             ep.state().set_balance(*tx.from, value_with_max_gas);
@@ -251,7 +264,8 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
     check_result( r, tx, "validate_transaction error" );
 
     Receipt receipt;
-    const auto res = ep.execute_transaction(tx, receipt, gas_params);
+    CallResult call_result; 
+    const auto res = ep.execute_transaction(tx, receipt, gas_params, call_result);
 
     // Calculate the miner portion of the actual gas fee (if necessary):
     std::optional<intx::uint256> gas_fee_miner_portion;
@@ -274,8 +288,29 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
         }
     }
 
-    if (rc.abort_on_failure)
-        eosio::check(receipt.success, "tx executed inline by contract must succeed");
+    if (rc.abort_on_failure) {
+        if (receipt.success == false) {
+            size_t size = (int)call_result.data.length();
+            constexpr size_t max_size = 1024;
+            std::string errmsg;
+            errmsg.reserve(max_size);
+            errmsg += "inline evm tx failed, evmc_status_code:";
+            errmsg += std::to_string((int)call_result.status);
+            errmsg += ", data:[";
+            errmsg += std::to_string(size);
+            errmsg += "]";
+            size_t i = 0;
+            for (; i < size && errmsg.length() < max_size - 6; ++i ) {
+                static const char hex_chars[] = "0123456789abcdef";
+                errmsg += hex_chars[((uint8_t)call_result.data[i]) >> 4];
+                errmsg += hex_chars[((uint8_t)call_result.data[i]) & 0xf];
+            }
+            if (i < size) {
+                errmsg += "...";
+            }
+            eosio::check(false, errmsg);
+        }
+    }
 
     if(!ep.state().reserved_objects().empty()) {
         intx::uint256 total_egress;
@@ -360,6 +395,26 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
         balance_table.modify(balance_table.get(miner.value), eosio::same_payer, [&](balance& b){
             b.balance += *gas_fee_miner_portion;
         });
+    }
+
+    if (rc.gas_payer) {
+        // return excess gas
+        uint64_t tx_gas_used = receipt.cumulative_gas_used;
+        auto base_fee = ep.evm().block().header.base_fee_per_gas.value();
+        const intx::uint512 max_gas_cost = intx::uint256(tx.gas_limit) * tx.max_fee_per_gas;
+        const intx::uint512 gas_fee = intx::uint256(tx_gas_used) * (tx.priority_fee_per_gas(base_fee) + base_fee);
+        check(gas_fee < std::numeric_limits<intx::uint256>::max() && max_gas_cost < std::numeric_limits<intx::uint256>::max() && max_gas_cost > gas_fee, "invalid gas fee");
+        const intx::uint256 refund = static_cast<intx::uint256>(max_gas_cost - gas_fee);
+
+        const name ingress_account(*extract_reserved_address(*tx.from));
+
+        balance_table.modify(balance_table.get(ingress_account.value), eosio::same_payer, [&](balance& b){
+            b.balance -= refund;
+        });
+        balance_table.modify(balance_table.get(rc.gas_payer->value), eosio::same_payer, [&](balance& b){
+            b.balance += refund;
+        });
+        // inevm remain same
     }
 
     // Statistics
@@ -836,7 +891,7 @@ void evm_contract::dispatch_tx(const runtime_config& rc, const transaction& tx) 
     if (_config->get_evm_version_and_maybe_promote() >= 1) {
         process_tx(rc, get_self(), tx, {} /* min_inclusion_price */);
     } else {
-        eosio::check(rc.allow_special_signature && rc.abort_on_failure && !rc.enforce_chain_id && !rc.allow_non_self_miner, "invalid runtime config");
+        eosio::check(!rc.gas_payer && rc.allow_special_signature && rc.abort_on_failure && !rc.enforce_chain_id && !rc.allow_non_self_miner, "invalid runtime config");
         action(permission_level{get_self(),"active"_n}, get_self(), "pushtx"_n,
             std::tuple<eosio::name, bytes>(get_self(), tx.get_rlptx())
         ).send();
@@ -856,6 +911,28 @@ void evm_contract::call(eosio::name from, const bytes& to, const bytes& value, c
         .abort_on_failure = true,
         .enforce_chain_id = false,
         .allow_non_self_miner = false
+    };
+
+    call_(rc, from.value, to, v, data, gas_limit, get_and_increment_nonce(from));
+}
+
+void evm_contract::callotherpay(eosio::name payer, eosio::name from, const bytes& to, const bytes& value, const bytes& data, uint64_t gas_limit) {
+    assert_unfrozen();
+    require_auth(from);
+    require_auth(payer);
+
+    eosio::check(_config->get_evm_version_and_maybe_promote() >= 1, "operation not supported for current evm version");
+
+    // Prepare v
+    eosio::check(value.size() == sizeof(intx::uint256), "invalid value");
+    intx::uint256 v = intx::be::unsafe::load<intx::uint256>((const uint8_t *)value.data());
+
+    runtime_config rc {
+        .allow_special_signature = true,
+        .abort_on_failure = true,
+        .enforce_chain_id = false,
+        .allow_non_self_miner = false,
+        .gas_payer = payer,
     };
 
     call_(rc, from.value, to, v, data, gas_limit, get_and_increment_nonce(from));
