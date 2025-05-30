@@ -282,7 +282,7 @@ BOOST_FIXTURE_TEST_CASE(call_test_function, call_evm_tester) try {
   auto evm_account_balance = intx::uint256(vault_balance(evm_account_name));
 
   BOOST_REQUIRE_EXCEPTION(call_test(token_addr, 0, "alice"_n, "alice"_n),
-                          eosio_assert_message_exception, eosio_assert_message_is("inline evm tx failed, evmc_status_code:2, data:[100] 08 C3 79 A0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 20 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 1C 73 6F 6C 69 64 69 74 79 3A 69 6E 70 75 74 20 63 61 6E 27 74 20 62 65 20 7A 65 72 6F 00 00 00 00"));
+                          eosio_assert_message_exception, eosio_assert_message_is("inline evm tx failed, evmc_status_code:2, data:[100]08c379a00000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000001c736f6c69646974793a696e7075742063616e2774206265207a65726f00000000"));
 
   // call run out of gas, EVMC_OUT_OF_GAS = 3, (gas limit > intrinsic gas)
   BOOST_REQUIRE_EXCEPTION(call_test(token_addr, 0, "alice"_n, "alice"_n, 21200),
@@ -423,7 +423,7 @@ BOOST_FIXTURE_TEST_CASE(admincall_test_function, call_evm_tester) try {
 
   try {
     BOOST_REQUIRE_EXCEPTION(admincall_test(token_addr, 0, evm2, evm_account_name),
-                            eosio_assert_message_exception, eosio_assert_message_is("inline evm tx failed, evmc_status_code:2, data:[100] 08 C3 79 A0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 20 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 1C 73 6F 6C 69 64 69 74 79 3A 69 6E 70 75 74 20 63 61 6E 27 74 20 62 65 20 7A 65 72 6F 00 00 00 00"));
+                            eosio_assert_message_exception, eosio_assert_message_is("inline evm tx failed, evmc_status_code:2, data:[100]08c379a00000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000001c736f6c69646974793a696e7075742063616e2774206265207a65726f00000000"));
   } FC_LOG_AND_RETHROW()
 
   // Call and check results  
@@ -648,7 +648,7 @@ BOOST_FIXTURE_TEST_CASE(call_test_function_version_1, call_evm_tester) try {
   auto evm_account_balance = intx::uint256(vault_balance(evm_account_name));
 
   BOOST_REQUIRE_EXCEPTION(call_test(token_addr, 0, "alice"_n, "alice"_n),
-                          eosio_assert_message_exception, eosio_assert_message_is("inline evm tx failed, evmc_status_code:2, data:[100] 08 C3 79 A0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 20 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 1C 73 6F 6C 69 64 69 74 79 3A 69 6E 70 75 74 20 63 61 6E 27 74 20 62 65 20 7A 65 72 6F 00 00 00 00"));
+                          eosio_assert_message_exception, eosio_assert_message_is("inline evm tx failed, evmc_status_code:2, data:[100]08c379a00000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000001c736f6c69646974793a696e7075742063616e2774206265207a65726f00000000"));
 
   BOOST_REQUIRE(intx::uint256(vault_balance("alice"_n)) == alice_balance);
   BOOST_REQUIRE(intx::uint256(vault_balance(evm_account_name)) == evm_account_balance);
@@ -791,7 +791,7 @@ BOOST_FIXTURE_TEST_CASE(call_other_payer_actually_same_function, call_evm_tester
   auto evm_account_balance = intx::uint256(vault_balance(evm_account_name));
 
   BOOST_REQUIRE_EXCEPTION(callotherpay_test(token_addr, 0, "alice"_n, "alice"_n, "alice"_n),
-                          eosio_assert_message_exception, eosio_assert_message_is("inline evm tx failed, evmc_status_code:2, data:[100] 08 C3 79 A0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 20 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 1C 73 6F 6C 69 64 69 74 79 3A 69 6E 70 75 74 20 63 61 6E 27 74 20 62 65 20 7A 65 72 6F 00 00 00 00"));
+                          eosio_assert_message_exception, eosio_assert_message_is("inline evm tx failed, evmc_status_code:2, data:[100]08c379a00000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000001c736f6c69646974793a696e7075742063616e2774206265207a65726f00000000"));
 
   BOOST_REQUIRE(intx::uint256(vault_balance("alice"_n)) == alice_balance);
   BOOST_REQUIRE(intx::uint256(vault_balance(evm_account_name)) == evm_account_balance);
@@ -946,7 +946,7 @@ BOOST_FIXTURE_TEST_CASE(call_other_payer_function, call_evm_tester) try {
   auto evm_account_balance = intx::uint256(vault_balance(evm_account_name));
 
   BOOST_REQUIRE_EXCEPTION(callotherpay_test(token_addr, 0, "alice"_n, "alice"_n, "bob"_n),
-                          eosio_assert_message_exception, eosio_assert_message_is("inline evm tx failed, evmc_status_code:2, data:[100] 08 C3 79 A0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 20 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 1C 73 6F 6C 69 64 69 74 79 3A 69 6E 70 75 74 20 63 61 6E 27 74 20 62 65 20 7A 65 72 6F 00 00 00 00"));
+                          eosio_assert_message_exception, eosio_assert_message_is("inline evm tx failed, evmc_status_code:2, data:[100]08c379a00000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000001c736f6c69646974793a696e7075742063616e2774206265207a65726f00000000"));
 
   BOOST_REQUIRE(intx::uint256(vault_balance("alice"_n)) == alice_balance);
   BOOST_REQUIRE(intx::uint256(vault_balance(evm_account_name)) == evm_account_balance);
