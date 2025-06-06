@@ -48,7 +48,7 @@ Follow the instruction in https://github.com/eosnetworkfoundation/eos-evm-node t
 
 ## Run A Local Node With EOS EVM Service
 
-In order to run an EOS EVM service, and thus have setup the Antelope blockchain with capabilities to push EVM transactions, we need to have the follow items inside one physical server / VM.
+In order to run an EOS EVM service, and thus have setup the Antelope blockchain with capabilities to push EVM transactions, we need to have the following items inside one physical server / VM.
 
 1. [Run A Local Antelope Node](#1-run-a-local-antelope-node)
 2. [Blockchain Bootstrap And Initialization](#2-blockchain-bootstrap-and-initialization)
@@ -306,7 +306,7 @@ executed transaction: acaf5ed70a7ce271627532cf76b6303ebab8d24656f57c69b03cfe8103
 warning: transaction executed locally, but may not be confirmed by the network yetult         ] 
 ```
 
-Run below commmand to set boot.abi:
+Run below command to set boot.abi:
 
 ```shell
 ./cleos set abi eosio ../eos-system-contracts/build/contracts/eosio.boot/eosio.boot.abi
@@ -500,7 +500,7 @@ EOS_PERMISSION="active"
 EXPIRE_SEC=60
 ```
 
-In the above environment settings, Tx Wrapper will listen to 127.0.0.1:18888, use `5JURSKS1BrJ1TagNBw1uVSzTQL2m9eHGkjknWeZkjSt33Awtior` to wrap and sign the in-coming ETH trasnactions into Antelope transactions (contract=evmevmevmevm, action_name=pushtx, with expire second set to 60 and using permission a123@active), and then push them into the Antelope RPC endpoint http://127.0.0.1:8888. If the endpoint http://127.0.0.1:8888 is unavailable, it will try the next endpoint http://192.168.1.100:8888.
+In the above environment settings, Tx Wrapper will listen to 127.0.0.1:18888, use `5JURSKS1BrJ1TagNBw1uVSzTQL2m9eHGkjknWeZkjSt33Awtior` to wrap and sign the in-coming ETH transactions into Antelope transactions (contract=evmevmevmevm, action_name=pushtx, with expire second set to 60 and using permission a123@active), and then push them into the Antelope RPC endpoint http://127.0.0.1:8888. If the endpoint http://127.0.0.1:8888 is unavailable, it will try the next endpoint http://192.168.1.100:8888.
 
 #### Start eos-evm-miner
 
@@ -525,7 +525,7 @@ Example output:
 
 Sign a normal Ethereum transaction to produce a raw signed ETH transaction.
 
-You can skip this if you are already familiar with. This is a example script sign_ethraw.py:
+You can skip this if you are already familiar with. This is an example script sign_ethraw.py:
 
 ```python
 import os
@@ -571,7 +571,7 @@ rlptx = rlp.encode(unsigned_tx.sign(EVM_SENDER_KEY, EVM_CHAINID), transactions.T
 print("Eth signed raw transaction is {}".format(rlptx.hex()))
 ```
 
-Example: sign a ETH transaction of transfering amount "1" (minimal positive amount) from 0x2787b98fc4e731d0456b3941f0b3fe2e01439961 to itself without input data, using nonce 0:
+Example: sign an ETH transaction of transferring amount "1" (minimal positive amount) from 0x2787b98fc4e731d0456b3941f0b3fe2e01439961 to itself without input data, using nonce 0:
 
 ```shell
 python3 sign_ethraw.py 0x2787b98fc4e731d0456b3941f0b3fe2e01439961 0x2787b98fc4e731d0456b3941f0b3fe2e01439961 1 "" 0
@@ -660,7 +660,7 @@ You will notice that the balance of account `2787b98fc4e731d0456b3941f0b3fe2e014
 
 #### Compile Simple Solidity Smart Contract
 
-Yoy can now play with Solidity smart contract and compile simple solidity smart contract. You can skip this one if you're already familiar. Take this example solidity smart contract:
+You can now play with Solidity smart contract and compile simple solidity smart contract. You can skip this one if you're already familiar. Take this example solidity smart contract:
 
 ```solidity
 // SPDX-License-Identifier: GPL-3.0
@@ -706,7 +706,7 @@ According to the standard of Ethereum, to deploy the contract, we need to put th
 python3 sign_ethraw.py 2787b98fc4e731d0456b3941f0b3fe2e01439961 "" 0 608060405234801561001057600080fd5b50610150806100206000396000f3fe608060405234801561001057600080fd5b50600436106100365760003560e01c80632e64cec11461003b5780636057361d14610059575b600080fd5b610043610075565b60405161005091906100d9565b60405180910390f35b610073600480360381019061006e919061009d565b61007e565b005b60008054905090565b8060008190555050565b60008135905061009781610103565b92915050565b6000602082840312156100b3576100b26100fe565b5b60006100c184828501610088565b91505092915050565b6100d3816100f4565b82525050565b60006020820190506100ee60008301846100ca565b92915050565b6000819050919050565b600080fd5b61010c816100f4565b811461011757600080fd5b5056fea26469706673582212209a159a4f3847890f10bfb87871a61eba91c5dbf5ee3cf6398207e292eee22a1664736f6c63430008070033 1
 ```
 
-You'll get the signed ETH raw transation:
+You'll get the signed ETH raw transaction:
 
 ```txt
 f901c401843b9aca00830f42408080b90170608060405234801561001057600080fd5b50610150806100206000396000f3fe608060405234801561001057600080fd5b50600436106100365760003560e01c80632e64cec11461003b5780636057361d14610059575b600080fd5b610043610075565b60405161005091906100d9565b60405180910390f35b610073600480360381019061006e919061009d565b61007e565b005b60008054905090565b8060008190555050565b60008135905061009781610103565b92915050565b6000602082840312156100b3576100b26100fe565b5b60006100c184828501610088565b91505092915050565b6100d3816100f4565b82525050565b60006020820190506100ee60008301846100ca565b92915050565b6000819050919050565b600080fd5b61010c816100f4565b811461011757600080fd5b5056fea26469706673582212209a159a4f3847890f10bfb87871a61eba91c5dbf5ee3cf6398207e292eee22a1664736f6c634300080700338279aaa0b1b54ab370d1f3e820249b64ca1a1edb53779a20cd6fbf29540af17d95546d2ca02ff89e2476a5022da7f39e0b98b895de6f73445c3961b0affd404c17141c537b
@@ -800,7 +800,7 @@ python3 sign_ethraw.py 2787b98fc4e731d0456b3941f0b3fe2e01439961 51a97d86ae7c83f0
 
 In this case `6057361d` is the function first 4 bytes of hash of `store(uint256 num)` (more precisely, `bytes4(keccak256("store(uint256)"))`, see https://solidity-by-example.org/function-selector/) , we use 123 as the value of `num`, which is 7b in hex form.
 
-Once you get the raw trasnaction, then we can push into Tx Wrapper to sign as the Antelope transaction and push to Antelope blockchain:
+Once you get the raw transaction, then we can push into Tx Wrapper to sign as the Antelope transaction and push to Antelope blockchain:
 
 ```shell
 curl http://127.0.0.1:18888 -X POST -H "Accept: application/json" -H "Content-Type: application/json" --data '{"method":"eth_sendRawTransaction","params":["0xf88a02843b9aca00830f42409451a97d86ae7c83f050056f03ebbe45100104676480a46057361d000000000000000000000000000000000000000000000000000000000000007b8279a9a0a2fc71e4beebd9cd1a3d9a55da213f126641f7ed0bb708a3882fa2b85dd6c30ea0164a5d8a8b9b37950091665194f07b5c4e8f6d1b0d6ef162b0e0a1f9bf10c7a7"],"id":1,"jsonrpc":"2.0"}'
@@ -915,13 +915,13 @@ Example output:
 
 ### 5. Start eos-evm-node 
 
-A eos-evm-node is a node process of the virtual ethereum blockchain that validates virtual ethereum blocks and serves the read requests coming from eos-evm-rpc. It will not produce blocks. However, it will consume blocks from Antelope node and convert Antelope blocks into Virutal Ethereum blocks in a deterministic way.
+A eos-evm-node is a node process of the virtual ethereum blockchain that validates virtual ethereum blocks and serves the read requests coming from eos-evm-rpc. It will not produce blocks. However, it will consume blocks from Antelope node and convert Antelope blocks into Virtual Ethereum blocks in a deterministic way.
 
 To set it up, we need to first make up a genesis of the virtual ethereum blockchain that maps to the same EVM state of the evm account of the Antelope chain that just initialized in the previous steps.
 
 #### Antelope To EVM Block Mapping
 
-We need to choose a block, let's say X, in Antelope as the starting point to build up the Virtual EVM blockchain. This block X need to be equal or eariler than the first EVM related transaction happened in Antelope.
+We need to choose a block, let's say X, in Antelope as the starting point to build up the Virtual EVM blockchain. This block X need to be equal or earlier than the first EVM related transaction happened in Antelope.
 
 For example:
 
@@ -956,7 +956,7 @@ check the current config table:
 }
 ```
 
-take the above example, we need to findout the Antelope block number x whose the timestamp equals to 2022-11-18T07:58:34.
+take the above example, we need to find out the Antelope block number x whose the timestamp equals to 2022-11-18T07:58:34.
 Once we have decided the starting block number x, the next step is to build up the correct genesis for the virtual Ethereum chain. Take this as example.
 
 Antelope block 2:
@@ -1042,7 +1042,7 @@ Final EVM genesis example:
 
 #### Start The EOS EVM Process
 
-Run the below commamnd to start the eos-evm-node:
+Run the below command to start the eos-evm-node:
 
 ```shell
 mkdir ./chain-data
@@ -1055,7 +1055,7 @@ The eos-evm-rpc process provides Ethereum compatible RPC service for clients. It
 
 #### Start The eos-evm-rpc process
 
-Run below commmand to start the eos-evm-node:
+Run below command to start the eos-evm-node:
 
 ```shell
 ./eos-evm-rpc --api-spec=eth,net --http-port=0.0.0.0:8881 --eos-evm-node=127.0.0.1:8080 --chaindata=./chain-data
@@ -1072,7 +1072,7 @@ To verify the RPC response run below command:
 curl --location --request POST 'localhost:8881/' --header 'Content-Type: application/json' --data-raw '{"method":"eth_blockNumber","id":0,"jsonrpc":"2.0"}'
 ```
 
-You'll recevie a response similar to the one below:
+You'll receive a response similar to the one below:
 
 ```json
 {"id":0,"jsonrpc":"2.0","result":"0x1"}
@@ -1173,7 +1173,7 @@ debian       jessie    3aaeab7a4777   19 months ago   129MB
 sudo docker run -p 81:80 -v ${PWD}/nginx.conf:/etc/nginx.conf 49564d312df7
 ```
 
-In the commmand above we map the host port 81 to the port 80 inside the docker.
+In the command above we map the host port 81 to the port 80 inside the docker.
 
 - Check if the proxy is responding:
 
