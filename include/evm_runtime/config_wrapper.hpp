@@ -69,6 +69,8 @@ struct config_wrapper {
     void set_ingress_gas_limit(uint64_t gas_limit);
     uint64_t get_ingress_gas_limit() const;
 
+    void swapgastoken(name new_token_contract, symbol new_symbol);
+
 private:
     void set_queue_front_block(uint32_t block_num);
     
