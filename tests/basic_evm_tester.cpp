@@ -220,7 +220,7 @@ evmc::address basic_evm_tester::make_reserved_address(name account) {
 basic_evm_tester::basic_evm_tester(std::string native_symbol_str) :
    native_symbol(symbol::from_string(native_symbol_str))
 {
-   create_accounts({token_account_name, faucet_account_name, evm_account_name});
+   create_accounts({token_account_name, faucet_account_name, evm_account_name, vaulta_account_name});
    produce_block();
 
    set_code(token_account_name, testing::contracts::eosio_token_wasm());
@@ -237,12 +237,24 @@ basic_evm_tester::basic_evm_tester(std::string native_symbol_str) :
 
    produce_block();
 
+   set_code(vaulta_account_name, testing::contracts::vaulta_system_wasm());
+   set_abi(vaulta_account_name, testing::contracts::vaulta_system_abi().data());
+   push_action(vaulta_account_name, "init"_n, vaulta_account_name, 
+               mvo()("maximum_supply",asset(10'000'000'000'0000, new_gas_symbol)));
+   produce_block();
+
    set_code(evm_account_name, testing::contracts::evm_runtime_wasm());
    set_abi(evm_account_name, testing::contracts::evm_runtime_abi().data());
    produce_block();
 }
 
 asset basic_evm_tester::make_asset(int64_t amount) const { return asset(amount, native_symbol); }
+
+transaction_trace_ptr basic_evm_tester::swapgastoken() {
+
+   return push_action(
+      evm_account_name, "swapgastoken"_n, evm_account_name, mvo()("new_token_contract", vaulta_account_name)("new_symbol",new_gas_symbol)("swap_dest_account",vaulta_account_name)("swap_memo","swap gas token"));
+}
 
 transaction_trace_ptr basic_evm_tester::transfer_token(name from, name to, asset quantity, std::string memo, name acct)
 {

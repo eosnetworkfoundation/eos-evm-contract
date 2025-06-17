@@ -102,6 +102,64 @@ BOOST_FIXTURE_TEST_CASE(basic_deposit_withdraw, native_token_evm_tester_EOS) try
 
 } FC_LOG_AND_RETHROW()
 
+
+BOOST_FIXTURE_TEST_CASE(deposit_withdraw_after_swap, native_token_evm_tester_EOS) try {
+   //can't transfer to alice's balance because it isn't open
+   BOOST_REQUIRE_EXCEPTION(transfer_token("alice"_n, "evm"_n, make_asset(1'0000), "alice"),
+                           eosio_assert_message_exception, eosio_assert_message_is("receiving account has not been opened"));
+
+   open("alice"_n);
+
+   //alice sends her own tokens in to her EVM balance
+   {
+      const int64_t to_transfer = 1'0000;
+      const int64_t alice_native_before = native_balance("alice"_n);
+      const int64_t alice_evm_before = vault_balance_token("alice"_n);
+      transfer_token("alice"_n, "evm"_n, make_asset(to_transfer), "alice");
+
+      BOOST_REQUIRE_EQUAL(alice_native_before - native_balance("alice"_n), to_transfer);
+      BOOST_REQUIRE_EQUAL(vault_balance_token("alice"_n), to_transfer);
+   }
+
+   //bob sends his tokens in to alice's EVM balance
+   {
+      const int64_t to_transfer = 1'0000;
+      const int64_t bob_native_before = native_balance("bob"_n);
+      const int64_t alice_evm_before = vault_balance_token("alice"_n);
+      transfer_token("bob"_n, "evm"_n, make_asset(to_transfer), "alice");
+
+      BOOST_REQUIRE_EQUAL(bob_native_before - native_balance("bob"_n), to_transfer);
+      BOOST_REQUIRE_EQUAL(vault_balance_token("alice"_n) - alice_evm_before, to_transfer);
+   }
+
+   produce_block();
+   swapgastoken(); // switch gas token
+
+   //withdraw a little bit of Alice's balance
+   {
+      const int64_t to_withdraw = 5000;
+      const int64_t alice_native_before = 0;
+      const int64_t alice_evm_before = vault_balance_token("alice"_n);
+      withdraw("alice"_n, asset(to_withdraw, new_gas_symbol));
+
+      BOOST_REQUIRE_EQUAL(native_new_gas_symbol_balance("alice"_n) - alice_native_before, to_withdraw);
+      BOOST_REQUIRE_EQUAL(alice_evm_before - vault_balance_token("alice"_n), to_withdraw);
+   }
+
+   //withdraw the remaining amount that alice has
+   {
+      const int64_t to_withdraw = 1'5000;
+      const int64_t alice_native_before = native_new_gas_symbol_balance("alice"_n);
+      const int64_t alice_evm_before = vault_balance_token("alice"_n);
+      withdraw("alice"_n, asset(to_withdraw, new_gas_symbol));
+
+      BOOST_REQUIRE_EQUAL(native_new_gas_symbol_balance("alice"_n) - alice_native_before, to_withdraw);
+      BOOST_REQUIRE_EQUAL(alice_evm_before - vault_balance_token("alice"_n), to_withdraw);
+   }
+
+} FC_LOG_AND_RETHROW()
+
+
 BOOST_FIXTURE_TEST_CASE(invalid_memos, native_token_evm_tester_EOS) try {
    //try some weird account names as memos
    BOOST_REQUIRE_EXCEPTION(transfer_token("alice"_n, "evm"_n, make_asset(1'0000), "BANANA"),

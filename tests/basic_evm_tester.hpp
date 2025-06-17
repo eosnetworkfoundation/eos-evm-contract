@@ -424,6 +424,8 @@ public:
    static constexpr name token_account_name = "eosio.token"_n;
    static constexpr name faucet_account_name = "faucet"_n;
    static constexpr name evm_account_name = "evm"_n;
+   static constexpr name vaulta_account_name = "core.vaulta"_n;
+   const symbol new_gas_symbol = symbol::from_string("4,A");
 
    static constexpr uint64_t evm_chain_id = 15555;
 
@@ -444,6 +446,7 @@ public:
    asset make_asset(int64_t amount) const;
 
    transaction_trace_ptr transfer_token(name from, name to, asset quantity, std::string memo = "", name acct=token_account_name);
+   transaction_trace_ptr swapgastoken();
 
    action get_action( account_name code, action_name acttype, vector<permission_level> auths,
                                  const bytes& data )const;
