@@ -287,4 +287,48 @@ BOOST_FIXTURE_TEST_CASE(gas_fee_statistics_basic_eos_evm_bridge, statistics_evm_
 
 } FC_LOG_AND_RETHROW()
 
+
+BOOST_FIXTURE_TEST_CASE(gas_fee_statistics_basic_eos_evm_bridge_tokeswap, statistics_evm_tester) try {
+
+   init();
+   fund_evm_faucet();
+   open(miner_account_name);
+
+   // swap EOS->A
+   swapgastoken();
+   transfer_token("alice"_n, vaulta_account_name, make_asset(50'0000), "");
+
+   evm_eoa evm1, evm2;
+
+   //reminder: .0001 A is 100 szabos
+   const intx::uint256 smallest = 100_szabo;
+
+   //to start with, there is no ingress bridge fee. should be 1->1
+
+   const auto s = get_statistics();
+   const auto initial_gas_count = s.gas_fee_income;
+   const auto initial_bridge_count = s.ingress_bridge_fee_income;
+
+   BOOST_REQUIRE_EQUAL(s.gas_fee_income.balance.get_symbol(), new_gas_symbol);
+   BOOST_REQUIRE_EQUAL(s.ingress_bridge_fee_income.balance.get_symbol(), new_gas_symbol);
+   
+   //transfer 0.5000 A from alice to evm2 account
+   {
+      const int64_t to_bridge = 5000;
+
+      transfer_token("alice"_n, "evm"_n, asset(to_bridge, new_gas_symbol), evm2.address_0x(), vaulta_account_name);
+
+      const auto s2 = get_statistics();
+      BOOST_REQUIRE(s2.ingress_bridge_fee_income == initial_bridge_count);
+      // Bridge transfers should not generate gas income as the gas fee for the evm transfer is paid by evm_runtime.
+      BOOST_REQUIRE(s2.gas_fee_income == initial_gas_count);
+   }
+
+   // set the bridge free to 0.1000 EOS
+   const int64_t bridge_fee = 1000;
+   setfeeparams(fee_parameters{.ingress_bridge_fee = make_asset(bridge_fee)});
+
+} FC_LOG_AND_RETHROW()
+
+
 BOOST_AUTO_TEST_SUITE_END()
