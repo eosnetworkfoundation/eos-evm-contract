@@ -294,6 +294,11 @@ BOOST_FIXTURE_TEST_CASE(gas_fee_statistics_basic_eos_evm_bridge_tokeswap, statis
    fund_evm_faucet();
    open(miner_account_name);
 
+   // ensure stats are using old symbol
+   const auto s0 = get_statistics();
+   BOOST_REQUIRE_EQUAL(s0.gas_fee_income.balance.get_symbol(), native_symbol);
+   BOOST_REQUIRE_EQUAL(s0.ingress_bridge_fee_income.balance.get_symbol(), native_symbol);      
+
    // swap EOS->A
    swapgastoken();
    transfer_token("alice"_n, vaulta_account_name, make_asset(50'0000), "");
@@ -324,9 +329,14 @@ BOOST_FIXTURE_TEST_CASE(gas_fee_statistics_basic_eos_evm_bridge_tokeswap, statis
       BOOST_REQUIRE(s2.gas_fee_income == initial_gas_count);
    }
 
-   // set the bridge free to 0.1000 EOS
+   // can't set the bridge free to 0.1000 EOS after token swap
    const int64_t bridge_fee = 1000;
-   setfeeparams(fee_parameters{.ingress_bridge_fee = make_asset(bridge_fee)});
+   BOOST_REQUIRE_EXCEPTION(setfeeparams(fee_parameters{.ingress_bridge_fee = make_asset(bridge_fee)}),
+                           eosio_assert_message_exception,
+                           [](const eosio_assert_message_exception& e) {return testing::expect_assert_message(e, "bridge symbol can't change");});
+
+   // set the bridge free to 0.1000 A
+   setfeeparams(fee_parameters{.ingress_bridge_fee = asset(bridge_fee, new_gas_symbol)});
 
 } FC_LOG_AND_RETHROW()
 

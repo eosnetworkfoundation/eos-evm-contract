@@ -133,7 +133,12 @@ BOOST_FIXTURE_TEST_CASE(deposit_withdraw_after_swap, native_token_evm_tester_EOS
    }
 
    produce_block();
+
+   BOOST_REQUIRE_EQUAL(inevm().balance.get_symbol(), native_symbol);
+   
    swapgastoken(); // switch gas token
+
+   BOOST_REQUIRE_EQUAL(inevm().balance.get_symbol(), new_gas_symbol);
 
    // alice do token swap of 50.0000 EOS to A
    transfer_token("alice"_n, vaulta_account_name, make_asset(50'0000), "");

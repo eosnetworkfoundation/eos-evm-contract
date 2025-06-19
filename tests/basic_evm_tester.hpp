@@ -447,6 +447,7 @@ public:
 
    transaction_trace_ptr transfer_token(name from, name to, asset quantity, std::string memo = "", name acct=token_account_name);
    transaction_trace_ptr swapgastoken();
+   transaction_trace_ptr migratebal(name from_name, int limit);
 
    action get_action( account_name code, action_name acttype, vector<permission_level> auths,
                                  const bytes& data )const;
@@ -530,6 +531,7 @@ public:
    std::optional<intx::uint256> evm_balance(const evm_eoa& account) const;
    gcstore get_gcstore(uint64_t id) const;
    asset get_eos_balance( const account_name& act );
+   asset get_A_balance( const account_name &act);
 
    void check_balances();
 

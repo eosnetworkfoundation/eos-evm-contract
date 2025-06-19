@@ -155,6 +155,69 @@ BOOST_FIXTURE_TEST_CASE(basic_tests, bridge_message_tester) try {
   BOOST_CHECK(out.data == to_bytes(evmc::from_hex("0102030405060708090a").value()));
 } FC_LOG_AND_RETHROW()
 
+
+BOOST_FIXTURE_TEST_CASE(swap_tests, bridge_message_tester) try {
+
+  // Create destination account
+  create_accounts({"rec1"_n});
+  set_code("rec1"_n, testing::contracts::evm_bridge_receiver_wasm());
+  set_abi("rec1"_n, testing::contracts::evm_bridge_receiver_abi().data());
+
+  // Register rec1 with 1000.0000 EOS as min_fee
+  bridgereg("rec1"_n, "rec1"_n, make_asset(1000'0000));
+
+  swapgastoken();
+  
+  // Fund evm1 address with 1001 EOS
+  evm_eoa evm1;
+  const int64_t to_bridge = 1001'0000;
+  transfer_token("alice"_n, vaulta_account_name, make_asset(to_bridge)); // EOS->A
+  transfer_token("alice"_n, evm_account_name, asset(to_bridge, new_gas_symbol), evm1.address_0x(), vaulta_account_name);
+
+  // Check rec1 balance (in EOS) before sending the message
+  BOOST_REQUIRE(vault_balance("rec1"_n) == (balance_and_dust{make_asset(0), 0}));
+
+  // Emit message
+  auto res = send_bridge_message(evm1, "rec1", 1000_ether, "0102030405060708090a");
+
+  // Check rec1 balance (in EOS) after sending the message
+  BOOST_REQUIRE(vault_balance("rec1"_n) == (balance_and_dust{make_asset(1000'0000), 0}));
+
+  // can't migrate any account afer zzzzzzzzzzzz
+  BOOST_REQUIRE_EXCEPTION(migratebal("zzzzzzzzzzzz"_n, 100),
+  eosio_assert_message_exception, eosio_assert_message_is("nothing changed"));
+
+  // migrate balance for up to 100 accounts, from beginning
+  migratebal(""_n, 100);
+
+  // Check rec1 balance (in A) after sending the message
+  BOOST_REQUIRE(vault_balance("rec1"_n) == (balance_and_dust{asset(1000'0000, new_gas_symbol), 0}));
+
+  // can't migrate anymore
+  BOOST_REQUIRE_EXCEPTION(migratebal(""_n, 101),
+      eosio_assert_message_exception, eosio_assert_message_is("nothing changed"));
+
+  // Recover message form the return value of rec1 contract
+  BOOST_CHECK(res->action_traces[1].receiver == "rec1"_n);
+  auto msgout = fc::raw::unpack<bridge_message>(res->action_traces[1].return_value);
+  auto out = std::get<bridge_message_v0>(msgout);
+
+  BOOST_CHECK(out.receiver == "rec1"_n);
+  BOOST_CHECK(out.sender == to_bytes(evm1.address));
+  BOOST_CHECK(out.timestamp.time_since_epoch() == control->pending_block_time().time_since_epoch());
+  BOOST_CHECK(out.value == to_bytes(1000_ether));
+  BOOST_CHECK(out.data == to_bytes(evmc::from_hex("0102030405060708090a").value()));
+
+  // can't register again changing min fee in EOS
+  BOOST_REQUIRE_EXCEPTION(bridgereg("rec1"_n, "rec1"_n, make_asset(1)),
+      eosio_assert_message_exception, eosio_assert_message_is("unexpected symbol"));
+
+  // register again changing min fee in A
+  bridgereg("rec1"_n, "rec1"_n, asset(1, new_gas_symbol));
+
+} FC_LOG_AND_RETHROW()
+
+
 BOOST_FIXTURE_TEST_CASE(test_bridge_errors, bridge_message_tester) try {
 
   auto emv_reserved_address = make_reserved_address(evm_account_name);
