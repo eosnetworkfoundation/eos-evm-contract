@@ -102,6 +102,131 @@ BOOST_FIXTURE_TEST_CASE(basic_deposit_withdraw, native_token_evm_tester_EOS) try
 
 } FC_LOG_AND_RETHROW()
 
+
+BOOST_FIXTURE_TEST_CASE(deposit_withdraw_after_swap, native_token_evm_tester_EOS) try {
+   //can't transfer to alice's balance because it isn't open
+   BOOST_REQUIRE_EXCEPTION(transfer_token("alice"_n, "evm"_n, make_asset(1'0000), "alice"),
+                           eosio_assert_message_exception, eosio_assert_message_is("receiving account has not been opened"));
+
+   open("alice"_n);
+
+   //alice sends her own tokens in to her EVM balance
+   {
+      const int64_t to_transfer = 1'1000;
+      const int64_t alice_native_before = native_balance("alice"_n);
+      const int64_t alice_evm_before = vault_balance_token("alice"_n);
+      transfer_token("alice"_n, "evm"_n, make_asset(to_transfer), "alice");
+
+      BOOST_REQUIRE_EQUAL(alice_native_before - native_balance("alice"_n), to_transfer);
+      BOOST_REQUIRE_EQUAL(vault_balance_token("alice"_n), to_transfer);
+   }
+
+   //bob sends his tokens in to alice's EVM balance
+   {
+      const int64_t to_transfer = 1'2000;
+      const int64_t bob_native_before = native_balance("bob"_n);
+      const int64_t alice_evm_before = vault_balance_token("alice"_n);
+      transfer_token("bob"_n, "evm"_n, make_asset(to_transfer), "alice");
+
+      BOOST_REQUIRE_EQUAL(bob_native_before - native_balance("bob"_n), to_transfer);
+      BOOST_REQUIRE_EQUAL(vault_balance_token("alice"_n) - alice_evm_before, to_transfer);
+   }
+
+   produce_block();
+
+   BOOST_REQUIRE_EQUAL(inevm().balance.get_symbol(), native_symbol);
+   
+   swapgastoken(); // switch gas token
+
+   BOOST_REQUIRE_EQUAL(inevm().balance.get_symbol(), new_gas_symbol);
+
+   // alice do token swap of 50.0000 EOS to A
+   transfer_token("alice"_n, vaulta_account_name, make_asset(50'0000), "");
+
+   //can't withdraw any balance using the old gas symbol
+   {
+      const int64_t to_withdraw = 5300;
+      BOOST_REQUIRE_EXCEPTION(withdraw("alice"_n, make_asset(to_withdraw)),
+                              eosio_assert_message_exception, eosio_assert_message_is("invalid symbol"));
+   }
+
+   // can't sends her own tokens in to her EVM balance
+   {
+      const int64_t to_transfer = 1'4000;
+      BOOST_REQUIRE_EXCEPTION(transfer_token("alice"_n, "evm"_n, make_asset(to_transfer), "alice"),
+                              eosio_assert_message_exception, eosio_assert_message_is("received unexpected token"));
+   }
+
+   //withdraw a little bit of Alice's balance using new symbol
+   {
+      const int64_t to_withdraw = 5500;
+      const int64_t alice_native_before = native_new_gas_symbol_balance("alice"_n);
+      const int64_t alice_evm_before = vault_balance_token("alice"_n);
+      withdraw("alice"_n, asset(to_withdraw, new_gas_symbol));
+
+      BOOST_REQUIRE_EQUAL(native_new_gas_symbol_balance("alice"_n) - alice_native_before, to_withdraw);
+      BOOST_REQUIRE_EQUAL(alice_evm_before - vault_balance_token("alice"_n), to_withdraw);
+   }
+
+   //alice sends her own tokens in to her EVM balance using new symbol
+   {
+      const int64_t to_transfer = 1600;
+      const int64_t alice_native_before = native_new_gas_symbol_balance("alice"_n);
+      const int64_t alice_evm_before = vault_balance_token("alice"_n);
+      transfer_token("alice"_n, "evm"_n, asset(to_transfer, new_gas_symbol), "alice", vaulta_account_name);
+
+      BOOST_REQUIRE_EQUAL(alice_native_before - native_new_gas_symbol_balance("alice"_n), to_transfer);
+      BOOST_REQUIRE_EQUAL(vault_balance_token("alice"_n) - alice_evm_before, to_transfer);
+   }
+
+   // tests with evm accounts
+   evm_eoa evm1, evm2;
+   //reminder: .0001 EOS is 100 szabos
+   const intx::uint256 smallest = 100_szabo;
+   const auto gas_fee = intx::uint256{get_config().gas_price} * 21000;
+   //alice transfers in 10.7000 A to evm1
+   {
+      const int64_t to_bridge = 10'7000;
+      const int64_t alice_native_before = native_new_gas_symbol_balance("alice"_n);
+      transfer_token("alice"_n, "evm"_n, asset(to_bridge, new_gas_symbol), evm1.address_0x(), vaulta_account_name);
+
+      BOOST_REQUIRE_EQUAL(alice_native_before - native_new_gas_symbol_balance("alice"_n), to_bridge);
+      BOOST_REQUIRE(!!evm_balance(evm1));
+      BOOST_REQUIRE(*evm_balance(evm1) == smallest * to_bridge);
+   }
+
+   //evm1 then transfers 2.8000 A to evm2
+   {
+      const int64_t to_transfer = 2'8000;
+      const intx::uint256 evm1_before = *evm_balance(evm1);
+      const intx::uint256 special_balance_before{vault_balance("evm"_n)};
+
+      auto txn = generate_tx(evm2.address, 100_szabo * to_transfer);
+      evm1.sign(txn);
+      pushtx(txn);
+
+      BOOST_REQUIRE_EQUAL(*evm_balance(evm1), (evm1_before - txn.value - gas_fee));
+      BOOST_REQUIRE(!!evm_balance(evm2));
+      BOOST_REQUIRE(*evm_balance(evm2) == txn.value);
+      BOOST_REQUIRE_EQUAL(static_cast<intx::uint256>(vault_balance("evm"_n)), (special_balance_before + gas_fee));
+   }
+
+   //evm1 is going to egress 1.9000 A bob
+   {
+      const int64_t to_bridge = 1'9000;
+      const intx::uint256 evm1_before = *evm_balance(evm1);
+
+      auto txn = generate_tx(make_reserved_address("bob"_n.to_uint64_t()), 100_szabo * to_bridge);
+      evm1.sign(txn);
+      pushtx(txn);
+
+      BOOST_REQUIRE_EQUAL(to_bridge, native_new_gas_symbol_balance("bob"_n));
+      BOOST_REQUIRE_EQUAL(*evm_balance(evm1), (evm1_before - txn.value - gas_fee));
+   }
+
+} FC_LOG_AND_RETHROW()
+
+
 BOOST_FIXTURE_TEST_CASE(invalid_memos, native_token_evm_tester_EOS) try {
    //try some weird account names as memos
    BOOST_REQUIRE_EXCEPTION(transfer_token("alice"_n, "evm"_n, make_asset(1'0000), "BANANA"),

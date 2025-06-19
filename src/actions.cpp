@@ -829,6 +829,11 @@ void evm_contract::transfer(eosio::name from, eosio::name to, eosio::asset quant
 
     eosio::check(get_code() == _config->get_token_contract() && quantity.symbol == _config->get_token_symbol(), "received unexpected token");
 
+    // special case for gas token swap
+    if (memo.size() == 0 && from == _config->get_token_contract()) {
+        return;
+    }
+
     if(memo.size() == 42 && memo[0] == '0' && memo[1] == 'x')
         handle_evm_transfer(quantity, memo);
     else if(!memo.empty() && memo.size() <= 13)
@@ -844,8 +849,10 @@ void evm_contract::withdraw(eosio::name owner, eosio::asset quantity, const eosi
     balances balance_table(get_self(), get_self().value);
     const balance& owner_account = balance_table.get(owner.value, "account is not open");
 
+    check(_config->get_token_symbol() == quantity.symbol, "invalid symbol");
     check(owner_account.balance.balance.amount >= quantity.amount, "overdrawn balance");
     balance_table.modify(owner_account, eosio::same_payer, [&](balance& a) {
+        a.balance.balance.symbol = _config->get_token_symbol();
         a.balance.balance -= quantity;
     });
 
@@ -1087,6 +1094,63 @@ statistics evm_contract::get_statistics() const {
 void evm_contract::set_statistics(const statistics &v) {
     statistics_singleton statistics_v(get_self(), get_self().value);
     statistics_v.set(v, get_self());
+}
+
+void evm_contract::swapgastoken(eosio::name new_token_contract, eosio::symbol new_symbol, eosio::name swap_dest_account, string swap_memo) {
+    require_auth(get_self());
+    
+    // config table
+    eosio::name old_token_contract = _config->get_token_contract();
+    eosio::symbol old_symbol = _config->get_token_symbol();
+    _config->swapgastoken(new_token_contract, new_symbol);
+
+    // inevm table
+    inevm_singleton inevm(get_self(), get_self().value);
+    balance_with_dust inevm_row = inevm.get();
+    inevm_row.balance.symbol = new_symbol;
+    inevm.set(inevm_row, eosio::same_payer);
+
+    // msgreceiver
+    message_receiver_table message_receivers(get_self(), get_self().value);
+    for (auto it = message_receivers.begin(); it != message_receivers.end(); ++it) {
+        message_receivers.modify(*it, eosio::same_payer, [&](message_receiver &row) {
+            row.min_fee.symbol = new_symbol;
+        });
+    }
+
+    // stat
+    statistics stat = get_statistics();
+    stat.gas_fee_income.balance.symbol = new_symbol;
+    stat.ingress_bridge_fee_income.balance.symbol = new_symbol;
+    set_statistics(stat);
+
+    // balance table, self row
+    migratebal(get_self(), 1);
+
+    if (swap_dest_account != eosio::name()) { 
+        // send full balance of old token to swap_dest_account
+        token::accounts_table_t self_bal(old_token_contract, get_self().value);
+        auto it = self_bal.find(old_symbol.code().raw());
+        eosio::check(it != self_bal.end(), "can't get self balance from old token contract");
+        token::transfer_action transfer_act(old_token_contract, {{get_self(), "active"_n}});
+        transfer_act.send(get_self(), swap_dest_account, it->balance, swap_memo);
+    }
+}
+
+void evm_contract::migratebal(eosio::name from_name, int limit) {
+    int count = 0;
+    balances balance_table(get_self(), get_self().value);
+    inevm_singleton inevm(get_self(), get_self().value);
+    eosio::symbol new_gas_symbol = inevm.get().balance.symbol;
+    for (auto it = balance_table.lower_bound(from_name); limit > 0 && it != balance_table.end(); ++it, --limit) {
+        if (it->balance.balance.symbol != new_gas_symbol) {
+            balance_table.modify(*it, eosio::same_payer, [&](balance &row){
+                row.balance.balance.symbol = new_gas_symbol;
+            });
+            ++count;
+        }
+    }
+    eosio::check(count > 0, "nothing changed");
 }
 
 } //evm_runtime

@@ -45,6 +45,10 @@ struct native_token_evm_tester : basic_evm_tester {
       return get_currency_balance(token_account_name, native_symbol, owner).get_amount();
    }
 
+   int64_t native_new_gas_symbol_balance(name owner) const {
+      return get_currency_balance(vaulta_account_name, new_gas_symbol, owner).get_amount();
+   }
+
    int64_t vault_balance_token(name owner) const {
       return vault_balance(owner).balance.get_amount();
    }

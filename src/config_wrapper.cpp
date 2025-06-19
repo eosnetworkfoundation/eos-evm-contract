@@ -418,4 +418,10 @@ uint64_t config_wrapper::get_ingress_gas_limit() const {
     return *_cached_config.ingress_gas_limit;
 }
 
+void config_wrapper::swapgastoken(name new_token_contract, symbol new_symbol) {
+    _cached_config.ingress_bridge_fee.symbol = new_symbol;
+    _cached_config.token_contract = new_token_contract;
+    set_dirty();
+}
+
 } //namespace evm_runtime

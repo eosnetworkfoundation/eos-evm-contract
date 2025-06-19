@@ -34,6 +34,9 @@ struct contracts {
    static std::vector<uint8_t> eosio_bios_wasm() { return read_wasm("${CMAKE_CURRENT_SOURCE_DIR}/contracts/eosio.bios/eosio.bios.wasm"); }
    static std::vector<char>    eosio_bios_abi() { return read_abi("${CMAKE_CURRENT_SOURCE_DIR}/contracts/eosio.bios/eosio.bios.abi"); }
 
+   static std::vector<uint8_t> vaulta_system_wasm() { return read_wasm("${CMAKE_CURRENT_SOURCE_DIR}/contracts/core.vaulta/system.wasm"); }
+   static std::vector<char>    vaulta_system_abi() { return read_abi("${CMAKE_CURRENT_SOURCE_DIR}/contracts/core.vaulta/system.abi"); }
+
    static std::vector<uint8_t> evm_runtime_wasm() { return read_wasm("${CMAKE_CURRENT_SOURCE_DIR}/../build/evm_runtime/evm_runtime.wasm"); }
    static std::vector<char>    evm_runtime_abi() { return read_abi("${CMAKE_CURRENT_SOURCE_DIR}/../build/evm_runtime/evm_runtime.abi"); }
 
