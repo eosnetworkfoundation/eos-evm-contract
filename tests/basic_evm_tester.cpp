@@ -220,7 +220,7 @@ evmc::address basic_evm_tester::make_reserved_address(name account) {
 basic_evm_tester::basic_evm_tester(std::string native_symbol_str) :
    native_symbol(symbol::from_string(native_symbol_str))
 {
-   create_accounts({token_account_name, faucet_account_name, evm_account_name});
+   create_accounts({token_account_name, faucet_account_name, evm_account_name, vaulta_account_name});
    produce_block();
 
    set_code(token_account_name, testing::contracts::eosio_token_wasm());
@@ -237,12 +237,30 @@ basic_evm_tester::basic_evm_tester(std::string native_symbol_str) :
 
    produce_block();
 
+   set_code(vaulta_account_name, testing::contracts::vaulta_system_wasm());
+   set_abi(vaulta_account_name, testing::contracts::vaulta_system_abi().data());
+   push_action(vaulta_account_name, "init"_n, vaulta_account_name, 
+               mvo()("maximum_supply",asset(10'000'000'000'0000, new_gas_symbol)));
+   produce_block();
+
    set_code(evm_account_name, testing::contracts::evm_runtime_wasm());
    set_abi(evm_account_name, testing::contracts::evm_runtime_abi().data());
    produce_block();
 }
 
 asset basic_evm_tester::make_asset(int64_t amount) const { return asset(amount, native_symbol); }
+
+transaction_trace_ptr basic_evm_tester::swapgastoken() {
+
+   return push_action(
+      evm_account_name, "swapgastoken"_n, evm_account_name, mvo()("new_token_contract", vaulta_account_name)("new_symbol",new_gas_symbol)("swap_dest_account",vaulta_account_name)("swap_memo","swap gas token"));
+}
+
+transaction_trace_ptr basic_evm_tester::migratebal(name from_name, int limit) {
+
+   return push_action(
+      evm_account_name, "migratebal"_n, evm_account_name, mvo()("from_name", from_name)("limit",limit));
+}
 
 transaction_trace_ptr basic_evm_tester::transfer_token(name from, name to, asset quantity, std::string memo, name acct)
 {
@@ -869,6 +887,11 @@ asset basic_evm_tester::get_eos_balance( const account_name& act ) {
    return data.empty() ? asset(0, native_symbol) : fc::raw::unpack<asset>(data);
 }
 
+asset basic_evm_tester::get_A_balance( const account_name& act ) {
+   vector<char> data = get_row_by_account( vaulta_account_name, act, "accounts"_n, name(new_gas_symbol.to_symbol_code().value) );
+   return data.empty() ? asset(0, new_gas_symbol) : fc::raw::unpack<asset>(data);
+}
+
 void basic_evm_tester::check_balances() {
    intx::uint256 total_in_evm_accounts;
    scan_accounts([&](evm_test::account_object&& account) -> bool {
@@ -888,7 +911,10 @@ void basic_evm_tester::check_balances() {
       return false;
    });
 
-   auto evm_eos_balance = intx::uint256(balance_and_dust{.balance=get_eos_balance(evm_account_name), .dust=0});
+   asset evm_eos_bal_ = get_eos_balance(evm_account_name);
+   asset evm_A_bal_ = get_A_balance(evm_account_name);
+
+   auto evm_eos_balance = intx::uint256(balance_and_dust{.balance=asset(evm_eos_bal_.get_amount() + evm_A_bal_.get_amount(), native_symbol), .dust=0});
    if(evm_eos_balance != total_in_accounts+total_in_evm_accounts) {
       dlog("evm_eos_balance: ${evm_eos_balance}, total_in_accounts+total_in_evm_accounts: ${tt}",("tt",intx::to_string(total_in_accounts+total_in_evm_accounts))("evm_eos_balance",intx::to_string(evm_eos_balance)));
       throw std::runtime_error("evm_eos_balance != total_in_accounts+total_in_evm_accounts");

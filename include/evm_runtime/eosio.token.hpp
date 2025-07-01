@@ -49,5 +49,11 @@ namespace eosio {
          using transfer_bytes_memo_action = eosio::action_wrapper<"transfer"_n, &token::transferb>;
          using open_action = eosio::action_wrapper<"open"_n, &token::open>;
          using close_action = eosio::action_wrapper<"close"_n, &token::close>;
+
+         struct [[eosio::table]] account {
+            asset    balance;
+            uint64_t primary_key()const { return balance.symbol.code().raw(); }
+         };
+         typedef eosio::multi_index< "accounts"_n, account > accounts_table_t;
    };
 }

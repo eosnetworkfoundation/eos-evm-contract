@@ -93,6 +93,9 @@ public:
    [[eosio::action]] void setgasprices(const gas_prices_type& prices);
    [[eosio::action]] void setgaslimit(uint64_t ingress_gas_limit);
 
+   [[eosio::action]] void swapgastoken(eosio::name new_token_contract, eosio::symbol new_symbol, eosio::name swap_dest_account, std::string swap_memo);
+   [[eosio::action]] void migratebal(eosio::name from_name, int limit);
+
    // Events
    [[eosio::action]] void evmtx(eosio::ignore<evm_runtime::evmtx_type> event){
       eosio::check(get_sender() == get_self(), "forbidden to call");
