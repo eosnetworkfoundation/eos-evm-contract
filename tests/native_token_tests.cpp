@@ -472,7 +472,8 @@ BOOST_FIXTURE_TEST_CASE(evm_eos_disallow_reserved_zero, native_token_evm_tester_
    transfer_token("alice"_n, "evm"_n, make_asset(10'0000), evm1.address_0x());
 
    //doing anything with the reserved-zero address should fail; in this case just send an empty message to it
-   auto txn = generate_tx(make_reserved_address(0u), 0);
+   //TODO: think
+   auto txn = generate_tx(make_reserved_address(0u), 1);
    evm1.sign(txn);
    BOOST_REQUIRE_EXCEPTION(pushtx(txn),
                            eosio_assert_message_exception, eosio_assert_message_is("reserved 0 address cannot be used"));
@@ -539,7 +540,7 @@ BOOST_FIXTURE_TEST_CASE(evm_eos_loopback, native_token_evm_tester_EOS) try {
    {
       const int64_t to_bridge = 10'0000;
       const int64_t alice_native_before = native_balance("alice"_n);
-      transfer_token("alice"_n, "evm"_n, make_asset(to_bridge), silkworm::to_hex(make_reserved_address("alice"_n.to_uint64_t()), true));
+      transfer_token("alice"_n, "evm"_n, make_asset(to_bridge), silkworm::to_hex(make_reserved_address("alice"_n.to_uint64_t()).bytes, true));
 
       BOOST_REQUIRE_EQUAL(alice_native_before, native_balance("alice"_n));
    }
@@ -549,7 +550,7 @@ BOOST_FIXTURE_TEST_CASE(evm_eos_loopback, native_token_evm_tester_EOS) try {
       const int64_t to_bridge = 10'0000;
       const int64_t alice_native_before = native_balance("alice"_n);
       const int64_t bob_native_before = native_balance("bob"_n);
-      transfer_token("alice"_n, "evm"_n, make_asset(to_bridge), silkworm::to_hex(make_reserved_address("bob"_n.to_uint64_t()), true));
+      transfer_token("alice"_n, "evm"_n, make_asset(to_bridge), silkworm::to_hex(make_reserved_address("bob"_n.to_uint64_t()).bytes, true));
 
       BOOST_REQUIRE_EQUAL(alice_native_before - native_balance("alice"_n), to_bridge);
       BOOST_REQUIRE_EQUAL(native_balance("bob"_n) - bob_native_before, to_bridge);
@@ -564,7 +565,7 @@ BOOST_FIXTURE_TEST_CASE(evm_eos_loopback, native_token_evm_tester_EOS) try {
    {
       const int64_t to_bridge = 10'0000;
       const int64_t alice_native_before = native_balance("alice"_n);
-      transfer_token("alice"_n, "evm"_n, make_asset(to_bridge), silkworm::to_hex(make_reserved_address("alice"_n.to_uint64_t()), true));
+      transfer_token("alice"_n, "evm"_n, make_asset(to_bridge), silkworm::to_hex(make_reserved_address("alice"_n.to_uint64_t()).bytes, true));
 
       BOOST_REQUIRE_EQUAL(alice_native_before - native_balance("alice"_n), bridge_fee);
    }
@@ -574,7 +575,7 @@ BOOST_FIXTURE_TEST_CASE(evm_eos_loopback, native_token_evm_tester_EOS) try {
       const int64_t to_bridge = 10'0000;
       const int64_t alice_native_before = native_balance("alice"_n);
       const int64_t bob_native_before = native_balance("bob"_n);
-      transfer_token("alice"_n, "evm"_n, make_asset(to_bridge), silkworm::to_hex(make_reserved_address("bob"_n.to_uint64_t()), true));
+      transfer_token("alice"_n, "evm"_n, make_asset(to_bridge), silkworm::to_hex(make_reserved_address("bob"_n.to_uint64_t()).bytes, true));
 
       BOOST_REQUIRE_EQUAL(alice_native_before - native_balance("alice"_n), to_bridge);
       BOOST_REQUIRE_EQUAL(native_balance("bob"_n) - bob_native_before, to_bridge - bridge_fee);

@@ -36,6 +36,13 @@ namespace eosio {
                          const asset&   quantity,
                          const std::basic_string<uint8_t>& memo );
 
+         //exists to send along a evmc::bytes as a memo without copying over to string first
+         [[eosio::action]]
+         void transferc( const name&    from,
+                         const name&    to,
+                         const asset&   quantity,
+                         const evmc::bytes& memo );
+
          [[eosio::action]]
          void open( const name& owner, const symbol& symbol, const name& ram_payer );
 
@@ -47,6 +54,7 @@ namespace eosio {
          using retire_action = eosio::action_wrapper<"retire"_n, &token::retire>;
          using transfer_action = eosio::action_wrapper<"transfer"_n, &token::transfer>;
          using transfer_bytes_memo_action = eosio::action_wrapper<"transfer"_n, &token::transferb>;
+         using transfer_evmc_bytes_memo_action = eosio::action_wrapper<"transfer"_n, &token::transferc>;
          using open_action = eosio::action_wrapper<"open"_n, &token::open>;
          using close_action = eosio::action_wrapper<"close"_n, &token::close>;
    };

@@ -161,15 +161,14 @@ try {
 
       unsigned int ordinal = 0;
       bool successful_scan = scan_account_storage(account_id, [&](storage_slot&& slot) -> bool {
-         if (ordinal == 0) {
+         if (slot.key == 0) {
             // The first storage slot of the contract is the block number.
 
             // ilog("block number = ${bn}", ("bn", slot.value));
 
-            BOOST_REQUIRE(slot.key == 0);
             BOOST_REQUIRE(slot.value < threshold);
             block_number = slot.value[0];
-         } else if (ordinal == 1) {
+         } else if (slot.key == 1) {
             // The second storage slot of the contract is the block timestamp.
 
             // ilog("timestamp = ${time}", ("time", slot.value));

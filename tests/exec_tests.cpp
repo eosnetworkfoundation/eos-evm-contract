@@ -1,5 +1,5 @@
 #include "basic_evm_tester.hpp"
-#include <silkworm/core/execution/address.hpp>
+#include <silkworm/core/types/address.hpp>
 
 using intx::operator""_u256;
 
@@ -61,7 +61,7 @@ struct exec_evm_tester : basic_evm_tester {
 
       silkworm::Bytes data;
       data += evmc::from_hex("a9059cbb").value();   // sha3(transfer(address,uint256))[:4]
-      data += silkworm::to_bytes32(evm2.address);   // to
+      data += silkworm::to_bytes32(evm2.address.bytes);   // to
       data += evmc::bytes32{amount};                // value
       txn.data = data;
 
@@ -76,7 +76,7 @@ struct exec_evm_tester : basic_evm_tester {
 
       silkworm::Bytes data;
       data += evmc::from_hex("70a08231").value();   // sha3(balanceOf(address))[:4]
-      data += silkworm::to_bytes32(account.address);
+      data += silkworm::to_bytes32(account.address.bytes);
       input.data = bytes{data.begin(), data.end()};
 
       return exec(input, callback);
@@ -164,7 +164,7 @@ BOOST_FIXTURE_TEST_CASE(exec_non_view_function, exec_evm_tester) try {
 
   silkworm::Bytes data;
   data += evmc::from_hex("a9059cbb").value();   // sha3(transfer(address,uint256))[:4]
-  data += silkworm::to_bytes32(evm2.address);   // to
+  data += silkworm::to_bytes32(evm2.address.bytes);   // to
   data += evmc::bytes32{1111};                  // value
 
   exec_input input;

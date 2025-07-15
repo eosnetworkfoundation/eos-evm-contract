@@ -157,9 +157,6 @@ void check_result( ValidationResult r, const Transaction& txn, const char* desc 
         case ValidationResult::kNonceTooHigh:
             err_msg += " Nonce too high";
             break;
-        case ValidationResult::kMissingSender:
-            err_msg += " Missing sender";
-            break;
         case ValidationResult::kSenderNoEOA:
             err_msg += " Sender is not EOA";
             break;
@@ -207,12 +204,12 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
     bool is_special_signature = silkworm::is_special_signature(tx.r, tx.s);
 
     ValidationResult r = silkworm::protocol::pre_validate_transaction(tx, ep.evm().revision(), ep.evm().config().chain_id,
-                            ep.evm().block().header.base_fee_per_gas, ep.evm().block().header.data_gas_price(),
+                            ep.evm().block().header.base_fee_per_gas, ep.evm().block().header.blob_gas_price(),
                             ep.evm().get_eos_evm_version(), gas_params);
     check_result( r, tx, "pre_validate_transaction error" );
 
-    txn.recover_sender();
-    eosio::check(tx.from.has_value(), "unable to recover sender");
+    auto from = txn.sender();
+    eosio::check(from.has_value(), "unable to recover sender");
     LOGTIME("EVM RECOVER SENDER");
 
     // 1 For regular signature, it's impossible to from reserved address, 
@@ -221,8 +218,8 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
     // and process the special balance if the tx is from reserved address.
     if (is_special_signature) {
         check(rc.allow_special_signature, "bridge signature used outside of bridge transaction");
-        if (is_reserved_address(*tx.from)) {
-            const name ingress_account(*extract_reserved_address(*tx.from));
+        if (is_reserved_address(*from)) {
+            const name ingress_account(*extract_reserved_address(*from));
 
             from_self = ingress_account == get_self();
 
@@ -249,8 +246,8 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
            
             inevm->set(inevm->get() += value_with_max_gas, eosio::same_payer);
 
-            ep.state().set_balance(*tx.from, value_with_max_gas);
-            ep.state().set_nonce(*tx.from, tx.nonce);
+            ep.state().set_balance(*from, value_with_max_gas);
+            ep.state().set_nonce(*from, tx.nonce);
         }
     }
 
@@ -264,8 +261,7 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
     check_result( r, tx, "validate_transaction error" );
 
     Receipt receipt;
-    CallResult call_result; 
-    const auto res = ep.execute_transaction(tx, receipt, gas_params, call_result);
+    const auto res = ep.execute_transaction(tx, receipt);
 
     // Calculate the miner portion of the actual gas fee (if necessary):
     std::optional<intx::uint256> gas_fee_miner_portion;
@@ -290,20 +286,20 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
 
     if (rc.abort_on_failure) {
         if (receipt.success == false) {
-            size_t size = (int)call_result.data.length();
+            size_t size = (int)res.data.length();
             constexpr size_t max_size = 1024;
             std::string errmsg;
             errmsg.reserve(max_size);
             errmsg += "inline evm tx failed, evmc_status_code:";
-            errmsg += std::to_string((int)call_result.status);
+            errmsg += std::to_string((int)res.status);
             errmsg += ", data:[";
             errmsg += std::to_string(size);
             errmsg += "]";
             size_t i = 0;
             for (; i < size && errmsg.length() < max_size - 6; ++i ) {
                 static const char hex_chars[] = "0123456789abcdef";
-                errmsg += hex_chars[((uint8_t)call_result.data[i]) >> 4];
-                errmsg += hex_chars[((uint8_t)call_result.data[i]) & 0xf];
+                errmsg += hex_chars[((uint8_t)res.data[i]) >> 4];
+                errmsg += hex_chars[((uint8_t)res.data[i]) & 0xf];
             }
             if (i < size) {
                 errmsg += "...";
@@ -381,7 +377,7 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
             const auto& rawmsg = ep.state().filtered_messages()[i];
             const name egress_account(*extract_reserved_address(rawmsg.receiver));
             auto value = intx::be::unsafe::load<uint256>(rawmsg.value.bytes);
-            token::transfer_bytes_memo_action transfer_act(_config->get_token_contract(), {{get_self(), "active"_n}});
+            token::transfer_evmc_bytes_memo_action transfer_act(_config->get_token_contract(), {{get_self(), "active"_n}});
             transfer_act.send(get_self(), egress_account, asset((uint64_t)(value / minimum_natively_representable), _config->get_token_symbol()), rawmsg.data);
         }
 
@@ -406,7 +402,7 @@ Receipt evm_contract::execute_tx(const runtime_config& rc, eosio::name miner, Bl
         check(gas_fee < std::numeric_limits<intx::uint256>::max() && max_gas_cost < std::numeric_limits<intx::uint256>::max() && max_gas_cost > gas_fee, "invalid gas fee");
         const intx::uint256 refund = static_cast<intx::uint256>(max_gas_cost - gas_fee);
 
-        const name ingress_account(*extract_reserved_address(*tx.from));
+        const name ingress_account(*extract_reserved_address(*from));
 
         balance_table.modify(balance_table.get(ingress_account.value), eosio::same_payer, [&](balance& b){
             b.balance -= refund;
@@ -482,7 +478,7 @@ void evm_contract::exec(const exec_input& input, const std::optional<exec_callba
     Transaction txn;
     txn.to    = to_address(input.to);
     txn.data  = Bytes{input.data.begin(), input.data.end()};
-    txn.from  = input.from.has_value()  ? to_address(input.from.value()) : evmc::address{};
+    txn.set_sender(input.from.has_value()  ? to_address(input.from.value()) : evmc::address{});
     txn.value = input.value.has_value() ? to_uint256(input.value.value()) : 0;
 
     const CallResult vm_res{evm.execute(txn, 0x7ffffffffff, gas_params)};
@@ -503,7 +499,7 @@ void evm_contract::exec(const exec_input& input, const std::optional<exec_callba
     }
 }
 
-void evm_contract::process_filtered_messages(std::function<bool(const silkworm::FilteredMessage&)> extra_filter, const std::vector<silkworm::FilteredMessage>& filtered_messages ) {
+void evm_contract::process_filtered_messages(std::function<bool(const evmone::eosevm::filtered_message&)> extra_filter, const std::vector<evmone::eosevm::filtered_message>& filtered_messages ) {
 
     intx::uint256 accumulated_value;
     for(const auto& rawmsg : filtered_messages) {
@@ -614,8 +610,8 @@ void evm_contract::process_tx(const runtime_config& rc, eosio::name miner, const
     }
 
     auto gas_prices = _config->get_gas_prices();
-    auto gp = silkworm::gas_prices_t{gas_prices.overhead_price.value_or(0), gas_prices.storage_price.value_or(0)};
-    silkworm::ExecutionProcessor ep{block, engine, state, *found_chain_config->second, gp};
+    auto gp = evmone::eosevm::gas_prices{gas_prices.overhead_price.value_or(0), gas_prices.storage_price.value_or(0)};
+    silkworm::ExecutionProcessor ep{block, engine, state, *found_chain_config->second, true, gas_params, gp};
 
     // Capture all messages to reserved addresses. They should be bridge transfers and EVM messages.
     ep.set_evm_message_filter([&](const evmc_message& message) -> bool {
@@ -626,12 +622,11 @@ void evm_contract::process_tx(const runtime_config& rc, eosio::name miner, const
 
     // Filter EVM messages (with data) that are sent to the reserved address
     // corresponding to the EOS account holding the contract (self)
-    process_filtered_messages([&](const silkworm::FilteredMessage& message) -> bool {
+    process_filtered_messages([&](const evmone::eosevm::filtered_message& message) -> bool {
         static auto me = make_reserved_address(get_self().value);
         return message.receiver == me && message.data.size() > 0;
     }, ep.state().filtered_messages());
 
-    engine.finalize(ep.state(), ep.evm().block());
     ep.state().write_to_db(ep.evm().block().header.number);
 
     if (gas_param_pair.second) {

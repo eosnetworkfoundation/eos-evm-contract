@@ -40,7 +40,8 @@ struct state : State {
 
     std::optional<Account> read_account(const evmc::address& address) const noexcept override;
 
-    ByteView read_code(const evmc::bytes32& code_hash) const noexcept override;
+    ByteView read_code(const evmc::address& address, const evmc::bytes32& code_hash) const noexcept override;
+
 
     evmc::bytes32 read_storage(const evmc::address& address, uint64_t incarnation,
                                const evmc::bytes32& location) const noexcept override;
@@ -70,7 +71,9 @@ struct state : State {
 
     void insert_receipts(uint64_t block_number, const std::vector<Receipt>& receipts) override;
 
-    void begin_block(uint64_t block_number) override;
+    void insert_call_traces(BlockNum block_num, const CallTraces& traces) override;
+
+    void begin_block(BlockNum block_num, size_t updated_accounts_count) override;
 
     void update_account(const evmc::address& address, std::optional<Account> initial,
                         std::optional<Account> current) override;

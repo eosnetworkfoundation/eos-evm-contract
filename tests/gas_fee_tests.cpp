@@ -37,7 +37,7 @@ try {
    BOOST_REQUIRE_EXCEPTION(
       transfer_token(faucet_account_name, evm_account_name, make_asset(11'0000), faucet_eoa.address_0x()),
       eosio_assert_message_exception,
-      eosio_assert_message_is("pre_validate_transaction error: 22 Intrinsic gas too low"));
+      eosio_assert_message_is("pre_validate_transaction error: 21 Intrinsic gas too low"));
 
    push_action(evm_account_name, "setgaslimit"_n, evm_account_name, mvo()("ingress_gas_limit", 24000));
 
@@ -156,16 +156,13 @@ try {
 
       auto restore_nonce = faucet_eoa.next_nonce;
 
-      silkworm::Transaction tx{
-         silkworm::UnsignedTransaction {
-            .type = silkworm::TransactionType::kLegacy,
-            .max_priority_fee_per_gas = suggested_gas_price - 1,
-            .max_fee_per_gas = suggested_gas_price - 1,
-            .gas_limit = 21000,
-            .to = recipient.address,
-            .value = 1,
-         }
-      };
+      silkworm::Transaction tx;
+      tx.type = silkworm::TransactionType::kLegacy;
+      tx.max_priority_fee_per_gas = suggested_gas_price - 1;
+      tx.max_fee_per_gas = suggested_gas_price - 1;
+      tx.gas_limit = 21000;
+      tx.to = recipient.address;
+      tx.value = 1;
       faucet_eoa.sign(tx);
 
       BOOST_REQUIRE_EXCEPTION(
@@ -177,33 +174,26 @@ try {
    {
       // Exactly matching gas price is accepted
 
-      silkworm::Transaction tx{
-         silkworm::UnsignedTransaction {
-            .type = silkworm::TransactionType::kLegacy,
-            .max_priority_fee_per_gas = suggested_gas_price,
-            .max_fee_per_gas = suggested_gas_price,
-            .gas_limit = 21000,
-            .to = recipient.address,
-            .value = 1,
-         }
-      };
+      silkworm::Transaction tx;
+      tx.type = silkworm::TransactionType::kLegacy;
+      tx.max_priority_fee_per_gas = suggested_gas_price;
+      tx.max_fee_per_gas = suggested_gas_price;
+      tx.gas_limit = 21000;
+      tx.to = recipient.address;
+      tx.value = 1;
       faucet_eoa.sign(tx);
       pushtx(tx);
    }
 
    {
       // Higher gas price is also okay
-
-      silkworm::Transaction tx{
-         silkworm::UnsignedTransaction {
-            .type = silkworm::TransactionType::kLegacy,
-            .max_priority_fee_per_gas = suggested_gas_price + 1,
-            .max_fee_per_gas = suggested_gas_price + 1,
-            .gas_limit = 21000,
-            .to = recipient.address,
-            .value = 1,
-         }
-      };
+      silkworm::Transaction tx;
+      tx.type = silkworm::TransactionType::kLegacy;
+      tx.max_priority_fee_per_gas = suggested_gas_price + 1;
+      tx.max_fee_per_gas = suggested_gas_price + 1;
+      tx.gas_limit = 21000;
+      tx.to = recipient.address;
+      tx.value = 1;
       faucet_eoa.sign(tx);
       pushtx(tx);
    }

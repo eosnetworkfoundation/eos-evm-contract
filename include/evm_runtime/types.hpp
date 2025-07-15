@@ -123,6 +123,16 @@ inline datastream<Stream>& operator>>(datastream<Stream>& ds, evm_runtime::uint2
    return ds;
 }
 
+
+template<typename Stream>
+inline datastream<Stream>& operator<<(datastream<Stream>& ds, const evmc::bytes& b) {
+   ds << (eosio::unsigned_int)b.size();
+   if(b.size()) {
+      ds.write((char*)b.data(), b.size());
+   }
+   return ds;
+}
+
 } //namespace eosio
 
 namespace std {

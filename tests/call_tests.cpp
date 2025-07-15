@@ -1,5 +1,5 @@
 #include "basic_evm_tester.hpp"
-#include <silkworm/core/execution/address.hpp>
+#include <silkworm/core/types/address.hpp>
 
 using intx::operator""_u256;
 
@@ -413,7 +413,7 @@ BOOST_FIXTURE_TEST_CASE(admincall_test_function, call_evm_tester) try {
 
   // Insufficient funds
   BOOST_REQUIRE_EXCEPTION( admincall_test(token_addr, 1234, evm2, evm_account_name),
-                          eosio_assert_message_exception, eosio_assert_message_is("validate_transaction error: 23 Insufficient funds"));
+                          eosio_assert_message_exception, eosio_assert_message_is("validate_transaction error: 22 Insufficient funds"));
 
   // Transfer enough funds, save initial balance
   transfer_token("alice"_n, evm_account_name, make_asset(999900), evm2.address_0x());
@@ -497,7 +497,7 @@ BOOST_FIXTURE_TEST_CASE(admincall_test_function, call_evm_tester) try {
 
   // No enough gas
   BOOST_REQUIRE_EXCEPTION(admincall_testpay(token_addr, *((uint128_t*)intx::as_words(50_ether)), evm2, evm_account_name),
-                          eosio_assert_message_exception, eosio_assert_message_is("validate_transaction error: 23 Insufficient funds"));
+                          eosio_assert_message_exception, eosio_assert_message_is("validate_transaction error: 22 Insufficient funds"));
   BOOST_REQUIRE(evm_balance(evm2) == evm2_balance);
   BOOST_REQUIRE(intx::uint256(vault_balance(evm_account_name)) == evm_account_balance);
   BOOST_REQUIRE(*evm_balance(token_addr) == 50_ether);

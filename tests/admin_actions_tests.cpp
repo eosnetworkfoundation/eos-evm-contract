@@ -1,7 +1,7 @@
 #include <boost/test/unit_test.hpp>
 
 #include "basic_evm_tester.hpp"
-#include <silkworm/core/execution/address.hpp>
+#include <silkworm/core/types/address.hpp>
 #include "utils.hpp"
 
 using namespace evm_test;

@@ -39,7 +39,7 @@ std::optional<Account> state::read_account(const evmc::address& address) const n
     return Account{itr->nonce, intx::be::load<uint256>(itr->get_balance()), code_hash, 0};
 }
 
-ByteView state::read_code(const evmc::bytes32& code_hash) const noexcept {
+ByteView state::read_code(const evmc::address&, const evmc::bytes32& code_hash) const noexcept {
     
     if(addr2code.find(code_hash) != addr2code.end()) {
         const auto& code = addr2code[code_hash];
@@ -91,7 +91,7 @@ uint64_t state::previous_incarnation(const evmc::address& address) const noexcep
     return 0;
 }
 
-void state::begin_block(uint64_t block_number) {}
+void state::begin_block(BlockNum block_num, size_t updated_accounts_count) {}
 
 void state::update_account(const evmc::address& address, std::optional<Account> initial,
                                    std::optional<Account> current) {
@@ -330,6 +330,10 @@ evmc::bytes32 state::state_root_hash() const {
     eosio::check(false, "state_root_hash not implemented");
     return {};
 }
+
+void state::insert_call_traces(BlockNum block_num, const CallTraces&) {
+    eosio::check(false, "insert_call_traces not implemented");
+};
 
 uint64_t state::get_next_account_id() {
     if(!_config2) {

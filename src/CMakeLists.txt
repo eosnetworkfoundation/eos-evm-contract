@@ -35,19 +35,26 @@ add_compile_definitions(PROJECT_VERSION="2.0.0-rc1")
 
 # ethash
 list(APPEND SOURCES 
-    ${CMAKE_CURRENT_SOURCE_DIR}/../silkworm/third_party/ethash/lib/keccak/keccak.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/../silkworm/third_party/ethash/lib/ethash/ethash.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../silkworm/third_party/ethash/lib/ethash/primes.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../silkworm/third_party/ethash/ethash/lib/keccak/keccak.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../silkworm/third_party/ethash/ethash/lib/ethash/ethash.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../silkworm/third_party/ethash/ethash/lib/ethash/primes.c
 )
 
 # evmone
 list(APPEND SOURCES 
-    ${CMAKE_CURRENT_SOURCE_DIR}/../silkworm/third_party/evmone/lib/evmone/instructions_calls.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../silkworm/third_party/evmone/lib/evmone/vm.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../silkworm/third_party/evmone/lib/evmone/eof.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../silkworm/third_party/evmone/lib/evmone/baseline.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../silkworm/third_party/evmone/lib/evmone/baseline_instruction_table.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../silkworm/third_party/evmone/lib/evmone/instructions_storage.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../silkworm/third_party/evmone/evmone/lib/evmone/instructions_calls.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../silkworm/third_party/evmone/evmone/lib/evmone/vm.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../silkworm/third_party/evmone/evmone/lib/evmone/eof.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../silkworm/third_party/evmone/evmone/lib/evmone/refund.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../silkworm/third_party/evmone/evmone/lib/evmone/baseline_analysis.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../silkworm/third_party/evmone/evmone/lib/evmone/baseline_execution.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../silkworm/third_party/evmone/evmone/lib/evmone/baseline_instruction_table.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../silkworm/third_party/evmone/evmone/lib/evmone/instructions_storage.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../silkworm/third_party/evmone/evmone/lib/evmone/gas_parameters.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../silkworm/third_party/evmone/evmone/lib/evmone/gas_parameters.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../silkworm/third_party/evmone/evmone/test/state/state.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../silkworm/third_party/evmone/evmone/test/state/host.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../silkworm/third_party/evmone/evmone/test/state/precompiles.cpp
 )
 
 # silkworm
@@ -60,7 +67,7 @@ list(APPEND SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/../silkworm/silkworm/core/protocol/intrinsic_gas.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../silkworm/silkworm/core/execution/evm.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../silkworm/silkworm/core/execution/precompile.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../silkworm/silkworm/core/execution/address.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../silkworm/silkworm/core/types/address.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../silkworm/silkworm/core/execution/processor.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../silkworm/silkworm/core/state/intra_block_state.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../silkworm/silkworm/core/state/delta.cpp
@@ -75,7 +82,7 @@ list(APPEND SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/../silkworm/silkworm/core/crypto/ecdsa.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../silkworm/silkworm/core/crypto/secp256k1n.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../silkworm/silkworm/core/chain/config.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../silkworm/eosevm/refund_v3.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../silkworm/silkworm/core/types/evmc_bytes32.cpp
 )
 
 add_contract( evm_contract evm_runtime ${SOURCES})
@@ -83,11 +90,12 @@ add_contract( evm_contract evm_runtime ${SOURCES})
 target_include_directories( evm_runtime PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/../include
     ${CMAKE_CURRENT_SOURCE_DIR}/../silkworm
-    ${CMAKE_CURRENT_SOURCE_DIR}/../silkworm/third_party/intx/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../silkworm/third_party/ethash/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../silkworm/third_party/evmone/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../silkworm/third_party/evmone/lib
-    ${CMAKE_CURRENT_SOURCE_DIR}/../silkworm/third_party/evmone/evmc/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../silkworm/third_party/intx/intx/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../silkworm/third_party/ethash/ethash/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../silkworm/third_party/evmone
+    ${CMAKE_CURRENT_SOURCE_DIR}/../silkworm/third_party/evmone/evmone/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../silkworm/third_party/evmone/evmone/lib
+    ${CMAKE_CURRENT_SOURCE_DIR}/../silkworm/third_party/evmone/evmone/evmc/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../external/expected/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../external/GSL/include
 )
@@ -97,5 +105,6 @@ target_compile_options(evm_runtime PUBLIC --no-missing-ricardian-clause)
 if (WITH_LARGE_STACK)
     target_link_options(evm_runtime PUBLIC --stack-size=50000000)
 else()
-    target_link_options(evm_runtime PUBLIC --stack-size=35984)
+    #target_link_options(evm_runtime PUBLIC --stack-size=27520)
+    target_link_options(evm_runtime PUBLIC --stack-size=16000)
 endif()

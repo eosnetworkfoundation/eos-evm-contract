@@ -83,16 +83,13 @@ BOOST_FIXTURE_TEST_CASE(basic, gas_param_evm_tester) try {
     // kick of setverion, evmtx event generated
     {
         evm_eoa recipient;
-        silkworm::Transaction tx{
-            silkworm::UnsignedTransaction {
-                .type = silkworm::TransactionType::kLegacy,
-                .max_priority_fee_per_gas = suggested_gas_price,
-                .max_fee_per_gas = suggested_gas_price,
-                .gas_limit = 21000,
-                .to = recipient.address,
-                .value = 1,
-            }
-        };
+        silkworm::Transaction tx;
+        tx.type = silkworm::TransactionType::kLegacy;
+        tx.max_priority_fee_per_gas = suggested_gas_price;
+        tx.max_fee_per_gas = suggested_gas_price;
+        tx.gas_limit = 21000;
+        tx.to = recipient.address;
+        tx.value = 1;
         faucet_eoa.sign(tx);
         chain::transaction_trace_ptr trace = pushtx(tx);
         BOOST_REQUIRE_EQUAL(trace->action_traces.size(), 2);
@@ -135,16 +132,13 @@ BOOST_FIXTURE_TEST_CASE(basic, gas_param_evm_tester) try {
 
     {
         evm_eoa recipient;
-        silkworm::Transaction tx{
-            silkworm::UnsignedTransaction {
-                .type = silkworm::TransactionType::kLegacy,
-                .max_priority_fee_per_gas = 1'000'000'000,
-                .max_fee_per_gas = 1'000'000'000,
-                .gas_limit = 21000,
-                .to = recipient.address,
-                .value = 1,
-            }
-        };
+        silkworm::Transaction tx;
+        tx.type = silkworm::TransactionType::kLegacy;
+        tx.max_priority_fee_per_gas = 1'000'000'000;
+        tx.max_fee_per_gas = 1'000'000'000;
+        tx.gas_limit = 21000;
+        tx.to = recipient.address;
+        tx.value = 1;
         faucet_eoa.sign(tx);
         BOOST_CHECK_NO_THROW(pushtx(tx));
     }
@@ -155,16 +149,13 @@ BOOST_FIXTURE_TEST_CASE(basic, gas_param_evm_tester) try {
     // new gas params take effect in the next evm block, configchange event before evmtx
     {
         evm_eoa recipient;
-        silkworm::Transaction tx{
-            silkworm::UnsignedTransaction {
-                .type = silkworm::TransactionType::kLegacy,
-                .max_priority_fee_per_gas = 1'000'000'000,
-                .max_fee_per_gas = 1'000'000'000,
-                .gas_limit = 21000,
-                .to = recipient.address,
-                .value = 1,
-            }
-        };
+        silkworm::Transaction tx;
+        tx.type = silkworm::TransactionType::kLegacy;
+        tx.max_priority_fee_per_gas = 1'000'000'000;
+        tx.max_fee_per_gas = 1'000'000'000;
+        tx.gas_limit = 21000;
+        tx.to = recipient.address;
+        tx.value = 1;
         faucet_eoa.sign(tx);
         chain::transaction_trace_ptr trace = pushtx(tx);
         BOOST_REQUIRE_EQUAL(trace->action_traces.size(), 3);
@@ -176,16 +167,13 @@ BOOST_FIXTURE_TEST_CASE(basic, gas_param_evm_tester) try {
     // subsequence trxs will have no more configchange event
     {
         evm_eoa recipient;
-        silkworm::Transaction tx{
-            silkworm::UnsignedTransaction {
-                .type = silkworm::TransactionType::kLegacy,
-                .max_priority_fee_per_gas = 1'000'000'000,
-                .max_fee_per_gas = 1'000'000'000,
-                .gas_limit = 21000,
-                .to = recipient.address,
-                .value = 2,
-            }
-        };
+        silkworm::Transaction tx;
+        tx.type = silkworm::TransactionType::kLegacy;
+        tx.max_priority_fee_per_gas = 1'000'000'000;
+        tx.max_fee_per_gas = 1'000'000'000;
+        tx.gas_limit = 21000;
+        tx.to = recipient.address;
+        tx.value = 2;
         faucet_eoa.sign(tx);
         chain::transaction_trace_ptr trace = pushtx(tx);
         BOOST_REQUIRE_EQUAL(trace->action_traces.size(), 2);
@@ -200,7 +188,7 @@ BOOST_FIXTURE_TEST_CASE(gas_param_traces, gas_param_evm_tester) try {
     init();
 
     // We need to have some gas prices active before switching to v3
-    silkworm::gas_prices_t gas_prices1{
+    evmone::eosevm::gas_prices gas_prices1{
         .overhead_price = 80*silkworm::kGiga,
         .storage_price  = 70*silkworm::kGiga
     };
@@ -256,7 +244,7 @@ BOOST_FIXTURE_TEST_CASE(gas_param_G_txnewaccount, gas_param_evm_tester) try {
     evm1.sign(txn);
     pushtx(txn);
     auto bal = evm_balance(evm2.address);
-    BOOST_CHECK(*bal == 1);
+    BOOST_CHECK(bal.has_value() && bal.value() == 1);
 
     // Set gas_txnewaccount = 1000
     setgasparam(1000, gas_newaccount, gas_txcreate, gas_codedeposit, gas_sset, evm_account_name);
@@ -275,7 +263,7 @@ BOOST_FIXTURE_TEST_CASE(gas_param_G_txnewaccount, gas_param_evm_tester) try {
     evm1.sign(txn);
     pushtx(txn);
     bal = evm_balance(evm3.address);
-    BOOST_ASSERT(*bal == 1);
+    BOOST_ASSERT(bal.has_value() && bal.value() == 1);
 
 } FC_LOG_AND_RETHROW()
 

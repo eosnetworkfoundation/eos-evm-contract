@@ -1,5 +1,5 @@
 #include "basic_evm_tester.hpp"
-#include <silkworm/core/execution/address.hpp>
+#include <silkworm/core/types/address.hpp>
 
 #include "utils.hpp"
 

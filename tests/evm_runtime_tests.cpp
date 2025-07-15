@@ -31,6 +31,7 @@
 
 #include <silkworm/core/state/state.hpp>
 #include <silkworm/core/protocol/blockchain.hpp>
+#include <silkworm/db/state/account_codec.hpp>
 
 #include <nlohmann/json.hpp>
 #include <ethash/keccak.hpp>
@@ -47,6 +48,8 @@ using namespace silkworm::rlp;
 
 namespace fs = std::filesystem;
 typedef intx::uint<256> u256;
+
+using namespace silkworm::db::state;
 
 enum class Status { kPassed, kFailed, kSkipped };
 struct [[nodiscard]] RunResults {
@@ -655,8 +658,12 @@ struct evm_runtime_tester : eosio_system_tester, silkworm::State {
       };
    };
 
+   void insert_call_traces(BlockNum, const CallTraces&) {
+
+   }
+
    mutable bytes read_code_buffer;
-   ByteView read_code(const evmc::bytes32& code_hash) const noexcept {
+   ByteView read_code(const evmc::address& address, const evmc::bytes32& code_hash) const noexcept {
       auto& db = const_cast<chainbase::database&>(control->db());
       auto accntcode = account_code::get_by_code_hash(db, code_hash);
       if(!accntcode) {
@@ -711,20 +718,21 @@ struct evm_runtime_tester : eosio_system_tester, silkworm::State {
       return;
    };
 
-   void begin_block(uint64_t block_number) {
-   };
+   void begin_block(BlockNum block_num, size_t updated_accounts_count) {
+
+   }
 
    void update_account(const evmc::address& address, std::optional<Account> initial,
                               std::optional<Account> current) {
       
       bytes oinitial;
       if(initial.has_value()) {
-         oinitial = to_bytes(initial->encode_for_storage());
+         oinitial = to_bytes(AccountCodec::encode_for_storage(*initial));
       }
 
       bytes ocurrent;
       if(current.has_value()) {
-         ocurrent = to_bytes(current->encode_for_storage());
+         ocurrent = to_bytes(AccountCodec::encode_for_storage(*current));
       }
 
       updateaccnt(to_bytes(address), oinitial, ocurrent);
@@ -1019,7 +1027,7 @@ struct evm_runtime_tester : eosio_system_tester, silkworm::State {
          }
 
          auto expected_code{j["code"].get<std::string>()};
-         Bytes actual_code{read_code(account->code_hash)};
+         Bytes actual_code{read_code({}, account->code_hash)};
          if (actual_code != from_hex(expected_code)) {
                std::cout << "Code mismatch for " << entry.key() << "\n";
                         //<< to_hex(actual_code) << " != " << expected_code << std::endl;

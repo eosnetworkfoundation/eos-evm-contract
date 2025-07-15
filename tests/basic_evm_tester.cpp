@@ -134,7 +134,7 @@ std::optional<evmc::address> public_key_to_address(const std::basic_string<uint8
     return evmc::address(*reinterpret_cast<const evmc_address*>(&key_hash.bytes[12]));
 }
 
-evm_eoa::evm_eoa(std::basic_string<uint8_t> optional_private_key)
+evm_eoa::evm_eoa(evmc::bytes optional_private_key)
 {
    if (optional_private_key.size() == 0) {
       // No private key specified. So randomly generate one.
@@ -267,6 +267,63 @@ action basic_evm_tester::get_action( account_name code, action_name acttype, vec
    return act;
 } FC_CAPTURE_AND_RETHROW() }
 
+static inline void print_debug(account_name receiver, const action_trace& ar) {
+   if (!ar.console.empty()) {
+      if (fc::logger::get(DEFAULT_LOGGER).is_enabled( fc::log_level::debug )) {
+         std::string prefix;
+         prefix.reserve(3 + 13 + 1 + 13 + 3 + 13 + 1);
+         prefix += "\n[(";
+         prefix += ar.act.account.to_string();
+         prefix += ",";
+         prefix += ar.act.name.to_string();
+         prefix += ")->";
+         prefix += receiver.to_string();
+         prefix += "]";
+
+         std::string output;
+         output.reserve(512);
+         output += prefix;
+         output += ": PENDING CONSOLE OUTPUT BEGIN =====================\n";
+         output += ar.console;
+         output += prefix;
+         output += ": PENDING CONSOLE OUTPUT END   =====================";
+         dlog( std::move(output) );
+      }
+   }
+}
+
+transaction_trace_ptr basic_evm_tester::push_transaction_ex( signed_transaction& trx,
+                                                      fc::time_point deadline,
+                                                      uint32_t billed_cpu_time_us,
+                                                      bool no_throw,
+                                                      transaction_metadata::trx_type trx_type
+                                                   )
+{ try {
+   if( !control->is_building_block() )
+      _start_block(control->head().block_time() + fc::microseconds(config::block_interval_us));
+   auto c = packed_transaction::compression_type::none;
+   if( fc::raw::pack_size(trx) > 1000 ) {
+      c = packed_transaction::compression_type::zlib;
+   }
+   auto time_limit = deadline == fc::time_point::maximum() ?
+         fc::microseconds::maximum() :
+         fc::microseconds( deadline - fc::time_point::now() );
+   auto ptrx = std::make_shared<packed_transaction>( trx, c );
+   auto fut = transaction_metadata::start_recover_keys( ptrx, control->get_thread_pool(), control->get_chain_id(), time_limit, trx_type );
+   auto r = control->push_transaction( fut.get(), deadline, fc::microseconds::maximum(), billed_cpu_time_us, billed_cpu_time_us > 0, 0 );
+   if (no_throw) return r;
+   if( r->except_ptr ) {
+      for(const auto& ar : r->action_traces) {
+         print_debug(ar.receiver, ar);
+      }
+      std::rethrow_exception( r->except_ptr );
+   }
+   if( r->except)  throw *r->except;
+   return r;
+} FC_RETHROW_EXCEPTIONS( warn, "transaction_header: ${header}, billed_cpu_time_us: ${billed}",
+                           ("header", transaction_header(trx) ) ("billed", billed_cpu_time_us))
+}
+
 transaction_trace_ptr basic_evm_tester::push_action( const account_name& code,
                                     const action_name& acttype,
                                     const account_name& actor,
@@ -284,7 +341,7 @@ transaction_trace_ptr basic_evm_tester::push_action( const account_name& code,
       trx.sign( get_private_key( auth.actor, auth.permission.to_string() ), control->get_chain_id() );
    }
 
-   return push_transaction( trx );
+   return push_transaction_ex( trx );
 } FC_CAPTURE_AND_RETHROW( (code)(acttype)(auths)(data)(expiration)(delay_sec) ) }
 
 transaction_trace_ptr basic_evm_tester::push_action2( const account_name& code,
@@ -309,7 +366,7 @@ transaction_trace_ptr basic_evm_tester::push_action2( const account_name& code,
       trx.sign( get_private_key( auth.actor, auth.permission.to_string() ), control->get_chain_id() );
    }
 
-   return push_transaction( trx );
+   return push_transaction_ex( trx );
    }
    FC_CAPTURE_AND_RETHROW( (code)(acttype)(auths)(data)(expiration)(delay_sec) ) 
 }
@@ -419,16 +476,14 @@ basic_evm_tester::generate_tx(const evmc::address& to, const intx::uint256& valu
 {
    const auto gas_price = get_gas_price();
 
-   return silkworm::Transaction{
-      silkworm::UnsignedTransaction {
-         .type = silkworm::TransactionType::kLegacy,
-         .max_priority_fee_per_gas = gas_price,
-         .max_fee_per_gas = gas_price,
-         .gas_limit = gas_limit,
-         .to = to,
-         .value = value,
-      }
-   };
+   silkworm::Transaction res;
+   res.type = silkworm::TransactionType::kLegacy;
+   res.max_priority_fee_per_gas = gas_price;
+   res.max_fee_per_gas = gas_price;
+   res.gas_limit = gas_limit;
+   res.to = to;
+   res.value = value;
+   return res;
 }
 transaction_trace_ptr basic_evm_tester::exec(const exec_input& input, const std::optional<exec_callback>& callback) {
    auto binary_data = fc::raw::pack<exec_input, std::optional<exec_callback>>(input, callback);
@@ -518,9 +573,9 @@ transaction_trace_ptr basic_evm_tester::pushtx(const silkworm::Transaction& trx,
    memcpy(rlp_bytes.data(), rlp.data(), rlp.size());
 
    if (min_inclusion_price.has_value()) {
-      return push_action(evm_account_name, "pushtx"_n, miner, mvo()("miner", miner)("rlptx", rlp_bytes)("min_inclusion_price", min_inclusion_price));
+      return basic_evm_tester::push_action2(evm_account_name, "pushtx"_n, miner, miner, mvo()("miner", miner)("rlptx", rlp_bytes)("min_inclusion_price", min_inclusion_price));
    } else {
-      return push_action(evm_account_name, "pushtx"_n, miner, mvo()("miner", miner)("rlptx", rlp_bytes));
+      return basic_evm_tester::push_action2(evm_account_name, "pushtx"_n, miner, miner, mvo()("miner", miner)("rlptx", rlp_bytes));
    }
 }
 
@@ -589,15 +644,12 @@ evmc::address basic_evm_tester::deploy_contract(evm_eoa& eoa, evmc::bytes byteco
    uint64_t nonce = eoa.next_nonce;
    const auto gas_price = get_gas_price();
 
-   silkworm::Transaction tx{
-      silkworm::UnsignedTransaction {
-         .type = silkworm::TransactionType::kLegacy,
-         .max_priority_fee_per_gas = gas_price,
-         .max_fee_per_gas = gas_price,
-         .gas_limit = 10'000'000,
-         .data = std::move(bytecode),
-      }
-   };
+   silkworm::Transaction tx;
+   tx.type = silkworm::TransactionType::kLegacy;
+   tx.max_priority_fee_per_gas = gas_price;
+   tx.max_fee_per_gas = gas_price;
+   tx.gas_limit = 10'000'000;
+   tx.data = std::move(bytecode);
 
    eoa.sign(tx);
    pushtx(tx);
@@ -701,8 +753,6 @@ bool basic_evm_tester::scan_accounts(std::function<bool(account_object)> visitor
 std::optional<account_object> basic_evm_tester::scan_for_account_by_address(const evmc::address& address) const
 {
    std::optional<account_object> result;
-
-   std::basic_string_view<uint8_t> address_view{address};
 
    scan_accounts([&](account_object&& account) -> bool {
       if (account.address == address) {

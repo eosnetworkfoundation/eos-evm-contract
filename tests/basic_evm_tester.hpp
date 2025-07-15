@@ -11,7 +11,7 @@
 #include <silkworm/core/types/transaction.hpp>
 #include <silkworm/core/rlp/encode.hpp>
 #include <silkworm/core/common/util.hpp>
-#include <silkworm/core/execution/address.hpp>
+#include <silkworm/core/types/address.hpp>
 #include <silkworm/core/protocol/param.hpp>
 
 #include <secp256k1.h>
@@ -283,7 +283,7 @@ namespace evm_test {
 class evm_eoa
 {
 public:
-   explicit evm_eoa(std::basic_string<uint8_t> optional_private_key = {});
+   explicit evm_eoa(evmc::bytes optional_private_key = {});
 
    std::string address_0x() const;
 
@@ -420,6 +420,7 @@ class basic_evm_tester : public evm_validating_tester
 {
 public:
    using evm_validating_tester::push_action;
+   using base_tester::_start_block;
 
    static constexpr name token_account_name = "eosio.token"_n;
    static constexpr name faucet_account_name = "faucet"_n;
@@ -447,6 +448,12 @@ public:
 
    action get_action( account_name code, action_name acttype, vector<permission_level> auths,
                                  const bytes& data )const;
+
+   transaction_trace_ptr push_transaction_ex( signed_transaction& trx,
+                                              fc::time_point deadline = fc::time_point::maximum(),
+                                              uint32_t billed_cpu_time_us = DEFAULT_BILLED_CPU_TIME_US,
+                                              bool no_throw = false,
+                                              transaction_metadata::trx_type trx_type = transaction_metadata::trx_type::input);
 
    transaction_trace_ptr push_action( const account_name& code,
                                       const action_name& acttype,

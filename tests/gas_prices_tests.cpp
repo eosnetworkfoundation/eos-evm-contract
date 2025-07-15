@@ -25,7 +25,7 @@ struct gas_prices_evm_tester : basic_evm_tester
       transfer_token(faucet_account_name, evm_account_name, make_asset(1000'0000), faucet_eoa.address_0x());
    }
 
-   auto send_tx(auto& eoa, silkworm::Transaction& txn, const silkworm::gas_prices_t& gas_prices, const evmone::gas_parameters& gas_params) -> auto {
+   auto send_tx(auto& eoa, silkworm::Transaction& txn, const evmone::eosevm::gas_prices& gas_prices, const evmone::gas_parameters& gas_params) -> auto {
       auto pre = evm_balance(eoa);
       eoa.sign(txn);
       pushtx(txn);
@@ -57,7 +57,7 @@ struct gas_prices_evm_tester : basic_evm_tester
       return std::string(pl, '0') + s;
    }
 
-   auto validate_final_fee(const auto& res, uint64_t cpu_gas, uint64_t storage_gas, const silkworm::gas_prices_t& gas_prices) {
+   auto validate_final_fee(const auto& res, uint64_t cpu_gas, uint64_t storage_gas, const evmone::eosevm::gas_prices& gas_prices) {
       
       auto [cost, inclusion_price, effective_gas_price, total_gas_billed, scaled_gp] = res;
       intx::uint256 total_gas_used = cpu_gas+storage_gas;
@@ -212,7 +212,7 @@ BOOST_FIXTURE_TEST_CASE(gas_param_scale, gas_prices_evm_tester) try {
    /////////////////////////////////////
 
    // We need to have some gas prices active before switching to v3
-   silkworm::gas_prices_t gas_prices1{
+   evmone::eosevm::gas_prices gas_prices1{
       .overhead_price = 80*kGiga,
       .storage_price  = 70*kGiga
    };
@@ -223,7 +223,7 @@ BOOST_FIXTURE_TEST_CASE(gas_param_scale, gas_prices_evm_tester) try {
    produce_block();
    produce_block();
 
-   auto run_gasparams_scale_test = [&](const silkworm::gas_prices_t& gas_prices) {
+   auto run_gasparams_scale_test = [&](const evmone::eosevm::gas_prices& gas_prices) {
 
       fund_evm_faucet();
       produce_block();
@@ -251,15 +251,14 @@ BOOST_FIXTURE_TEST_CASE(gas_param_scale, gas_prices_evm_tester) try {
       BOOST_REQUIRE(event_v3.overhead_price == gas_prices.overhead_price);
       BOOST_REQUIRE(event_v3.storage_price == gas_prices.storage_price);
 
-      evmone::gas_parameters gas_params{
-         /*G_txnewaccount*/ 10000,
-         /*G_newaccount*/   25000,
-         /*G_txcreate*/     32000,
-         /*G_codedeposit*/  200,
-         /*G_sset*/         20000
-      };
+      evmone::gas_parameters gas_params;
+      gas_params.values_.G_txnewaccount = 10000;
+      gas_params.values_.G_newaccount = 25000;
+      gas_params.values_.G_txcreate = 32000;
+      gas_params.values_.G_codedeposit = 200;
+      gas_params.values_.G_sset = 20000;
 
-      setgasparam(gas_params.G_txnewaccount, gas_params.G_newaccount, gas_params.G_txcreate, gas_params.G_codedeposit, gas_params.G_sset, evm_account_name);
+      setgasparam(gas_params.values_.G_txnewaccount, gas_params.values_.G_newaccount, gas_params.values_.G_txcreate, gas_params.values_.G_codedeposit, gas_params.values_.G_sset, evm_account_name);
       produce_blocks(3);
 
       // *****************************************************
@@ -305,7 +304,7 @@ BOOST_FIXTURE_TEST_CASE(gas_param_scale, gas_prices_evm_tester) try {
       auto contract_account = find_account_by_address(contract_address).value();
       auto code_len = get_code_len(contract_account.code_id.value());
       // total_cpu_gas_consumed: 30945
-      validate_final_fee(res, 30945, code_len*std::get<4>(res).G_codedeposit + std::get<4>(res).G_txcreate, gas_prices);
+      validate_final_fee(res, 30945, code_len*std::get<4>(res).values_.G_codedeposit + std::get<4>(res).values_.G_txcreate, gas_prices);
 
       // *****************************************************
       // TEST G_sset
@@ -318,7 +317,7 @@ BOOST_FIXTURE_TEST_CASE(gas_param_scale, gas_prices_evm_tester) try {
       };
       res = set_value(evm1, intx::uint256{77});
       // total_cpu_gas_consumed: 26646
-      validate_final_fee(res, 26646, std::get<4>(res).G_sset, gas_prices); //sset - reset
+      validate_final_fee(res, 26646, std::get<4>(res).values_.G_sset, gas_prices); //sset - reset
 
       // *****************************************************
       // TEST G_txnewaccount
@@ -330,7 +329,7 @@ BOOST_FIXTURE_TEST_CASE(gas_param_scale, gas_prices_evm_tester) try {
       };
       res = send_to_new_address(evm1, intx::uint256{1});
       // total_cpu_gas_consumed: 21000
-      validate_final_fee(res, 21000, std::get<4>(res).G_txnewaccount, gas_prices);
+      validate_final_fee(res, 21000, std::get<4>(res).values_.G_txnewaccount, gas_prices);
 
       // *****************************************************
       // TEST G_newaccount
@@ -350,18 +349,18 @@ BOOST_FIXTURE_TEST_CASE(gas_param_scale, gas_prices_evm_tester) try {
 
       res = transfer_random_wei(evm1);
       // total_cpu_gas_consumed: 31250
-      validate_final_fee(res, 31250, std::get<4>(res).G_newaccount, gas_prices);
+      validate_final_fee(res, 31250, std::get<4>(res).values_.G_newaccount, gas_prices);
    };
 
    run_gasparams_scale_test(gas_prices1);
 
-   silkworm::gas_prices_t gas_prices2{
+   evmone::eosevm::gas_prices gas_prices2{
       .overhead_price = 30*kGiga,
       .storage_price  = 50*kGiga
    };
    run_gasparams_scale_test(gas_prices2);
 
-   silkworm::gas_prices_t gas_prices3{
+   evmone::eosevm::gas_prices gas_prices3{
       .overhead_price = 100*kGiga,
       .storage_price  = 100*kGiga
    };

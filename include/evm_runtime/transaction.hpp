@@ -38,11 +38,10 @@ struct transaction {
     return tx_.value();
   }
 
-  void recover_sender()const {
+  std::optional<evmc::address> sender()const {
     eosio::check(tx_.has_value(), "no tx");
     auto& tx = tx_.value();
-    tx.from.reset();
-    tx.recover_sender();
+    return tx.sender();
   }
 
 private:

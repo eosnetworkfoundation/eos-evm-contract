@@ -1,5 +1,5 @@
 #include "basic_evm_tester.hpp"
-#include <silkworm/core/execution/address.hpp>
+#include <silkworm/core/types/address.hpp>
 #include <silkworm/core/types/transaction.hpp>
 #include <eosevm/block_mapping.hpp>
 
@@ -40,15 +40,12 @@ struct version_tester : basic_evm_tester {
 
     const auto gas_price = get_config().gas_price;
 
-    silkworm::Transaction tx{
-      silkworm::UnsignedTransaction {
-        .type = silkworm::TransactionType::kLegacy,
-        .max_priority_fee_per_gas = gas_price,
-        .max_fee_per_gas = gas_price,
-        .gas_limit = 10'000'000,
-        .data = std::move(bytecode),
-      }
-    };
+    silkworm::Transaction tx;
+    tx.type = silkworm::TransactionType::kLegacy;
+    tx.max_priority_fee_per_gas = gas_price;
+    tx.max_fee_per_gas = gas_price;
+    tx.gas_limit = 10'000'000;
+    tx.data = std::move(bytecode);
 
     eoa.sign(tx);
     auto trace = pushtx(tx);
@@ -67,7 +64,7 @@ struct version_tester : basic_evm_tester {
 
     silkworm::Bytes data;
     data += evmc::from_hex(retrieve_).value();
-    data += silkworm::to_bytes32(account);
+    data += silkworm::to_bytes32(account.bytes);
     input.data = bytes{data.begin(), data.end()};
 
     auto res = exec(input, {});
@@ -238,16 +235,13 @@ BOOST_FIXTURE_TEST_CASE(traces_in_different_eosevm_version, version_tester) try 
     BOOST_REQUIRE(tx.to == evm1.address);
 
     // Test traces of `pushtx` (EVM VERSION=1)
-    silkworm::Transaction txin {
-      silkworm::UnsignedTransaction {
-        .type = silkworm::TransactionType::kLegacy,
-        .max_priority_fee_per_gas = config.gas_price,
-        .max_fee_per_gas = config.gas_price,
-        .gas_limit = 10'000'000,
-        .to = contract_address,
-        .data = *data
-      }
-    };
+    silkworm::Transaction txin;
+    txin.type = silkworm::TransactionType::kLegacy;
+    txin.max_priority_fee_per_gas = config.gas_price;
+    txin.max_fee_per_gas = config.gas_price;
+    txin.gas_limit = 10'000'000;
+    txin.to = contract_address;
+    txin.data = *data;
 
     evm1.sign(txin);
     trace = pushtx(txin);
@@ -271,12 +265,12 @@ BOOST_FIXTURE_TEST_CASE(traces_in_different_eosevm_version, version_tester) try 
     BOOST_REQUIRE(trace->action_traces[1].act.name == "evmtx"_n);
 
     tx = get_tx_from_trace(trace->action_traces[1].act.data);
-    tx.recover_sender();
+    tx.sender();
 
     BOOST_REQUIRE(tx.value == intx::uint256(0));
     BOOST_REQUIRE(tx.to == contract_address);
     BOOST_REQUIRE(tx.data == *data);
-    BOOST_REQUIRE(*tx.from == alice_addr);
+    BOOST_REQUIRE(*tx.sender() == alice_addr);
 
     // Test traces of `admincall` (EVM VERSION=1)
     trace = admincall(from, to, silkworm::Bytes(evmc::bytes32{}), *data, 1000000, evm_account_name);
@@ -287,12 +281,12 @@ BOOST_FIXTURE_TEST_CASE(traces_in_different_eosevm_version, version_tester) try 
     BOOST_REQUIRE(trace->action_traces[1].act.name == "evmtx"_n);
 
     tx = get_tx_from_trace(trace->action_traces[1].act.data);
-    tx.recover_sender();
+    tx.sender();
 
     BOOST_REQUIRE(tx.value == intx::uint256(0));
     BOOST_REQUIRE(tx.to == contract_address);
     BOOST_REQUIRE(tx.data == *data);
-    BOOST_REQUIRE(*tx.from == alice_addr);
+    BOOST_REQUIRE(*tx.sender() == alice_addr);
 
     // Check 4 times call to `increment` from alice_addr
     BOOST_REQUIRE(retrieve(contract_address, alice_addr) == intx::uint256(4));
@@ -343,16 +337,13 @@ BOOST_FIXTURE_TEST_CASE(exec_does_not_update_version, version_tester) try {
     auto [_, contract_address] = deploy_test_contract(evm1);
 
     // Call `increment` from evm1 address
-    silkworm::Transaction txin {
-      silkworm::UnsignedTransaction {
-        .type = silkworm::TransactionType::kLegacy,
-        .max_priority_fee_per_gas = config.gas_price,
-        .max_fee_per_gas = config.gas_price,
-        .gas_limit = 10'000'000,
-        .to = contract_address,
-        .data = *evmc::from_hex(increment_)
-      }
-    };
+    silkworm::Transaction txin;
+    txin.type = silkworm::TransactionType::kLegacy;
+    txin.max_priority_fee_per_gas = config.gas_price;
+    txin.max_fee_per_gas = config.gas_price;
+    txin.gas_limit = 10'000'000;
+    txin.to = contract_address;
+    txin.data = *evmc::from_hex(increment_);
 
     evm1.sign(txin);
     pushtx(txin);
@@ -392,16 +383,13 @@ BOOST_FIXTURE_TEST_CASE(call_promote_pending, version_tester) try {
     auto [_, contract_address] = deploy_test_contract(evm1);
 
     // Call `increment` from evm1 address
-    silkworm::Transaction txin {
-      silkworm::UnsignedTransaction {
-        .type = silkworm::TransactionType::kLegacy,
-        .max_priority_fee_per_gas = config.gas_price,
-        .max_fee_per_gas = config.gas_price,
-        .gas_limit = 10'000'000,
-        .to = contract_address,
-        .data = *evmc::from_hex(increment_)
-      }
-    };
+    silkworm::Transaction txin;
+    txin.type = silkworm::TransactionType::kLegacy;
+    txin.max_priority_fee_per_gas = config.gas_price;
+    txin.max_fee_per_gas = config.gas_price;
+    txin.gas_limit = 10'000'000;
+    txin.to = contract_address;
+    txin.data = *evmc::from_hex(increment_);
 
     evm1.sign(txin);
     pushtx(txin);
@@ -441,16 +429,13 @@ BOOST_FIXTURE_TEST_CASE(admincall_promote_pending, version_tester) try {
     auto [_, contract_address] = deploy_test_contract(evm1);
 
     // Call `increment` from evm1 address
-    silkworm::Transaction txin {
-      silkworm::UnsignedTransaction {
-        .type = silkworm::TransactionType::kLegacy,
-        .max_priority_fee_per_gas = config.gas_price,
-        .max_fee_per_gas = config.gas_price,
-        .gas_limit = 10'000'000,
-        .to = contract_address,
-        .data = *evmc::from_hex(increment_)
-      }
-    };
+    silkworm::Transaction txin;
+    txin.type = silkworm::TransactionType::kLegacy;
+    txin.max_priority_fee_per_gas = config.gas_price;
+    txin.max_fee_per_gas = config.gas_price;
+    txin.gas_limit = 10'000'000;
+    txin.to = contract_address;
+    txin.data = *evmc::from_hex(increment_);
 
     evm1.sign(txin);
     pushtx(txin);
@@ -491,33 +476,29 @@ BOOST_FIXTURE_TEST_CASE(min_inclusion_price, version_tester) try {
 	auto old_nonce = evm1.next_nonce;
 	evm1.next_nonce = old_nonce;
     // EVM Version 0 does not support kDynamicFee transaction type
-    silkworm::Transaction txin0 {
-      silkworm::UnsignedTransaction {
-        .type = silkworm::TransactionType::kDynamicFee,
-        .max_priority_fee_per_gas = config.gas_price + 10,
-        .max_fee_per_gas = config.gas_price + 10,
-        .gas_limit = 10'000'000,
-        .to = evmc::address{},
-        .data = silkworm::Bytes{}
-      }
-    };
+    silkworm::Transaction txin0;
+    txin0.type = silkworm::TransactionType::kDynamicFee;
+    txin0.max_priority_fee_per_gas = config.gas_price + 10;
+    txin0.max_fee_per_gas = config.gas_price + 10;
+    txin0.gas_limit = 10'000'000;
+    txin0.to = evmc::address{};
+    txin0.data = silkworm::Bytes{};
+
     evm1.sign(txin0);
     BOOST_REQUIRE_EXCEPTION(pushtx(txin0, evm_account_name),
         eosio_assert_message_exception,
-        eosio_assert_message_is("pre_validate_transaction error: 29 Unsupported transaction type"));
+        eosio_assert_message_is("pre_validate_transaction error: 31 Unsupported transaction type"));
 
     evm1.next_nonce = old_nonce;
     // EVM Version 0 does not support kDynamicFee transaction type
-    silkworm::Transaction txin01 {
-        silkworm::UnsignedTransaction {
-        .type = silkworm::TransactionType::kLegacy,
-        .max_priority_fee_per_gas = config.gas_price + 10,
-        .max_fee_per_gas = config.gas_price + 10,
-        .gas_limit = 10'000'000,
-        .to = evmc::address{},
-        .data = silkworm::Bytes{}
-        }
-    };
+    silkworm::Transaction txin01;
+    txin01.type = silkworm::TransactionType::kLegacy;
+    txin01.max_priority_fee_per_gas = config.gas_price + 10;
+    txin01.max_fee_per_gas = config.gas_price + 10;
+    txin01.gas_limit = 10'000'000;
+    txin01.to = evmc::address{};
+    txin01.data = silkworm::Bytes{};
+
     evm1.sign(txin01);
     BOOST_REQUIRE_EXCEPTION(pushtx(txin01, evm_account_name, 1),
         eosio_assert_message_exception,
@@ -532,81 +513,71 @@ BOOST_FIXTURE_TEST_CASE(min_inclusion_price, version_tester) try {
 
 	evm1.next_nonce = old_nonce;
     // test max priority fee too low
-    silkworm::Transaction txin1 {
-      silkworm::UnsignedTransaction {
-        .type = silkworm::TransactionType::kDynamicFee,
-        .max_priority_fee_per_gas = 1,
-        .max_fee_per_gas = config.gas_price + 10,
-        .gas_limit = 10'000'000,
-        .to = evmc::address{},
-        .data = silkworm::Bytes{}
-      }
-    };
+    silkworm::Transaction txin1;
+    txin1.type = silkworm::TransactionType::kDynamicFee;
+    txin1.max_priority_fee_per_gas = 1;
+    txin1.max_fee_per_gas = config.gas_price + 10;
+    txin1.gas_limit = 10'000'000;
+    txin1.to = evmc::address{};
+    txin1.data = silkworm::Bytes{};
+
     evm1.sign(txin1);
     BOOST_REQUIRE_EXCEPTION(pushtx(txin1, evm_account_name, 2),
         eosio_assert_message_exception,
         eosio_assert_message_is("inclusion price must >= min_inclusion_price"));
 
     // gas fee too low: miner expect 11Gwei inclusion fee
-	evm1.next_nonce = old_nonce;
-    silkworm::Transaction txin2 {
-      silkworm::UnsignedTransaction {
-        .type = silkworm::TransactionType::kDynamicFee,
-        .max_priority_fee_per_gas = config.gas_price,
-        .max_fee_per_gas = config.gas_price + 10,
-        .gas_limit = 10'000'000,
-        .to = evmc::address{},
-        .data = silkworm::Bytes{}
-      }
-    };
+	  evm1.next_nonce = old_nonce;
+    silkworm::Transaction txin2;
+    txin2.type = silkworm::TransactionType::kDynamicFee;
+    txin2.max_priority_fee_per_gas = config.gas_price;
+    txin2.max_fee_per_gas = config.gas_price + 10;
+    txin2.gas_limit = 10'000'000;
+    txin2.to = evmc::address{};
+    txin2.data = silkworm::Bytes{};
+
     evm1.sign(txin2);
     BOOST_REQUIRE_EXCEPTION(pushtx(txin2, evm_account_name, 11),
         eosio_assert_message_exception,
         eosio_assert_message_is("inclusion price must >= min_inclusion_price"));
 
     // gas fee too low: gas fee < base fee
-	evm1.next_nonce = old_nonce;
-    silkworm::Transaction txin22 {
-      silkworm::UnsignedTransaction {
-        .type = silkworm::TransactionType::kDynamicFee,
-        .max_priority_fee_per_gas = config.gas_price - 10,
-        .max_fee_per_gas = config.gas_price - 10,
-        .gas_limit = 10'000'000,
-        .to = evmc::address{},
-        .data = silkworm::Bytes{}
-      }
-    };
+	  evm1.next_nonce = old_nonce;
+    silkworm::Transaction txin22;
+    txin22.type = silkworm::TransactionType::kDynamicFee;
+    txin22.max_priority_fee_per_gas = config.gas_price - 10;
+    txin22.max_fee_per_gas = config.gas_price - 10;
+    txin22.gas_limit = 10'000'000;
+    txin22.to = evmc::address{};
+    txin22.data = silkworm::Bytes{};
+
     evm1.sign(txin22);
     BOOST_REQUIRE_EXCEPTION(pushtx(txin22, evm_account_name),
         eosio_assert_message_exception,
-        eosio_assert_message_is("pre_validate_transaction error: 25 Max fee per gas less than block base fee"));
+        eosio_assert_message_is("pre_validate_transaction error: 34 Max fee per gas less than block base fee"));
 
     // gas fee just fine. (miner expect 10Gwei inclusion fee)
-	evm1.next_nonce = old_nonce;
-    silkworm::Transaction txin3 {
-      silkworm::UnsignedTransaction {
-        .type = silkworm::TransactionType::kDynamicFee,
-        .max_priority_fee_per_gas = config.gas_price,
-        .max_fee_per_gas = config.gas_price + 10,
-        .gas_limit = 10'000'000,
-        .to = evmc::address{},
-        .data = silkworm::Bytes{}
-      }
-    };
+	  evm1.next_nonce = old_nonce;
+    silkworm::Transaction txin3;
+    txin3.type = silkworm::TransactionType::kDynamicFee;
+    txin3.max_priority_fee_per_gas = config.gas_price;
+    txin3.max_fee_per_gas = config.gas_price + 10;
+    txin3.gas_limit = 10'000'000;
+    txin3.to = evmc::address{};
+    txin3.data = silkworm::Bytes{};
+
     evm1.sign(txin3);
     pushtx(txin3, evm_account_name, 10);
 
-	// miner doesn't specify min_inclusion_price, default to 0
-    silkworm::Transaction txin4 {
-      silkworm::UnsignedTransaction {
-        .type = silkworm::TransactionType::kDynamicFee,
-        .max_priority_fee_per_gas = config.gas_price,
-        .max_fee_per_gas = config.gas_price,
-        .gas_limit = 10'000'000,
-        .to = evmc::address{},
-        .data = silkworm::Bytes{}
-      }
-    };
+    // miner doesn't specify min_inclusion_price, default to 0
+    silkworm::Transaction txin4;
+    txin4.type = silkworm::TransactionType::kDynamicFee;
+    txin4.max_priority_fee_per_gas = config.gas_price;
+    txin4.max_fee_per_gas = config.gas_price;
+    txin4.gas_limit = 10'000'000;
+    txin4.to = evmc::address{};
+    txin4.data = silkworm::Bytes{};
+
     evm1.sign(txin4);
     pushtx(txin4, evm_account_name);
 
